@@ -1,0 +1,5 @@
+logLevel = "debug"
+telemetry = false
+
+[run]
+bun = true
