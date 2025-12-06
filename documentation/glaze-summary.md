@@ -303,70 +303,89 @@ $ bun glaze convergence:diff
 
 ## 🗄️ Admin Metadata Storage
 
-Admin-specific configuration is stored separately from content data across three tables, each with a clear purpose.
+Admin-specific configuration is stored separately from content data using a dedicated PostgreSQL schema, keeping user content tables clean.
 
 ### Design Goals
 
 1. **Invisible to casual users** — admin UI just works
 2. **Inspectable by advanced users** — clear structure, not a junk drawer
 3. **Doesn't pollute content tables** — your `posts` table stays clean
-4. **Clear separation** — settings vs entities vs user preferences
+4. **Clear separation** — system tables in `glaze` schema, content in `public` schema
+
+### Schema Separation
+
+```
+glaze schema (system):
+├── settings
+├── entities
+└── user_preferences
+
+public schema (user content):
+├── posts
+├── users
+└── ... (all user-defined tables)
+```
 
 ### Three Tables, Three Concerns
 
-| Table               | Purpose                               | Scope                  |
-| ------------------- | ------------------------------------- | ---------------------- |
-| `_glaze_settings`   | Global admin settings                 | Singleton (one row)    |
-| `_glaze_entities`   | Content-type and field display config | Per content-type/field |
-| `_glaze_user_prefs` | User view preferences                 | Per user, per context  |
+| Table                    | Purpose                               | Scope                  |
+| ------------------------ | ------------------------------------- | ---------------------- |
+| `glaze.settings`         | Global admin settings                 | Singleton (one row)    |
+| `glaze.entities`         | Content-type and field display config | Per content-type/field |
+| `glaze.user_preferences` | User view preferences                 | Per user, per context  |
 
 ### Structure
 
 ````typescript
 // Global admin settings — single row
-export const _glazeSettings = pgTable('_glaze_settings', {
+export const settings = pgTable('settings', {
   id: serial('id').primaryKey(),
   siteName: text('site_name'),
   logo: text('logo'),
   primaryColor: text('primary_color'),
   updatedAt: timestamp('updated_at').defaultNow()
-})
+}, (table) => ({
+  schema: 'glaze'
+}))
 
 // Content-type and field configuration
-export const _glazeEntities = pgTable('_glaze_entities', {
+export const entities = pgTable('entities', {
   id: serial('id').primaryKey(),
   key: text('key').notNull().unique(),  // 'posts', 'posts.title'
   value: jsonb('value').notNull(),
   updatedAt: timestamp('updated_at').defaultNow()
-})
+}, (table) => ({
+  schema: 'glaze'
+}))
 
 // Per-user preferences
-export const _glazeUserPrefs = pgTable('_glaze_user_prefs', {
+export const userPreferences = pgTable('user_preferences', {
   id: serial('id').primaryKey(),
   userId: integer('user_id').notNull().references(() => users.id),
   context: text('context').notNull(),   // 'list.posts', 'editor.posts'
   prefs: jsonb('prefs').notNull(),
   updatedAt: timestamp('updated_at').defaultNow()
 }, (table) => ({
-  unique: unique().on(table.userId, table.context)
-}))
+  unique: unique().on(table.userId, table.context),
+  schema: 'glaze'
+})))
 
 
 ### Examples
 
-**`_glaze_settings`** (one row):
+**`glaze.settings`** (one row):
 | siteName | logo | primaryColor |
-|----------|------|--------------|
+|----------|------|------------|
 | "My CMS" | "/uploads/logo.png" | "#3b82f6" |
 
-**`_glaze_entities`**:
+**`glaze.entities`**:
 | key | value |
 |-----|-------|
 | `posts` | `{ displayName: "Blog Posts", icon: "newspaper" }` |
 | `posts.title` | `{ helpText: "Keep under 60 chars", width: "full" }` |
 | `users` | `{ displayName: "Team Members", icon: "users" }` |
 
-**`_glaze_user_prefs`**:
+**`glaze.user_preferences`**:
 | userId | context | prefs |
 |--------|---------|-------|
 | 1 | `list.posts` | `{ sortBy: "createdAt", sortOrder: "desc", columns: ["title", "status"], pageSize: 25 }` |
@@ -637,8 +656,8 @@ glaze/
 **Database**:
 
 - [ ] PostgreSQL support
-- [ ] `_glaze_meta` table for admin config
-- [ ] Clean content tables (no metadata pollution)
+- [ ] `glaze` schema for system tables (`settings`, `entities`, `user_preferences`)
+- [ ] Clean content tables in `public` schema (no metadata pollution)
 
 ### V2 - Enhanced Features
 
@@ -806,7 +825,7 @@ Convergence tells you when things drift. It doesn't promise to save you from you
 | API              | REST first, GraphQL V2         | Simple wins                       |
 | Schema editing   | Dev-only                       | Matches Strapi, avoids complexity |
 | Convergence      | Detection tool, not safety net | Honest about limitations          |
-| Metadata storage | `_glaze_meta` table            | Clean content tables              |
+| Metadata storage | `glaze` PostgreSQL schema      | Clean content tables in `public`  |
 
 ---
 

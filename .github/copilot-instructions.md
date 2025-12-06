@@ -30,13 +30,13 @@ On `bun dev` startup, detect schema drift between `src/schema.ts` and actual dat
 
 ### Admin Metadata Tables
 
-Three system tables store CMS configuration **separately from content**:
+Three system tables in the `glaze` PostgreSQL schema store CMS configuration **separately from user content**:
 
-- `_glaze_settings` - global admin settings (singleton)
-- `_glaze_entities` - per-content-type/field display config (key-value with JSONB)
-- `_glaze_user_prefs` - user view preferences (per user, per context)
+- `glaze.settings` - global admin settings (singleton)
+- `glaze.entities` - per-content-type/field display config (key-value with JSONB)
+- `glaze.user_preferences` - user view preferences (per user, per context)
 
-**Never pollute user content tables** with admin metadata.
+**Schema separation**: System tables in `glaze` schema, user content in `public` schema. **Never pollute user content tables** with admin metadata.
 
 ## Development Workflow
 
@@ -151,7 +151,7 @@ With query support: `?filter[status]=published&sort=-createdAt&limit=10`
 ## Common Pitfalls
 
 1. **Don't modify DB directly in production** - Convergence is dev-only
-2. **Don't add admin fields to content tables** - use `_glaze_*` tables
+2. **Don't add admin fields to content tables** - use `glaze` schema tables
 3. **Don't bypass schema workflow** - schema.ts → migration → DB (never manual ALTER)
 4. **Don't use Node.js patterns** - this is Bun (check Bun APIs first)
 5. **Don't skip migrations** - always generate + apply when changing schemas
