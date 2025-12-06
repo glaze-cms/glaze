@@ -1,5 +1,5 @@
 {
-	"name": "@glaze/core",
+	"name": "@glaze/convergence",
 	"version": "0.0.1",
 	"type": "module",
 	"exports": {
@@ -7,7 +7,6 @@
 	},
 	"dependencies": {
 		"@glaze/shared": "workspace:*",
-		"drizzle-orm": "catalog:drizzle",
 		"drizzle-kit": "catalog:drizzle"
 	},
 	"devDependencies": {
