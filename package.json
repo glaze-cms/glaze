@@ -2,6 +2,7 @@
 	"name": "glaze-cms",
 	"version": "0.0.1",
 	"private": true,
+	"repository": "https://github.com/glaze-cms/glaze",
 	"workspaces": [
 		"packages/*"
 	],

@@ -85,7 +85,7 @@ Battle-tested libraries. Native performance. No compromises.
 
 ```bash
 # Clone and install
-git clone https://github.com/placeholder/glaze-cms.git
+git clone git@github.com:glaze-cms/glaze.git
 cd glaze-cms
 bun install
 
