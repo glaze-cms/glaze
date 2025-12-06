@@ -1,4 +1,4 @@
-# 🌊 Glaze CMS
+# 🍰 Glaze CMS
 
 > A Bun-native content management system built for performance
 
@@ -8,7 +8,7 @@
 
 ## What is Glaze?
 
-Glaze is a modern CMS that runs **exclusively on Bun** — leveraging native APIs like `Bun.sql`, `Bun.serve`, and the Bun runtime for maximum performance at minimal cost.
+Glaze is a modern CMS that runs **exclusively on Bun** — leveraging native APIs like `Bun.sql`, `Bun.file`, and the Bun runtime for maximum performance at minimal cost.
 
 This isn't a Node.js CMS ported to Bun. It's built from the ground up to take full advantage of everything Bun offers.
 
@@ -21,8 +21,6 @@ We don't reinvent wheels. Glaze composes best-in-class libraries into a cohesive
 - **Elysia** for Bun-native API routing
 - **Better-Auth** for authentication
 - **TanStack Start** for SSR admin UI
-
-Battle-tested libraries. Native performance. No compromises.
 
 ---
 
