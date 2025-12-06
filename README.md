@@ -12,6 +12,14 @@ Glaze is a modern CMS that runs **exclusively on Bun** — leveraging native API
 
 This isn't a Node.js CMS ported to Bun. It's built from the ground up to take full advantage of everything Bun offers.
 
+### For Developers and Editors Alike
+
+Most CMSs force a tradeoff: developer control or editor experience. Glaze refuses to choose.
+
+- **Developers** get full schema control in code, type safety, and extensibility
+- **Editors** get a clean, intuitive admin UI that just works
+- **Both** benefit from a system that stays in sync and never breaks silently
+
 ### Philosophy: Standing on Giants
 
 We don't reinvent wheels. Glaze composes best-in-class libraries into a cohesive CMS:
@@ -43,6 +51,26 @@ We don't reinvent wheels. Glaze composes best-in-class libraries into a cohesive
 - **Smaller servers** — what needs 2GB elsewhere runs on 512MB
 - **Fewer resources** — less memory, less CPU, lower bills
 - **Single deployment** — no separate admin instance needed
+
+---
+
+## The Convergence Engine
+
+Schema drift is inevitable. Developers edit code, admins tweak settings, databases get modified directly. Most CMSs break silently when this happens. Glaze detects it.
+
+**Convergence** runs on startup in development and tells you exactly what changed:
+
+```
+⚠️  Schema drift detected!
+
+Your database schema does not match your schema files.
+
+  1) Accept database schema (update code to match DB)
+  2) Reject database changes (revert DB to match code)
+  3) Show differences
+```
+
+No silent failures. No mysterious bugs in production. You see the drift, you decide how to fix it.
 
 ---
 
@@ -84,7 +112,7 @@ We don't reinvent wheels. Glaze composes best-in-class libraries into a cohesive
 ```bash
 # Clone and install
 git clone git@github.com:glaze-cms/glaze.git
-cd glaze-cms
+cd glaze
 bun install
 
 # Start development server
