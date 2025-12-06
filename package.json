@@ -2,21 +2,37 @@
 	"name": "glaze",
 	"version": "0.0.1",
 	"private": true,
+	"workspaces": [
+		"packages/*"
+	],
+	"catalogs": {
+		"drizzle": {
+			"drizzle-orm": "latest",
+			"drizzle-kit": "latest"
+		},
+		"development": {
+			"typescript": "latest",
+			"@types/bun": "latest",
+			"@eslint/js": "latest",
+			"eslint": "latest",
+			"eslint-config-prettier": "latest",
+			"typescript-eslint": "latest",
+			"prettier": "latest"
+		}
+	},
 	"scripts": {
-		"dev": "bun run --watch --hot ./src/index.ts",
-		"build": "bun build ./src/index.ts --outfile ./dist/index.js",
+		"dev": "bun run --watch --hot ./packages/core/src/index.ts",
+		"build": "bun run ./scripts/build.ts",
 		"start": "bun run ./dist/index.js"
 	},
-	"dependencies": {
-		"drizzle-orm": "latest"
-	},
+	"dependencies": {},
 	"devDependencies": {
-		"@eslint/js": "latest",
-		"@types/bun": "latest",
-		"eslint": "latest",
-		"eslint-config-prettier": "latest",
-		"prettier": "latest",
-		"typescript": "latest",
-		"typescript-eslint": "latest"
+		"@eslint/js": "catalog:development",
+		"@types/bun": "catalog:development",
+		"eslint": "catalog:development",
+		"eslint-config-prettier": "catalog:development",
+		"prettier": "catalog:development",
+		"typescript": "catalog:development",
+		"typescript-eslint": "catalog:development"
 	}
 }
