@@ -24,8 +24,12 @@
 		// Workspace path aliases
 		"paths": {
 			"@glaze/shared": ["./packages/shared/src"],
+			"@glaze/logger": ["./packages/logger/src"],
 			"@glaze/core": ["./packages/core/src"],
-			"@glaze/convergence": ["./packages/convergence/src"]
+			"@glaze/convergence": ["./packages/convergence/src"],
+			"@glaze/backend": ["./packages/backend/src"],
+			"@glaze/admin": ["./packages/admin/src"],
+			"@glaze/cli": ["./packages/cli/src"]
 		}
 	}
 }

@@ -10,6 +10,11 @@
 			"drizzle-orm": "latest",
 			"drizzle-kit": "latest"
 		},
+		"system": {
+			"dotenv": "latest",
+			"pino": "latest",
+			"pino-pretty": "latest"
+		},
 		"development": {
 			"typescript": "latest",
 			"@types/bun": "latest",

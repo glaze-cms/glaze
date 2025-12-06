@@ -1,15 +1,13 @@
 {
-	"name": "@glaze/core",
+	"name": "@glaze/logger",
 	"version": "0.0.1",
 	"type": "module",
 	"exports": {
 		".": "./src/index.ts"
 	},
 	"dependencies": {
-		"@glaze/shared": "workspace:*",
-		"@glaze/logger": "workspace:*",
-		"drizzle-orm": "catalog:drizzle",
-		"drizzle-kit": "catalog:drizzle"
+		"pino": "catalog:system",
+		"pino-pretty": "catalog:system"
 	},
 	"devDependencies": {
 		"typescript": "catalog:development"
