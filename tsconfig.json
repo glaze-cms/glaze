@@ -19,6 +19,14 @@
 		"skipLibCheck": true,
 		"noFallthroughCasesInSwitch": true,
 		"noUncheckedIndexedAccess": true,
-		"noImplicitOverride": true
+		"noImplicitOverride": true,
+
+		// Workspace path aliases
+		"paths": {
+			"@glaze/core": ["./packages/core/src"],
+			"@glaze/backend": ["./packages/backend/src"],
+			"@glaze/admin": ["./packages/admin/src"],
+			"@glaze/cli": ["./packages/cli/src"]
+		}
 	}
 }

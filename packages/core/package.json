@@ -1,0 +1,15 @@
+{
+	"name": "@glaze/core",
+	"version": "0.0.1",
+	"type": "module",
+	"exports": {
+		".": "./src/index.ts"
+	},
+	"dependencies": {
+		"drizzle-orm": "catalog:drizzle",
+		"drizzle-kit": "catalog:drizzle"
+	},
+	"devDependencies": {
+		"typescript": "catalog:development"
+	}
+}
