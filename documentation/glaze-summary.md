@@ -87,9 +87,9 @@ Run Glaze inside your frontend framework. Pick your adapter:
 
 ```typescript
 // src/routes/api.glaze.$.ts
-import { mountGlazeCms } from '@glaze/tanstack';
+import { tanstackAdapter } from '@glaze/adapters/tanstack';
 
-export const Route = mountGlazeCms({
+export const Route = tanstackAdapter({
 	database: process.env.DATABASE_URL!,
 });
 ```
@@ -98,9 +98,9 @@ export const Route = mountGlazeCms({
 
 ```typescript
 // app/api/[[...slugs]]/route.ts
-import { createNextHandlers } from '@glaze/nextjs';
+import { nextjsAdapter } from '@glaze/adapters/nextjs';
 
-export const { GET, POST, PUT, DELETE, PATCH } = createNextHandlers({
+export const { GET, POST, PUT, DELETE, PATCH } = nextjsAdapter({
 	database: process.env.DATABASE_URL!,
 });
 ```
@@ -109,9 +109,9 @@ export const { GET, POST, PUT, DELETE, PATCH } = createNextHandlers({
 
 ```typescript
 // src/pages/api/[...slugs].ts
-import { createAstroHandlers } from '@glaze/astro';
+import { astroAdapter } from '@glaze/adapters/astro';
 
-export const { GET, POST, PUT, DELETE, PATCH } = createAstroHandlers({
+export const { GET, POST, PUT, DELETE, PATCH } = astroAdapter({
 	database: process.env.DATABASE_URL!,
 });
 ```
@@ -134,13 +134,13 @@ export const handler = glaze.fetch;
 
 ```typescript
 import { Elysia } from 'elysia';
-import { mountGlazeCms } from '@glaze/tanstack';
+import { tanstackAdapter } from '@glaze/adapters/tanstack';
 
 const api = new Elysia()
 	.get('/custom', () => 'hello')
 	.post('/webhooks/stripe', handleStripe);
 
-export const Route = mountGlazeCms({
+export const Route = tanstackAdapter({
 	database: process.env.DATABASE_URL!,
 	routes: api,
 });
@@ -195,12 +195,12 @@ glaze.listen(4000);
 
 ### Available Adapters
 
-| Package           | Framework       | Install                   |
-| ----------------- | --------------- | ------------------------- |
-| `@glaze/tanstack` | TanStack Start  | `bun add @glaze/tanstack` |
-| `@glaze/nextjs`   | Next.js         | `bun add @glaze/nextjs`   |
-| `@glaze/astro`    | Astro           | `bun add @glaze/astro`    |
-| `@glaze/core`     | Any (raw fetch) | `bun add @glaze/core`     |
+| Import                     | Framework       |
+| -------------------------- | --------------- |
+| `@glaze/adapters/tanstack` | TanStack Start  |
+| `@glaze/adapters/nextjs`   | Next.js         |
+| `@glaze/adapters/astro`    | Astro           |
+| `@glaze/core`              | Any (raw fetch) |
 
 ### Eden Treaty Integration
 
@@ -1026,27 +1026,34 @@ Local dev → Commit schema changes → CI runs migrations → Deploy
 ```
 glaze/
 ├── packages/
-│   ├── core/                 # Core Glaze engine
-│   │   ├── convergence/      # Convergence engine
-│   │   ├── schema/           # Schema management
-│   │   └── migrations/       # Migration utilities
+│   ├── core/                 # Core Glaze engine (framework-agnostic)
+│   │   ├── src/
+│   │   │   ├── server.ts     # Elysia server factory
+│   │   │   └── index.ts      # Exports
+│   │   └── package.json
 │   │
-│   ├── backend/              # Elysia backend
-│   │   ├── api/              # Content API
-│   │   ├── plugins/          # Plugin system
-│   │   └── config/           # Configuration
+│   ├── adapters/             # Framework adapters
+│   │   ├── src/
+│   │   │   ├── tanstack.ts   # TanStack Start adapter
+│   │   │   ├── nextjs.ts     # Next.js adapter
+│   │   │   └── astro.ts      # Astro adapter
+│   │   └── package.json      # Subpath exports
 │   │
-│   ├── admin/                # TanStack Start admin
+│   ├── convergence/          # Convergence engine (dev-only)
+│   │   └── src/
+│   │
+│   ├── admin/                # Admin UI (TanStack Start)
 │   │   ├── app/              # Admin routes
 │   │   ├── components/       # UI components
 │   │   └── server/           # Server functions
 │   │
 │   └── cli/                  # CLI tools
-│       └── commands/         # Convergence commands
+│       └── commands/         # glaze init, dev, migrate
 │
 ├── examples/
-│   ├── blog/                 # Example blog CMS
-│   └── ecommerce/            # Example store CMS
+│   ├── standalone/           # Standalone API example
+│   ├── tanstack/             # TanStack Start integration
+│   └── nextjs/               # Next.js integration
 │
 └── docs/                     # Documentation
 ```
@@ -1260,28 +1267,28 @@ Convergence tells you when things drift. It doesn't promise to save you from you
 
 ## 📋 Decisions Log
 
-| Decision           | Choice                                   | Rationale                              |
-| ------------------ | ---------------------------------------- | -------------------------------------- |
-| Runtime            | Bun                                      | Performance, future-proof              |
-| Framework          | Elysia                                   | Type-safe, Bun-native                  |
-| Admin UI           | TanStack Start                           | SSR, modern, growing                   |
-| ORM                | Drizzle                                  | Type-safe, lightweight                 |
-| Validation         | drizzle-typebox                          | Schema → validation → OpenAPI, no dup  |
-| Database           | PostgreSQL (primary)                     | Production-ready, JSONB, schemas       |
-| Auth               | Better-Auth                              | Battle-tested, not NIH                 |
-| API                | REST first, GraphQL V2                   | Simple wins                            |
-| Schema editing     | Dev-only                                 | Matches Strapi, avoids complexity      |
-| Metadata storage   | `glaze` PostgreSQL schema                | Clean content tables in `public`       |
-| Code → UI          | Runtime introspection (`getTableConfig`) | Uses Drizzle's own understanding       |
-| UI → Code          | ts-morph                                 | Preserves formatting, surgical edits   |
-| DB ↔ Code          | drizzle-kit CLI                          | Proven tooling, no reinvention         |
-| V1 scope           | Tables, relations, enums                 | Core features first                    |
-| Custom types       | V2                                       | Edge case for power users              |
-| Deployment modes   | Integrated + Standalone                  | Flexibility for any setup              |
-| Framework adapters | @glaze/tanstack, nextjs, astro           | Framework-agnostic core, thin adapters |
-| Type-safe client   | Eden Treaty                              | End-to-end types, no codegen           |
-| Project structure  | `src/glaze/` for integrated mode         | Follows Payload pattern, familiar      |
-| CLI scaffolding    | `bunx glaze init`                        | Quick start for both modes             |
+| Decision           | Choice                                   | Rationale                             |
+| ------------------ | ---------------------------------------- | ------------------------------------- |
+| Runtime            | Bun                                      | Performance, future-proof             |
+| Framework          | Elysia                                   | Type-safe, Bun-native                 |
+| Admin UI           | TanStack Start                           | SSR, modern, growing                  |
+| ORM                | Drizzle                                  | Type-safe, lightweight                |
+| Validation         | drizzle-typebox                          | Schema → validation → OpenAPI, no dup |
+| Database           | PostgreSQL (primary)                     | Production-ready, JSONB, schemas      |
+| Auth               | Better-Auth                              | Battle-tested, not NIH                |
+| API                | REST first, GraphQL V2                   | Simple wins                           |
+| Schema editing     | Dev-only                                 | Matches Strapi, avoids complexity     |
+| Metadata storage   | `glaze` PostgreSQL schema                | Clean content tables in `public`      |
+| Code → UI          | Runtime introspection (`getTableConfig`) | Uses Drizzle's own understanding      |
+| UI → Code          | ts-morph                                 | Preserves formatting, surgical edits  |
+| DB ↔ Code          | drizzle-kit CLI                          | Proven tooling, no reinvention        |
+| V1 scope           | Tables, relations, enums                 | Core features first                   |
+| Custom types       | V2                                       | Edge case for power users             |
+| Deployment modes   | Integrated + Standalone                  | Flexibility for any setup             |
+| Framework adapters | `@glaze/adapters/*` subpath exports      | One package, tree-shakeable imports   |
+| Type-safe client   | Eden Treaty                              | End-to-end types, no codegen          |
+| Project structure  | `src/glaze/` for integrated mode         | Follows Payload pattern, familiar     |
+| CLI scaffolding    | `bunx glaze init`                        | Quick start for both modes            |
 
 ---
 
