@@ -58,7 +58,19 @@ We don't reinvent wheels. Glaze composes best-in-class libraries into a cohesive
 
 Schema drift is inevitable. Developers edit code, admins tweak settings, databases get modified directly. Most CMSs break silently when this happens. Glaze detects it.
 
-**Convergence** runs on startup in development and tells you exactly what changed:
+**Convergence** is a three-way sync engine that keeps your code, database, and admin UI in harmony:
+
+```
+┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+│   Schema    │◄───►│  Database   │◄───►│  Admin UI   │
+│   Files     │     │             │     │   Editor    │
+└─────────────┘     └─────────────┘     └─────────────┘
+        ▲                                      │
+        └──────────────────────────────────────┘
+                    Convergence Engine
+```
+
+**On startup in development**, Convergence tells you exactly what changed:
 
 ```
 ⚠️  Schema drift detected!
@@ -70,31 +82,99 @@ Your database schema does not match your schema files.
   3) Show differences
 ```
 
+### Three-Way Sync
+
+| Direction     | Tool               | Purpose                            |
+| ------------- | ------------------ | ---------------------------------- |
+| **Code ↔ DB** | drizzle-kit        | Detect drift, generate migrations  |
+| **Code → UI** | `getTableConfig()` | Display schema in admin editor     |
+| **UI → Code** | ts-morph           | Write changes back to schema files |
+
 No silent failures. No mysterious bugs in production. You see the drift, you decide how to fix it.
+
+---
+
+## Deployment Modes
+
+Like Payload, Glaze gives you flexibility in how you deploy:
+
+### Integrated Mode (Single Process)
+
+Run Glaze inside your TanStack Start app:
+
+```typescript
+// src/routes/api.glaze.$.ts
+import { createGlazeServer } from '@glaze/core';
+import { createFileRoute } from '@tanstack/react-router';
+
+const glaze = createGlazeServer({
+	schema: './src/schema.ts',
+	database: process.env.DATABASE_URL,
+});
+
+const handle = ({ request }: { request: Request }) => glaze.fetch(request);
+
+export const Route = createFileRoute('/api/glaze/$')({
+	server: {
+		handlers: { GET: handle, POST: handle, PUT: handle, DELETE: handle },
+	},
+});
+```
+
+**Best for:** Most projects, simpler deployments, smaller teams
+
+### Separate Mode (Two Processes)
+
+Run Glaze as a standalone server:
+
+```typescript
+// server.ts
+import { createGlazeServer } from '@glaze/core';
+
+const glaze = createGlazeServer({
+	schema: './src/schema.ts',
+	database: process.env.DATABASE_URL,
+});
+
+glaze.listen(4000);
+```
+
+**Best for:** Larger teams, microservices, multiple frontends sharing one CMS
+
+### End-to-End Type Safety with Eden
+
+Both modes support [Eden Treaty](https://elysiajs.com/eden/overview.html) for type-safe API calls — like tRPC, but without code generation:
+
+```typescript
+// Fully typed, no codegen needed
+const posts = await api().posts.get();
+```
 
 ---
 
 ## Key Features
 
-| Feature             | Description                                                 |
-| ------------------- | ----------------------------------------------------------- |
-| **⚡ Bun Native**   | Built exclusively for Bun — not a port, native from day one |
-| **🔒 Type-Safe**    | End-to-end type safety from database schema to admin UI     |
-| **🔄 Convergence**  | Schema drift detection and recovery tools for development   |
-| **🎨 Modern Admin** | SSR admin panel with TanStack Start                         |
-| **🔌 Extensible**   | Elysia plugin system for custom routes and webhooks         |
+| Feature                | Description                                                 |
+| ---------------------- | ----------------------------------------------------------- |
+| **⚡ Bun Native**      | Built exclusively for Bun — not a port, native from day one |
+| **🔒 Type-Safe**       | End-to-end type safety from database schema to admin UI     |
+| **🔄 Convergence**     | Bidirectional schema sync between code, database, and UI    |
+| **🎨 Modern Admin**    | SSR admin panel with TanStack Start                         |
+| **🔌 Extensible**      | Elysia plugin system for custom routes and webhooks         |
+| **📦 Flexible Deploy** | Run integrated or standalone — your choice                  |
 
 ---
 
 ## Technology Stack
 
-| Layer    | Technology        | Why Bun-native?                                |
-| -------- | ----------------- | ---------------------------------------------- |
-| Runtime  | Bun               | Native TypeScript, fast startup, low memory    |
-| Database | Bun.sql + Drizzle | Native PostgreSQL bindings, no `pg` dependency |
-| Backend  | Elysia            | Built for Bun, type-safe, fastest framework    |
-| Admin UI | TanStack Start    | SSR with typed server functions                |
-| Auth     | Better-Auth       | Framework-agnostic, works with Elysia          |
+| Layer       | Technology             | Why?                                        |
+| ----------- | ---------------------- | ------------------------------------------- |
+| Runtime     | Bun                    | Native TypeScript, fast startup, low memory |
+| Database    | Bun.sql + Drizzle      | Native PostgreSQL bindings, type-safe ORM   |
+| Backend     | Elysia                 | Built for Bun, type-safe, fastest framework |
+| Admin UI    | TanStack Start         | SSR with typed server functions             |
+| Auth        | Better-Auth            | Framework-agnostic, battle-tested           |
+| Schema Sync | drizzle-kit + ts-morph | Bidirectional code ↔ DB ↔ UI sync           |
 
 ---
 

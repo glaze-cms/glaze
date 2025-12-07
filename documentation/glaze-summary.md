@@ -15,7 +15,7 @@ At a fraction of the operational cost.
 ### Key Differentiators
 
 1. **Schema ↔ UI Cycle**: Schema editor in development, content management in production
-2. **Convergence Engine**: Detection and recovery aid for schema drift (dev-only)
+2. **Convergence Engine**: Bidirectional sync between code, database, and admin UI (dev-only)
 3. **Type-Safe Everything**: End-to-end type safety from database to UI
 4. **Cost Efficient**: Runs on smaller instances than Strapi due to Bun's efficiency
 5. **Modern Stack**: Built with cutting-edge tools that work together seamlessly
@@ -26,40 +26,180 @@ At a fraction of the operational cost.
 ## 🏗️ Architecture Overview
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│         TanStack Start Admin UI (Port 3000)             │
-│  ┌──────────────┐  ┌──────────────┐  ┌───────────────┐  │
-│  │   Content    │  │   Schema     │  │  Convergence  │  │
-│  │ Management   │  │   Editor     │  │      UI       │  │
-│  │  (all envs)  │  │  (dev only)  │  │  (dev only)   │  │
-│  └──────────────┘  └──────────────┘  └───────────────┘  │
-│         SSR + Server Functions + Client Components      │
-└──────────────────────┬──────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│         TanStack Start Admin UI (Port 3000)                 │
+│  ┌──────────────┐  ┌──────────────┐  ┌───────────────┐      │
+│  │   Content    │  │   Schema     │  │  Convergence  │      │
+│  │ Management   │  │   Editor     │  │      UI       │      │
+│  │  (all envs)  │  │  (dev only)  │  │  (dev only)   │      │
+│  └──────────────┘  └──────────────┘  └───────────────┘      │
+│         SSR + Server Functions + Client Components          │
+└──────────────────────┬──────────────────────────────────────┘
                        │ REST API + Server Functions
                        ▼
-┌─────────────────────────────────────────────────────────┐
-│           Elysia Backend (Port 4000)                    │
-│  ┌──────────────┐  ┌──────────────┐  ┌───────────────┐  │
-│  │  Content API │  │Custom Routes │  │   Plugins     │  │
-│  │     REST     │  │   Webhooks   │  │    System     │  │
-│  └──────────────┘  └──────────────┘  └───────────────┘  │
-│         Extensible Backend (like Koa for Strapi)        │
-└──────────────────────┬──────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│           Elysia Backend (Port 4000)                        │
+│  ┌──────────────┐  ┌──────────────┐  ┌───────────────┐      │
+│  │  Content API │  │Custom Routes │  │   Plugins     │      │
+│  │     REST     │  │   Webhooks   │  │    System     │      │
+│  └──────────────┘  └──────────────┘  └───────────────┘      │
+│         Extensible Backend (like Koa for Strapi)            │
+└──────────────────────┬──────────────────────────────────────┘
                        │
                        ▼
-┌─────────────────────────────────────────────────────────┐
-│              Convergence Engine (Dev Only)              │
-│  ┌──────────────┐  ┌──────────────┐  ┌───────────────┐  │
-│  │Drift Detection│  │   Drizzle   │  │      UI       │  │
-│  │ (check/pull) │  │  Migrations  │  │   Generator   │  │
-│  └──────────────┘  └──────────────┘  └───────────────┘  │
-└──────────────────────┬──────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│              Convergence Engine (Dev Only)                  │
+│  ┌──────────────┐  ┌──────────────┐  ┌───────────────┐      │
+│  │    Schema    │  │   Drizzle    │  │   ts-morph    │      │
+│  │ Introspection│  │  Kit CLI     │  │  Code Writer  │      │
+│  └──────────────┘  └──────────────┘  └───────────────┘      │
+└──────────────────────┬──────────────────────────────────────┘
                        │
                        ▼
-┌─────────────────────────────────────────────────────────┐
-│              Drizzle ORM + PostgreSQL                   │
-│              Schema Files = Source of Truth             │
-└─────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│              Drizzle ORM + PostgreSQL                       │
+│              Schema Files = Source of Truth                 │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 🔗 Deployment Modes
+
+Glaze supports two deployment modes, giving developers flexibility based on their needs:
+
+### Integrated Mode (Single Process)
+
+Run Glaze inside your TanStack Start app. Elysia mounts as a route handler:
+
+```
+┌─────────────────────────────────────────┐
+│          TanStack Start App             │
+│  ┌─────────────┐  ┌─────────────────┐   │
+│  │  Your App   │  │   Glaze CMS     │   │
+│  │   Routes    │  │  (Admin + API)  │   │
+│  └─────────────┘  └─────────────────┘   │
+│            Single Bun Process           │
+└─────────────────────────────────────────┘
+```
+
+```typescript
+// src/routes/api.glaze.$.ts
+import { createGlazeServer } from '@glaze/core';
+import { createFileRoute } from '@tanstack/react-router';
+
+const glaze = createGlazeServer({
+	schema: './src/schema.ts',
+	database: process.env.DATABASE_URL,
+});
+
+const handle = ({ request }: { request: Request }) => glaze.fetch(request);
+
+export const Route = createFileRoute('/api/glaze/$')({
+	server: {
+		handlers: {
+			GET: handle,
+			POST: handle,
+			PUT: handle,
+			DELETE: handle,
+		},
+	},
+});
+```
+
+**Benefits**:
+
+- Single deployment (one process)
+- Shared database connection
+- Lower latency between frontend and CMS
+- Eden Treaty for end-to-end type safety (no codegen)
+
+**Best for**: Most projects, simpler ops, smaller teams
+
+### Separate Mode (Two Processes)
+
+Run Glaze as a standalone server:
+
+```
+┌─────────────────────┐    ┌─────────────────────┐
+│  TanStack Start App │    │     Glaze CMS       │
+│    (Port 3000)      │───▶│    (Port 4000)      │
+│                     │    │   Admin + API       │
+└─────────────────────┘    └─────────────────────┘
+```
+
+```typescript
+// server.ts
+import { createGlazeServer } from '@glaze/core';
+
+const glaze = createGlazeServer({
+	schema: './src/schema.ts',
+	database: process.env.DATABASE_URL,
+});
+
+glaze.listen(4000);
+```
+
+**Benefits**:
+
+- Independent scaling
+- CMS can run on different infrastructure
+- Multiple frontends can share one CMS instance
+- Clear separation of concerns
+
+**Best for**: Larger teams, microservices, multiple sites sharing one CMS
+
+### Eden Treaty Integration
+
+Both modes support [Eden Treaty](https://elysiajs.com/eden/overview.html) for end-to-end type safety, similar to tRPC but without code generation:
+
+```typescript
+// src/routes/api.glaze.$.ts
+import { createGlazeServer } from '@glaze/core';
+import { treaty } from '@elysiajs/eden';
+import { createFileRoute } from '@tanstack/react-router';
+import { createIsomorphicFn } from '@tanstack/react-start';
+
+const glaze = createGlazeServer({
+	schema: './src/schema.ts',
+	database: process.env.DATABASE_URL,
+});
+
+const handle = ({ request }: { request: Request }) => glaze.fetch(request);
+
+export const Route = createFileRoute('/api/glaze/$')({
+	server: {
+		handlers: {
+			GET: handle,
+			POST: handle,
+			PUT: handle,
+			DELETE: handle,
+		},
+	},
+});
+
+// Type-safe client - works on both server and client
+export const api = createIsomorphicFn()
+	.server(() => treaty(glaze).api)
+	.client(() => treaty<typeof glaze>('localhost:3000').api.glaze);
+```
+
+Then in your components:
+
+```typescript
+// src/routes/index.tsx
+import { createFileRoute } from '@tanstack/react-router'
+import { api } from './api.glaze.$'
+
+export const Route = createFileRoute('/')({
+  component: App,
+  loader: () => api().posts.get().then((res) => res.data)
+})
+
+function App() {
+  const posts = Route.useLoaderData() // Fully typed!
+  return <PostList posts={posts} />
+}
 ```
 
 ---
@@ -183,7 +323,11 @@ This matches how Strapi works and avoids complexity:
 
 ### What It Is
 
-A **detection and recovery aid** for schema drift in development. It tells you when something changed and gives you tools to resolve it.
+A **bidirectional sync engine** for schema management in development. It handles three directions:
+
+1. **Code ↔ Database**: Detect and resolve schema drift
+2. **Code → UI**: Display schema in admin editor (runtime introspection)
+3. **UI → Code**: Write schema changes back to files (ts-morph)
 
 ### What It Is NOT
 
@@ -197,9 +341,13 @@ A **detection and recovery aid** for schema drift in development. It tells you w
 
 Convergence is for advanced users who understand the implications. If you reject database changes and lose data, that's on you.
 
-### When It Runs
+### The Three Sync Directions
 
-**Development mode only**, on app startup:
+#### Direction 1: Code ↔ Database (Drift Detection)
+
+**Tools**: drizzle-kit CLI (`check`, `pull`, `push`, `generate`, `migrate`)
+
+On `bun dev` startup, detect schema drift:
 
 ```bash
 $ bun dev
@@ -225,66 +373,118 @@ What would you like to do?
 Choice: _
 ```
 
-### The Convergence Workflow
+**Workflow**:
 
-#### Step 1: Detect Drift
+| Step               | Command                | Purpose                    |
+| ------------------ | ---------------------- | -------------------------- |
+| Detect drift       | `drizzle-kit check`    | Compare code vs DB         |
+| Pull DB schema     | `drizzle-kit pull`     | Generate schema.ts from DB |
+| Push to DB         | `drizzle-kit push`     | Apply code changes to DB   |
+| Generate migration | `drizzle-kit generate` | Create migration files     |
+| Apply migration    | `drizzle-kit migrate`  | Run pending migrations     |
 
-```bash
-drizzle-kit check --dialect=postgresql
+#### Direction 2: Code → UI (Schema Introspection)
+
+**Tools**: Drizzle's runtime `getTableConfig()` API
+
+The admin UI needs to display the schema for editing. Instead of parsing TypeScript, we use Drizzle's built-in introspection:
+
+```typescript
+import { getTableConfig } from 'drizzle-orm/pg-core';
+import * as schema from './schema';
+
+// Import user's schema and extract metadata at runtime
+const postsConfig = getTableConfig(schema.posts);
+
+// Returns:
+{
+  name: 'posts',
+  schema: undefined,  // or 'glaze' for system tables
+  columns: [
+    {
+      name: 'id',
+      columnType: 'PgSerial',
+      dataType: 'number',
+      notNull: true,
+      hasDefault: true,
+      primary: true,
+      isUnique: false,
+    },
+    {
+      name: 'title',
+      columnType: 'PgVarchar',
+      dataType: 'string',
+      notNull: true,
+      hasDefault: false,
+      length: 255,  // varchar length
+    },
+    // ... more columns
+  ],
+  indexes: [...],
+  foreignKeys: [...],
+  primaryKeys: [...],
+}
 ```
 
-- Exits successfully → No drift
-- Exits with error → Drift detected
+**Key insight**: This is generated **on-the-fly** when the admin UI requests it. No caching, no extra files. The schema files are the source of truth.
 
-#### Step 2: Pull Database Schema
+**What's extracted**:
 
-```bash
-drizzle-kit pull
+- Table name and PostgreSQL schema
+- All columns with types, constraints, defaults
+- Relations (via Drizzle's `relations()` API)
+- Indexes and foreign keys
+- Enum values (for columns using `pgEnum`)
+
+#### Direction 3: UI → Code (Schema Writing)
+
+**Tools**: ts-morph (TypeScript AST manipulation)
+
+When a user adds/edits a field in the admin schema editor, we need to surgically update the `schema.ts` file without destroying:
+
+- Developer comments
+- Custom formatting
+- Other tables in the file
+- Import statements
+
+ts-morph allows AST-level edits:
+
+```typescript
+import { Project } from 'ts-morph';
+
+const project = new Project();
+const sourceFile = project.addSourceFileAtPath('src/schema.ts');
+
+// Find the posts table and add a new column
+const postsTable = sourceFile.getVariableDeclaration('posts');
+// ... manipulate AST to add column
+// ... preserve formatting and comments
+
+sourceFile.save();
 ```
 
-- Generates `drizzle/schema.ts` from current database state
-- Doesn't touch existing `src/schema.ts`
+**Why ts-morph over alternatives**:
 
-#### Step 3: User Decision
+- Preserves comments and formatting
+- Handles complex TypeScript (generics, method chains)
+- Battle-tested for codemods
+- ~2MB size is acceptable for dev-only tooling
 
-**Option 1 - Accept** (safe):
+### V1 Scope
 
-```bash
-✅ Accepting database schema...
+**Included**:
 
-📄 Copying drizzle/schema.ts → src/schema.ts
-📝 Generating migration from new schema...
-⚡ Applying migration...
-🎨 Regenerating admin UI...
+- Tables (`pgTable`)
+- All standard column types
+- Relations (`relations()`)
+- Enums (`pgEnum`)
+- Indexes and constraints
 
-✅ Glaze is ready! Schema in sync.
-```
+**Deferred to V2**:
 
-**Option 2 - Reject** (potentially destructive):
-
-```bash
-⚠️  WARNING: This may cause data loss!
-
-The following changes will be reverted:
-  • DROP COLUMN posts.new_field (contains 142 rows of data)
-  • ALTER COLUMN users.email (type change)
-
-Type "I understand" to proceed: _
-```
-
-**Option 3 - Show Differences**:
-
-```bash
-📊 Comparing schemas:
-
-  Current schema:  src/schema.ts
-  Database schema: drizzle/schema.ts (just generated)
-
-Open them in your editor to compare:
-  $ code --diff src/schema.ts drizzle/schema.ts
-
-Press Enter to continue...
-```
+- Custom types (`customType()`) - show as "unsupported" in UI
+- Views
+- Schemas beyond `public` and `glaze`
 
 ### CLI Commands
 
@@ -336,40 +536,54 @@ public schema (user content):
 
 ### Structure
 
-````typescript
+```typescript
 // Global admin settings — single row
-export const settings = pgTable('settings', {
-  id: serial('id').primaryKey(),
-  siteName: text('site_name'),
-  logo: text('logo'),
-  primaryColor: text('primary_color'),
-  updatedAt: timestamp('updated_at').defaultNow()
-}, (table) => ({
-  schema: 'glaze'
-}))
+export const settings = pgTable(
+	'settings',
+	{
+		id: serial('id').primaryKey(),
+		siteName: text('site_name'),
+		logo: text('logo'),
+		primaryColor: text('primary_color'),
+		updatedAt: timestamp('updated_at').defaultNow(),
+	},
+	(table) => ({
+		schema: 'glaze',
+	}),
+);
 
 // Content-type and field configuration
-export const entities = pgTable('entities', {
-  id: serial('id').primaryKey(),
-  key: text('key').notNull().unique(),  // 'posts', 'posts.title'
-  value: jsonb('value').notNull(),
-  updatedAt: timestamp('updated_at').defaultNow()
-}, (table) => ({
-  schema: 'glaze'
-}))
+export const entities = pgTable(
+	'entities',
+	{
+		id: serial('id').primaryKey(),
+		key: text('key').notNull().unique(), // 'posts', 'posts.title'
+		value: jsonb('value').notNull(),
+		updatedAt: timestamp('updated_at').defaultNow(),
+	},
+	(table) => ({
+		schema: 'glaze',
+	}),
+);
 
 // Per-user preferences
-export const userPreferences = pgTable('user_preferences', {
-  id: serial('id').primaryKey(),
-  userId: integer('user_id').notNull().references(() => users.id),
-  context: text('context').notNull(),   // 'list.posts', 'editor.posts'
-  prefs: jsonb('prefs').notNull(),
-  updatedAt: timestamp('updated_at').defaultNow()
-}, (table) => ({
-  unique: unique().on(table.userId, table.context),
-  schema: 'glaze'
-})))
-
+export const userPreferences = pgTable(
+	'user_preferences',
+	{
+		id: serial('id').primaryKey(),
+		userId: integer('user_id')
+			.notNull()
+			.references(() => users.id),
+		context: text('context').notNull(), // 'list.posts', 'editor.posts'
+		prefs: jsonb('prefs').notNull(),
+		updatedAt: timestamp('updated_at').defaultNow(),
+	},
+	(table) => ({
+		unique: unique().on(table.userId, table.context),
+		schema: 'glaze',
+	}),
+);
+```
 
 ### Examples
 
@@ -393,14 +607,19 @@ export const userPreferences = pgTable('user_preferences', {
 
 ### What Users See in Database
 
-\`\`\`
-Tables:
-  posts              ← their content
-  users              ← their content
-  _glaze_settings    ← site name, logo (1 row)
-  _glaze_entities    ← content-type/field display options
-  _glaze_user_prefs  ← each user's view preferences
-\`\`\`
+```
+Schemas:
+  public              ← user content tables
+  glaze               ← CMS system tables
+
+public.posts          ← their content
+public.users          ← their content
+
+glaze.settings        ← site name, logo (1 row)
+glaze.entities        ← content-type/field display options
+glaze.user_preferences ← each user's view preferences
+```
+
 ---
 
 ## 🎨 Admin UI (TanStack Start)
@@ -471,7 +690,7 @@ export default {
 		);
 	},
 };
-````
+```
 
 ### Built-in APIs
 
@@ -628,7 +847,10 @@ glaze/
 
 - [ ] Drift detection on startup (dev only)
 - [ ] Interactive CLI for accept/reject
-- [ ] Schema file synchronization
+- [ ] Schema introspection via `getTableConfig()`
+- [ ] Code generation via ts-morph
+- [ ] Relations support
+- [ ] Enum support
 - [ ] Migration generation & application
 - [ ] Clear warnings for destructive operations
 
@@ -663,6 +885,7 @@ glaze/
 
 **Convergence Enhancements**:
 
+- [ ] Custom type support (`customType()`)
 - [ ] Line-by-line schema diff viewer
 - [ ] Selective field acceptance
 - [ ] Migration history viewer
@@ -711,7 +934,7 @@ glaze/
 
 1. **Standing on giants** — Uses best-in-class libraries, not NIH syndrome
 2. **Dev/prod separation** — Schema changes in dev, content in prod (like Strapi)
-3. **Convergence as detection** — Helps you see drift, doesn't promise magic
+3. **Convergence as bidirectional sync** — Code ↔ DB ↔ UI all stay in sync
 4. **Type safety everywhere** — From database to UI, all typed
 5. **Cost efficiency** — Bun + Drizzle = smaller servers
 
@@ -724,12 +947,19 @@ glaze/
 - Keeps production stable
 - Changes go through git
 
-**Why Convergence as a detection tool (not safety net)?**
+**Why runtime introspection for Code → UI?**
 
-- Direct DB access = advanced user territory
-- We detect and inform, you decide
-- No false promises about data safety
-- AI can assist with complex migrations
+- Drizzle's `getTableConfig()` gives us everything
+- No need to parse TypeScript ourselves
+- Always accurate (same code that runs the app)
+- Generated on-the-fly, no caching complexity
+
+**Why ts-morph for UI → Code?**
+
+- Preserves comments and formatting
+- Surgical edits, not full regeneration
+- Handles complex TypeScript patterns
+- Battle-tested for codemods
 
 **Why Better-Auth instead of custom auth?**
 
@@ -742,7 +972,7 @@ glaze/
 
 - Full SQL power needed for production apps
 - JSONB for metadata storage
-- Your users are building real apps, not prototypes
+- Separate schemas (`glaze` vs `public`) for clean separation
 - SQLite can come later as demo mode
 
 ---
@@ -802,11 +1032,11 @@ Convergence tells you when things drift. It doesn't promise to save you from you
 - **Elysia** for extensible backend
 - **TanStack Start** for modern admin UI
 - **Better-Auth** for authentication
-- **Convergence** for schema drift detection
+- **Convergence** for bidirectional schema sync
 
 **Target users**: Agencies, startups, developers who want Strapi's UX with better performance, type safety, and lower costs.
 
-**Competitive positioning**: "The CMS that detects schema drift" + "Modern stack, smaller servers"
+**Competitive positioning**: "The CMS that keeps schema in sync" + "Modern stack, smaller servers"
 
 **Status**: Architecture defined, decisions locked, ready for implementation
 
@@ -814,19 +1044,25 @@ Convergence tells you when things drift. It doesn't promise to save you from you
 
 ## 📋 Decisions Log
 
-| Decision         | Choice                         | Rationale                         |
-| ---------------- | ------------------------------ | --------------------------------- |
-| Runtime          | Bun                            | Performance, future-proof         |
-| Framework        | Elysia                         | Type-safe, Bun-native             |
-| Admin UI         | TanStack Start                 | SSR, modern, growing              |
-| ORM              | Drizzle                        | Type-safe, lightweight            |
-| Database         | PostgreSQL (primary)           | Production-ready, JSONB           |
-| Auth             | Better-Auth                    | Battle-tested, not NIH            |
-| API              | REST first, GraphQL V2         | Simple wins                       |
-| Schema editing   | Dev-only                       | Matches Strapi, avoids complexity |
-| Convergence      | Detection tool, not safety net | Honest about limitations          |
-| Metadata storage | `glaze` PostgreSQL schema      | Clean content tables in `public`  |
+| Decision         | Choice                                   | Rationale                            |
+| ---------------- | ---------------------------------------- | ------------------------------------ |
+| Runtime          | Bun                                      | Performance, future-proof            |
+| Framework        | Elysia                                   | Type-safe, Bun-native                |
+| Admin UI         | TanStack Start                           | SSR, modern, growing                 |
+| ORM              | Drizzle                                  | Type-safe, lightweight               |
+| Database         | PostgreSQL (primary)                     | Production-ready, JSONB, schemas     |
+| Auth             | Better-Auth                              | Battle-tested, not NIH               |
+| API              | REST first, GraphQL V2                   | Simple wins                          |
+| Schema editing   | Dev-only                                 | Matches Strapi, avoids complexity    |
+| Metadata storage | `glaze` PostgreSQL schema                | Clean content tables in `public`     |
+| Code → UI        | Runtime introspection (`getTableConfig`) | Uses Drizzle's own understanding     |
+| UI → Code        | ts-morph                                 | Preserves formatting, surgical edits |
+| DB ↔ Code        | drizzle-kit CLI                          | Proven tooling, no reinvention       |
+| V1 scope         | Tables, relations, enums                 | Core features first                  |
+| Custom types     | V2                                       | Edge case for power users            |
+| Deployment modes | Integrated + Separate                    | Flexibility like Payload             |
+| Type-safe client | Eden Treaty                              | End-to-end types, no codegen         |
 
 ---
 
-_Glaze: Standing on giants, detecting chaos, shipping fast._
+_Glaze: Standing on giants, keeping schema in sync, shipping fast._
