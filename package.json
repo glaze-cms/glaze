@@ -4,7 +4,8 @@
 	"private": true,
 	"repository": "https://github.com/glaze-cms/glaze",
 	"workspaces": [
-		"packages/*"
+		"packages/*",
+		"examples/*"
 	],
 	"catalogs": {
 		"drizzle": {

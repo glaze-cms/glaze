@@ -6,10 +6,11 @@
 		".": "./src/index.ts"
 	},
 	"dependencies": {
-		"@glaze/shared": "workspace:*",
 		"@glaze/logger": "workspace:*",
+		"@glaze/shared": "workspace:*",
+		"drizzle-kit": "catalog:drizzle",
 		"drizzle-orm": "catalog:drizzle",
-		"drizzle-kit": "catalog:drizzle"
+		"elysia": "latest"
 	},
 	"devDependencies": {
 		"typescript": "catalog:development"

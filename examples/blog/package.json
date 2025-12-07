@@ -1,0 +1,15 @@
+{
+	"name": "glaze-example-blog",
+	"version": "0.0.1",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"dev": "bun --watch src/index.ts"
+	},
+	"dependencies": {
+		"@glaze/core": "workspace:*",
+		"@glaze/logger": "workspace:*",
+		"@glaze/shared": "workspace:*",
+		"drizzle-orm": "catalog:drizzle"
+	}
+}

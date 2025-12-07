@@ -1,8 +1,4 @@
-import { GLAZE_VERSION } from '@glaze/shared';
-import { logger } from '@glaze/logger';
+export type { GlazeConfig, GlazeDatabase, GlazeServer } from './server';
+export { createGlazeServer } from './server';
 
-// Core Glaze engine - schema management, convergence, utilities
-export const version = GLAZE_VERSION;
-export { GLAZE_VERSION };
-
-logger.info(`🌊 Glaze CMS v${version} - Initialized!`);
+export { GLAZE_VERSION } from '@glaze/shared';
