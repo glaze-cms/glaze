@@ -327,6 +327,7 @@ bun glaze migrate:apply
 | **Backend Framework** | Elysia               | Fast, type-safe, extensible (like Koa but modern)             |
 | **Admin UI**          | TanStack Start       | SSR React with server functions, framework-agnostic           |
 | **ORM**               | Drizzle              | Schema-first, migrations, type-safe, lightweight              |
+| **Validation**        | drizzle-typebox      | Converts Drizzle schema to Elysia validation + OpenAPI        |
 | **Database**          | PostgreSQL (primary) | Full SQL power, JSONB support, production-ready               |
 | **Auth**              | Better-Auth          | Framework-agnostic, OAuth, sessions, TypeScript-first         |
 | **API**               | REST (GraphQL later) | Simple, well-understood, sufficient for V1                    |
@@ -337,6 +338,7 @@ Glaze doesn't reinvent the wheel. Instead, it integrates best-in-class tools:
 
 - **Better-Auth** for authentication (not custom auth)
 - **Drizzle** for database (not custom ORM)
+- **drizzle-typebox** for validation (not custom schemas)
 - **Elysia** for API (not custom framework)
 - **TanStack** for UI (not custom React framework)
 
@@ -863,6 +865,39 @@ GET / api / auth / me;
 // + OAuth flows, magic links, etc.
 ```
 
+### Schema-Driven Validation (drizzle-typebox)
+
+Glaze uses `drizzle-typebox` to automatically generate request/response validation from your Drizzle schema:
+
+```
+Drizzle Schema → drizzle-typebox → Elysia validation → OpenAPI docs → Eden types
+```
+
+**How it works:**
+
+```typescript
+// Your Drizzle schema (source of truth)
+export const posts = pgTable('posts', {
+	id: serial('id').primaryKey(),
+	title: varchar('title', { length: 255 }).notNull(),
+	content: text('content'),
+	status: varchar('status', { enum: ['draft', 'published'] }),
+});
+
+// Glaze auto-generates validated endpoints:
+// POST /api/posts validates body against insert schema
+// GET /api/posts/:id response matches select schema
+// OpenAPI docs generated automatically
+// Eden Treaty provides frontend type safety
+```
+
+**Benefits:**
+
+- **Single source of truth**: Drizzle schema drives everything
+- **Automatic validation**: No manual schema duplication
+- **Free OpenAPI docs**: Elysia generates docs from TypeBox schemas
+- **End-to-end types**: Eden Treaty inherits types from the same schema
+
 ---
 
 ## 📊 Competitive Comparison
@@ -1002,6 +1037,8 @@ glaze/
 **Backend API**:
 
 - [ ] Auto-generated REST API
+- [ ] Schema-driven validation (drizzle-typebox)
+- [ ] OpenAPI documentation (auto-generated)
 - [ ] Basic plugin system
 - [ ] Webhook support
 
@@ -1181,27 +1218,28 @@ Convergence tells you when things drift. It doesn't promise to save you from you
 
 ## 📋 Decisions Log
 
-| Decision          | Choice                                   | Rationale                            |
-| ----------------- | ---------------------------------------- | ------------------------------------ |
-| Runtime           | Bun                                      | Performance, future-proof            |
-| Framework         | Elysia                                   | Type-safe, Bun-native                |
-| Admin UI          | TanStack Start                           | SSR, modern, growing                 |
-| ORM               | Drizzle                                  | Type-safe, lightweight               |
-| Database          | PostgreSQL (primary)                     | Production-ready, JSONB, schemas     |
-| Auth              | Better-Auth                              | Battle-tested, not NIH               |
-| API               | REST first, GraphQL V2                   | Simple wins                          |
-| Schema editing    | Dev-only                                 | Matches Strapi, avoids complexity    |
-| Metadata storage  | `glaze` PostgreSQL schema                | Clean content tables in `public`     |
-| Code → UI         | Runtime introspection (`getTableConfig`) | Uses Drizzle's own understanding     |
-| UI → Code         | ts-morph                                 | Preserves formatting, surgical edits |
-| DB ↔ Code         | drizzle-kit CLI                          | Proven tooling, no reinvention       |
-| V1 scope          | Tables, relations, enums                 | Core features first                  |
-| Custom types      | V2                                       | Edge case for power users            |
-| Deployment modes  | Integrated + Standalone                  | Flexibility like Payload             |
-| Type-safe client  | Eden Treaty                              | End-to-end types, no codegen         |
-| Project structure | `src/glaze/` for integrated mode         | Follows Payload pattern, familiar    |
-| CLI scaffolding   | `bunx glaze init`                        | Quick start for both modes           |
-| Mounting API      | `mountGlazeCms()` + `routes` option      | Clean, user builds Elysia first      |
+| Decision          | Choice                                   | Rationale                             |
+| ----------------- | ---------------------------------------- | ------------------------------------- |
+| Runtime           | Bun                                      | Performance, future-proof             |
+| Framework         | Elysia                                   | Type-safe, Bun-native                 |
+| Admin UI          | TanStack Start                           | SSR, modern, growing                  |
+| ORM               | Drizzle                                  | Type-safe, lightweight                |
+| Validation        | drizzle-typebox                          | Schema → validation → OpenAPI, no dup |
+| Database          | PostgreSQL (primary)                     | Production-ready, JSONB, schemas      |
+| Auth              | Better-Auth                              | Battle-tested, not NIH                |
+| API               | REST first, GraphQL V2                   | Simple wins                           |
+| Schema editing    | Dev-only                                 | Matches Strapi, avoids complexity     |
+| Metadata storage  | `glaze` PostgreSQL schema                | Clean content tables in `public`      |
+| Code → UI         | Runtime introspection (`getTableConfig`) | Uses Drizzle's own understanding      |
+| UI → Code         | ts-morph                                 | Preserves formatting, surgical edits  |
+| DB ↔ Code         | drizzle-kit CLI                          | Proven tooling, no reinvention        |
+| V1 scope          | Tables, relations, enums                 | Core features first                   |
+| Custom types      | V2                                       | Edge case for power users             |
+| Deployment modes  | Integrated + Standalone                  | Flexibility like Payload              |
+| Type-safe client  | Eden Treaty                              | End-to-end types, no codegen          |
+| Project structure | `src/glaze/` for integrated mode         | Follows Payload pattern, familiar     |
+| CLI scaffolding   | `bunx glaze init`                        | Quick start for both modes            |
+| Mounting API      | `mountGlazeCms()` + `routes` option      | Clean, user builds Elysia first       |
 
 ---
 
