@@ -66,15 +66,15 @@ At a fraction of the operational cost.
 
 ## 🔗 Deployment Modes
 
-Glaze supports two deployment modes, giving developers flexibility based on their needs:
+Glaze is **framework-agnostic**. The core is WinterCG compliant - it takes a `Request` and returns a `Response`. Thin adapters provide convenience for each framework.
 
 ### Integrated Mode (Single Process)
 
-Run Glaze inside your TanStack Start app. Elysia mounts as a route handler:
+Run Glaze inside your frontend framework. Pick your adapter:
 
 ```
 ┌─────────────────────────────────────────┐
-│          TanStack Start App             │
+│          Your Frontend App              │
 │  ┌─────────────┐  ┌─────────────────┐   │
 │  │  Your App   │  │   Glaze CMS     │   │
 │  │   Routes    │  │  (Admin + API)  │   │
@@ -83,29 +83,63 @@ Run Glaze inside your TanStack Start app. Elysia mounts as a route handler:
 └─────────────────────────────────────────┘
 ```
 
+**TanStack Start:**
+
 ```typescript
 // src/routes/api.glaze.$.ts
-import { mountGlazeCms } from '@glaze/core';
+import { mountGlazeCms } from '@glaze/tanstack';
 
 export const Route = mountGlazeCms({
 	database: process.env.DATABASE_URL!,
 });
 ```
 
+**Next.js:**
+
+```typescript
+// app/api/[[...slugs]]/route.ts
+import { createNextHandlers } from '@glaze/nextjs';
+
+export const { GET, POST, PUT, DELETE, PATCH } = createNextHandlers({
+	database: process.env.DATABASE_URL!,
+});
+```
+
+**Astro:**
+
+```typescript
+// src/pages/api/[...slugs].ts
+import { createAstroHandlers } from '@glaze/astro';
+
+export const { GET, POST, PUT, DELETE, PATCH } = createAstroHandlers({
+	database: process.env.DATABASE_URL!,
+});
+```
+
+**Any WinterCG-compliant framework:**
+
+```typescript
+// Just use glaze.fetch directly
+import { createGlazeServer } from '@glaze/core';
+
+const glaze = createGlazeServer({
+	database: process.env.DATABASE_URL!,
+});
+
+// glaze.fetch is (request: Request) => Response
+export const handler = glaze.fetch;
+```
+
 **With custom routes** - build your Elysia app first, then pass it:
 
 ```typescript
-// src/routes/api.glaze.$.ts
 import { Elysia } from 'elysia';
-import { mountGlazeCms } from '@glaze/core';
+import { mountGlazeCms } from '@glaze/tanstack';
 
-// Your custom routes
 const api = new Elysia()
 	.get('/custom', () => 'hello')
-	.use(analyticsPlugin())
 	.post('/webhooks/stripe', handleStripe);
 
-// Mount Glaze with your routes merged in
 export const Route = mountGlazeCms({
 	database: process.env.DATABASE_URL!,
 	routes: api,
@@ -127,7 +161,7 @@ Run Glaze as a standalone server:
 
 ```
 ┌─────────────────────┐    ┌─────────────────────┐
-│  TanStack Start App │    │     Glaze CMS       │
+│   Your Frontend     │    │     Glaze CMS       │
 │    (Port 3000)      │───▶│    (Port 4000)      │
 │                     │    │   Admin + API       │
 └─────────────────────┘    └─────────────────────┘
@@ -138,7 +172,6 @@ Run Glaze as a standalone server:
 import { Elysia } from 'elysia';
 import { createGlazeServer } from '@glaze/core';
 
-// Optional: your custom routes
 const api = new Elysia()
 	.get('/custom', () => 'hello')
 	.post('/webhooks/stripe', handleStripe);
@@ -159,6 +192,15 @@ glaze.listen(4000);
 - Clear separation of concerns
 
 **Best for**: Larger teams, microservices, multiple sites sharing one CMS
+
+### Available Adapters
+
+| Package           | Framework       | Install                   |
+| ----------------- | --------------- | ------------------------- |
+| `@glaze/tanstack` | TanStack Start  | `bun add @glaze/tanstack` |
+| `@glaze/nextjs`   | Next.js         | `bun add @glaze/nextjs`   |
+| `@glaze/astro`    | Astro           | `bun add @glaze/astro`    |
+| `@glaze/core`     | Any (raw fetch) | `bun add @glaze/core`     |
 
 ### Eden Treaty Integration
 
@@ -1218,28 +1260,28 @@ Convergence tells you when things drift. It doesn't promise to save you from you
 
 ## 📋 Decisions Log
 
-| Decision          | Choice                                   | Rationale                             |
-| ----------------- | ---------------------------------------- | ------------------------------------- |
-| Runtime           | Bun                                      | Performance, future-proof             |
-| Framework         | Elysia                                   | Type-safe, Bun-native                 |
-| Admin UI          | TanStack Start                           | SSR, modern, growing                  |
-| ORM               | Drizzle                                  | Type-safe, lightweight                |
-| Validation        | drizzle-typebox                          | Schema → validation → OpenAPI, no dup |
-| Database          | PostgreSQL (primary)                     | Production-ready, JSONB, schemas      |
-| Auth              | Better-Auth                              | Battle-tested, not NIH                |
-| API               | REST first, GraphQL V2                   | Simple wins                           |
-| Schema editing    | Dev-only                                 | Matches Strapi, avoids complexity     |
-| Metadata storage  | `glaze` PostgreSQL schema                | Clean content tables in `public`      |
-| Code → UI         | Runtime introspection (`getTableConfig`) | Uses Drizzle's own understanding      |
-| UI → Code         | ts-morph                                 | Preserves formatting, surgical edits  |
-| DB ↔ Code         | drizzle-kit CLI                          | Proven tooling, no reinvention        |
-| V1 scope          | Tables, relations, enums                 | Core features first                   |
-| Custom types      | V2                                       | Edge case for power users             |
-| Deployment modes  | Integrated + Standalone                  | Flexibility like Payload              |
-| Type-safe client  | Eden Treaty                              | End-to-end types, no codegen          |
-| Project structure | `src/glaze/` for integrated mode         | Follows Payload pattern, familiar     |
-| CLI scaffolding   | `bunx glaze init`                        | Quick start for both modes            |
-| Mounting API      | `mountGlazeCms()` + `routes` option      | Clean, user builds Elysia first       |
+| Decision           | Choice                                   | Rationale                              |
+| ------------------ | ---------------------------------------- | -------------------------------------- |
+| Runtime            | Bun                                      | Performance, future-proof              |
+| Framework          | Elysia                                   | Type-safe, Bun-native                  |
+| Admin UI           | TanStack Start                           | SSR, modern, growing                   |
+| ORM                | Drizzle                                  | Type-safe, lightweight                 |
+| Validation         | drizzle-typebox                          | Schema → validation → OpenAPI, no dup  |
+| Database           | PostgreSQL (primary)                     | Production-ready, JSONB, schemas       |
+| Auth               | Better-Auth                              | Battle-tested, not NIH                 |
+| API                | REST first, GraphQL V2                   | Simple wins                            |
+| Schema editing     | Dev-only                                 | Matches Strapi, avoids complexity      |
+| Metadata storage   | `glaze` PostgreSQL schema                | Clean content tables in `public`       |
+| Code → UI          | Runtime introspection (`getTableConfig`) | Uses Drizzle's own understanding       |
+| UI → Code          | ts-morph                                 | Preserves formatting, surgical edits   |
+| DB ↔ Code          | drizzle-kit CLI                          | Proven tooling, no reinvention         |
+| V1 scope           | Tables, relations, enums                 | Core features first                    |
+| Custom types       | V2                                       | Edge case for power users              |
+| Deployment modes   | Integrated + Standalone                  | Flexibility for any setup              |
+| Framework adapters | @glaze/tanstack, nextjs, astro           | Framework-agnostic core, thin adapters |
+| Type-safe client   | Eden Treaty                              | End-to-end types, no codegen           |
+| Project structure  | `src/glaze/` for integrated mode         | Follows Payload pattern, familiar      |
+| CLI scaffolding    | `bunx glaze init`                        | Quick start for both modes             |
 
 ---
 
