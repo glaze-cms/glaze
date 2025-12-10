@@ -5,7 +5,7 @@ import prettierConfig from 'eslint-config-prettier';
 export default [
 	// Base ignores
 	{
-		ignores: ['build/', 'dist/', 'node_modules/', , '**/*.d.ts'],
+		ignores: ['build/', 'dist/', 'node_modules/', '**/*.d.ts'],
 	},
 
 	// Base recommended rules

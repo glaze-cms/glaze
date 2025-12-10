@@ -28,7 +28,7 @@
 		}
 	},
 	"scripts": {
-		"dev": "bun run --watch --hot ./packages/core/src/index.ts",
+		"dev": "cd examples/blog && bun dev",
 		"build": "bun run ./scripts/build.ts",
 		"start": "bun run ./dist/index.js"
 	},
