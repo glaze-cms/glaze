@@ -374,6 +374,509 @@ bun glaze migrate:apply
 | **Auth**              | Better-Auth          | Framework-agnostic, OAuth, sessions, TypeScript-first         |
 | **API**               | REST (GraphQL later) | Simple, well-understood, sufficient for V1                    |
 
+# Phase 1 Update for glaze-summary.md
+
+## INSERT THIS SECTION AFTER "Technology Stack" and BEFORE "The Schema ↔ UI Cycle"
+
+---
+
+## ✅ Phase 1: Config System (COMPLETE)
+
+**Status:** Fully Implemented and Tested (December 10, 2024)
+
+Phase 1 establishes the foundation: configuration system, validation, and server initialization.
+
+### What We Built
+
+#### 1. Two-Tier Type System
+
+```typescript
+// What users provide (optional fields for validation)
+export interface GlazeInitialConfig {
+	schema?: Record<string, unknown>;
+	database?: string;
+	port?: number;
+	prefix?: string;
+	routes?: any;
+	development?: DevelopmentConfig;
+	migrations?: MigrationsConfig;
+	contentAPI?: ContentAPIConfig;
+	logger?: LoggerOptions;
+}
+
+// After defaults applied (guaranteed fields)
+export interface GlazeConfig extends GlazeInitialConfig {
+	schema: Record<string, unknown>; // Required
+	database: string; // Required
+	prefix: string; // Required
+	development: DevelopmentConfig; // Required with defaults
+	migrations: MigrationsConfig; // Required with defaults
+	contentAPI: ContentAPIConfig; // Required with defaults
+}
+```
+
+**Why two types?**
+
+- `GlazeInitialConfig` - Optional fields allow validation to catch missing values
+- `GlazeConfig` - Required fields guarantee everything exists after validation + defaults
+- No ESLint warnings about unnecessary checks
+- Better error messages at runtime
+
+#### 2. Config Helper with Defaults
+
+```typescript
+export function glazeConfig(config: GlazeInitialConfig): GlazeConfig {
+	return {
+		...config,
+		schema: config.schema,
+		database: config.database,
+		prefix: config.prefix ?? '/api',
+		development: {
+			strategy: config.development?.strategy ?? 'migrate',
+			skipMigrationChecks: config.development?.skipMigrationChecks ?? false,
+		},
+		migrations: {
+			folder: config.migrations?.folder ?? './migrations',
+			table: config.migrations?.table ?? '__drizzle_migrations',
+			schema: config.migrations?.schema ?? 'drizzle',
+		},
+		contentAPI: {
+			enabled: config.contentAPI?.enabled ?? true,
+			exclude: config.contentAPI?.exclude ?? [],
+		},
+	} as GlazeConfig;
+}
+```
+
+**Features:**
+
+- Applies sensible defaults
+- Optional for users (defaults applied in `createGlazeServer` anyway)
+- Provides better autocomplete when exported from config file
+- Returns fully typed `GlazeConfig`
+
+#### 3. Comprehensive Validation
+
+```typescript
+function validateConfig(config: GlazeInitialConfig): void {
+	// 1. Required fields
+	if (!config.database) {
+		throw new Error(
+			'❌ Missing required field: database\n' +
+				'   Provide a PostgreSQL connection URL in your config',
+		);
+	}
+
+	if (!config.schema) {
+		throw new Error(
+			'❌ Missing required field: schema\n' +
+				'   Provide path to your Drizzle schema or imported schema object',
+		);
+	}
+
+	// 2. Database URL format
+	if (
+		!config.database.startsWith('postgres://') &&
+		!config.database.startsWith('postgresql://')
+	) {
+		throw new Error(
+			`❌ Invalid database URL: ${config.database}\n` +
+				'   Glaze requires PostgreSQL. Expected postgres:// or postgresql:// prefix.',
+		);
+	}
+
+	// 3. Strategy enum
+	if (
+		config.development?.strategy &&
+		!['migrate', 'push'].includes(config.development.strategy)
+	) {
+		throw new Error(
+			`❌ Invalid development.strategy: ${config.development.strategy}\n` +
+				'   Must be "migrate" or "push"',
+		);
+	}
+
+	// 4. Block push in production
+	const isProduction = process.env.NODE_ENV === 'production';
+	if (isProduction && config.development?.strategy === 'push') {
+		throw new Error(
+			'❌ Push mode is not allowed in production!\n' +
+				'   Use migrations for production deployments.\n' +
+				'   Set development.strategy to "migrate"',
+		);
+	}
+}
+```
+
+**Validation includes:**
+
+- ✅ Required field checks
+- ✅ Database URL format validation
+- ✅ Strategy enum validation
+- ✅ Production safety (blocks `push` mode)
+- ✅ Helpful error messages with fix suggestions
+
+#### 4. Server Creation with Elysia
+
+```typescript
+export function createGlazeServer(config: GlazeInitialConfig) {
+	// Validate first
+	validateConfig(config);
+
+	// Apply defaults (in case user didn't use glazeConfig())
+	const finalConfig = glazeConfig(config);
+
+	const { database, schema, prefix, routes } = finalConfig;
+
+	// Initialize logger
+	const logger = createLogger({
+		name: 'glaze',
+		...finalConfig.logger,
+	});
+
+	logger.info(`🍰 Glaze CMS v${GLAZE_VERSION} starting...`);
+
+	// Connect to PostgreSQL using Bun's native driver
+	logger.info('Connecting to PostgreSQL...');
+	const db = drizzle(database, { schema });
+
+	// Create Elysia app
+	const app = new Elysia({ prefix })
+		.decorate('db', db)
+		.decorate('logger', logger)
+		.decorate('schema', schema)
+
+		// Health check endpoint
+		.get('/health', ({ set }) => {
+			set.status = 200;
+			return {
+				status: 'ok' as const,
+				version: GLAZE_VERSION,
+				timestamp: new Date().toISOString(),
+			};
+		})
+
+		// Ready check (verifies database connection)
+		.get('/ready', async ({ db, set }) => {
+			try {
+				await db.execute(sql`SELECT 1`);
+				set.status = 200;
+				return {
+					status: 'ready' as const,
+					database: 'connected' as const,
+					timestamp: new Date().toISOString(),
+				};
+			} catch (error) {
+				set.status = 503;
+				const errorMessage =
+					error instanceof Error
+						? error.message.split('\n')[0] // Clean up error
+						: 'Unknown error';
+				return {
+					status: 'error' as const,
+					database: 'disconnected' as const,
+					error: errorMessage,
+					timestamp: new Date().toISOString(),
+				};
+			}
+		});
+
+	// TODO: Auto-generate Content API (Phase 2)
+	// if (schema && contentAPI.enabled) {
+	//   createContentAPI(app, schema, db, logger, contentAPI);
+	// }
+
+	// Merge user's custom routes if provided
+	if (routes) {
+		app.use(routes);
+	}
+
+	// Startup hook
+	app.onStart(() => {
+		logger.info(`🍰 Glaze CMS v${GLAZE_VERSION} ready`);
+		logger.info(`   API prefix: ${prefix}`);
+	});
+
+	return app;
+}
+
+export type GlazeServer = ReturnType<typeof createGlazeServer>;
+```
+
+**Features:**
+
+- ✅ Validates config before proceeding
+- ✅ Applies defaults automatically
+- ✅ Initializes Pino logger with config options
+- ✅ Connects to PostgreSQL using Drizzle
+- ✅ Creates Elysia app with decorators (db, logger, schema)
+- ✅ Provides health and ready endpoints
+- ✅ Merges custom user routes
+- ✅ Startup logging
+
+#### 5. Clean User-Facing API
+
+```typescript
+export function glaze(config: GlazeInitialConfig) {
+	const server = createGlazeServer(config);
+
+	return Object.assign(server, {
+		start(port?: number) {
+			const finalPort = port ?? config.port ?? 4000;
+			server.listen(finalPort);
+			return server;
+		},
+	});
+}
+```
+
+### Database Schema Organization
+
+Three PostgreSQL schemas:
+
+```
+public   → User application data (posts, users, comments, etc.)
+drizzle  → Migration history (__drizzle_migrations table)
+glaze    → CMS infrastructure (Phase 4: settings, entities, user_preferences)
+```
+
+**Why separate schemas?**
+
+- ✅ Clean separation of concerns
+- ✅ User content stays clean (no CMS pollution)
+- ✅ Easy to inspect and understand
+- ✅ System tables clearly identified
+
+### Usage Examples
+
+**Simple (most common):**
+
+```typescript
+import { glaze } from '@glaze/core';
+import * as schema from './schema';
+
+glaze({
+	database: process.env.DATABASE_URL!,
+	schema,
+}).start(4000);
+```
+
+**With glazeConfig helper:**
+
+```typescript
+// glaze.config.ts
+import { glazeConfig } from '@glaze/core';
+import * as schema from './schema';
+
+export default glazeConfig({
+	database: process.env.DATABASE_URL!,
+	schema,
+	prefix: '/api/v1',
+	port: 4000,
+	development: {
+		strategy: 'migrate',
+		skipMigrationChecks: false,
+	},
+	logger: {
+		level: 'debug',
+	},
+});
+
+// src/index.ts
+import { glaze } from '@glaze/core';
+import config from './glaze.config';
+
+glaze(config).start(); // Uses config.port
+```
+
+**With custom routes:**
+
+```typescript
+import { Elysia } from 'elysia';
+import { glaze } from '@glaze/core';
+import * as schema from './schema';
+
+const customRoutes = new Elysia()
+	.get('/custom', () => 'Hello!')
+	.post('/webhooks/stripe', handleStripeWebhook)
+	.get('/analytics', getAnalytics);
+
+glaze({
+	database: process.env.DATABASE_URL!,
+	schema,
+	routes: customRoutes,
+}).start(4000);
+```
+
+**Advanced (modify before starting):**
+
+```typescript
+import { glaze } from '@glaze/core';
+import * as schema from './schema';
+
+const app = glaze({
+	database: process.env.DATABASE_URL!,
+	schema,
+});
+
+// Add more routes
+app.get('/status', () => ({ uptime: process.uptime() }));
+
+// Add middleware
+app.onBeforeHandle((context) => {
+	// Custom logic
+});
+
+app.start(4000);
+```
+
+### Available Endpoints (Phase 1)
+
+- **`GET /api/health`** - Health check
+
+  ```json
+  {
+  	"status": "ok",
+  	"version": "0.0.1",
+  	"timestamp": "2024-12-10T..."
+  }
+  ```
+
+- **`GET /api/ready`** - Readiness check (verifies database connection)
+  ```json
+  {
+  	"status": "ready",
+  	"database": "connected",
+  	"timestamp": "2024-12-10T..."
+  }
+  ```
+
+### Configuration Reference
+
+```typescript
+{
+  // REQUIRED
+  schema: Record<string, unknown>  // Imported Drizzle schema
+  database: string                 // PostgreSQL connection URL
+
+  // OPTIONAL
+  port?: number                    // Default: 4000
+  prefix?: string                  // Default: '/api'
+  routes?: Elysia                  // Custom routes to merge
+
+  development?: {
+    strategy?: 'migrate' | 'push'  // Default: 'migrate'
+    skipMigrationChecks?: boolean  // Default: false
+  }
+
+  migrations?: {
+    folder?: string                // Default: './migrations'
+    table?: string                 // Default: '__drizzle_migrations'
+    schema?: string                // Default: 'drizzle'
+  }
+
+  contentAPI?: {
+    enabled?: boolean              // Default: true
+    exclude?: string[]             // Default: []
+  }
+
+  logger?: {
+    level?: string                 // Default: 'info'
+    name?: string                  // Default: 'glaze'
+  }
+}
+```
+
+### Testing Phase 1
+
+```bash
+# Clone and install
+git clone git@github.com:glaze-cms/glaze.git
+cd glaze
+bun install
+
+# Run blog example
+cd examples/blog
+bun dev
+
+# Expected output:
+# INFO (glaze): 🍰 Glaze CMS v0.0.1 starting...
+# INFO (glaze): Connecting to PostgreSQL...
+# INFO (glaze): 🍰 Glaze CMS v0.0.1 ready
+# INFO (glaze):    API prefix: /api
+
+# Test endpoints
+curl http://localhost:4000/api/health
+curl http://localhost:4000/api/ready
+```
+
+### Files Implemented
+
+```
+packages/
+├── core/
+│   ├── src/
+│   │   ├── config.ts       ✅ Type system + glazeConfig()
+│   │   ├── server.ts       ✅ Validation + createGlazeServer()
+│   │   └── index.ts        ✅ Exports glaze() + types
+│   └── package.json        ✅ Dependencies
+│
+├── logger/
+│   ├── src/index.ts        ✅ Pino logger setup
+│   └── package.json        ✅ Dependencies
+│
+└── shared/
+    ├── src/index.ts        ✅ GLAZE_VERSION constant
+    └── package.json        ✅ Dependencies
+
+examples/
+└── blog/
+    ├── src/
+    │   ├── index.ts        ✅ Simple glaze() usage
+    │   └── schema.ts       ✅ Sample posts table
+    ├── package.json        ✅ Dependencies
+    └── README.md           ✅ Updated docs
+```
+
+### What's NOT in Phase 1
+
+These features are planned but NOT yet implemented:
+
+- ❌ Auto-generated Content API (Phase 2)
+  - No CRUD endpoints yet
+  - No validation
+  - No OpenAPI docs
+
+- ❌ Database migrations (Phase 3)
+  - No `db:generate` command
+  - No `db:migrate` command
+  - No migration workflow
+
+- ❌ Convergence engine (Phase 4)
+  - No drift detection
+  - No interactive CLI
+  - No schema sync
+
+- ❌ Admin UI (Phase 5)
+  - No TanStack Start app
+  - No content management interface
+  - No schema editor
+
+**Phase 1 provides the foundation for all future features.**
+
+### Key Takeaways
+
+✅ **Clean API** - `glaze(config).start(port)` is intuitive  
+✅ **Type-safe** - Two-tier type system catches errors  
+✅ **Validated** - Comprehensive checks with helpful messages  
+✅ **Extensible** - Custom routes via `routes` option  
+✅ **Tested** - Working blog example demonstrates usage  
+✅ **Documented** - READMEs and examples updated
+
+**Phase 1 is complete.**
+
+---
+
 ### Philosophy: Standing on Giants
 
 Glaze doesn't reinvent the wheel. Instead, it integrates best-in-class tools:
