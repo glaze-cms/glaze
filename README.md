@@ -2,13 +2,13 @@
 
 > A Bun-native content management system built for performance
 
-**Status:** 🚧 Early Development
+**Status:** 🚧 Active Development - Phase 1 Complete
 
 ---
 
 ## What is Glaze?
 
-Glaze is a modern CMS that runs **exclusively on Bun** — leveraging native APIs like `Bun.sql`, `Bun.file`, and the Bun runtime for maximum performance at minimal cost.
+Glaze is a modern CMS that runs **exclusively on Bun** — leveraging native APIs for maximum performance at minimal cost.
 
 This isn't a Node.js CMS ported to Bun. It's built from the ground up to take full advantage of everything Bun offers.
 
@@ -24,11 +24,78 @@ Most CMSs force a tradeoff: developer control or editor experience. Glaze refuse
 
 We don't reinvent wheels. Glaze composes best-in-class libraries into a cohesive CMS:
 
-- **Bun.sql** for native database connectivity
+- **Bun** for native runtime performance
 - **Drizzle** for type-safe schema management
 - **Elysia** for Bun-native API routing
-- **Better-Auth** for authentication
-- **TanStack Start** for SSR admin UI
+- **Better-Auth** for authentication (coming soon)
+- **TanStack Start** for SSR admin UI (coming soon)
+
+---
+
+## Quick Start
+
+### Installation
+
+```bash
+# Create a new Glaze project (coming soon)
+bunx create-glaze my-blog
+
+# Or add to existing project
+bun add @glaze/core drizzle-orm
+```
+
+### Basic Usage
+
+```typescript
+// src/index.ts
+import { glaze } from '@glaze/core';
+import * as schema from './schema';
+
+const app = glaze({
+	database: process.env.DATABASE_URL!,
+	schema,
+});
+
+app.start(4000);
+```
+
+That's it! Glaze handles configuration, validation, and server startup.
+
+### Define Your Schema
+
+```typescript
+// src/schema.ts
+import { pgTable, serial, text, varchar, timestamp } from 'drizzle-orm/pg-core';
+
+export const posts = pgTable('posts', {
+	id: serial('id').primaryKey(),
+	title: varchar('title', { length: 255 }).notNull(),
+	slug: varchar('slug', { length: 255 }).notNull().unique(),
+	content: text('content'),
+	status: varchar('status', { length: 20 }).default('draft'),
+	createdAt: timestamp('created_at').defaultNow(),
+	updatedAt: timestamp('updated_at').defaultNow(),
+});
+```
+
+### Auto-Generated API (Phase 2)
+
+Once Phase 2 is complete, your schema automatically gets CRUD endpoints:
+
+```bash
+GET    /api/posts           # List all posts
+POST   /api/posts           # Create new post
+GET    /api/posts/:id       # Get single post
+PUT    /api/posts/:id       # Update post
+DELETE /api/posts/:id       # Delete post
+```
+
+With automatic:
+
+- ✅ Request/response validation
+- ✅ Type safety
+- ✅ OpenAPI documentation
+- ✅ Pagination support
 
 ---
 
@@ -54,11 +121,113 @@ We don't reinvent wheels. Glaze composes best-in-class libraries into a cohesive
 
 ---
 
-## The Convergence Engine
+## Configuration
+
+### Simple Configuration
+
+```typescript
+import { glaze } from '@glaze/core';
+import * as schema from './schema';
+
+glaze({
+	database: process.env.DATABASE_URL!,
+	schema,
+}).start(4000);
+```
+
+### Advanced Configuration
+
+```typescript
+import { glazeConfig } from '@glaze/core';
+import * as schema from './schema';
+
+export default glazeConfig({
+	database: process.env.DATABASE_URL!,
+	schema,
+
+	// API configuration
+	prefix: '/api/v1',
+	port: 4000,
+
+	// Development settings
+	development: {
+		strategy: 'migrate', // or 'push' for fast prototyping
+		skipMigrationChecks: false,
+	},
+
+	// Migration settings
+	migrations: {
+		folder: './migrations',
+		table: '__drizzle_migrations',
+		schema: 'drizzle', // Separate schema for migrations
+	},
+
+	// Content API
+	contentAPI: {
+		enabled: true,
+		exclude: [], // Tables to exclude from auto-generation
+	},
+
+	// Logger
+	logger: {
+		level: 'info',
+	},
+});
+```
+
+### Database Schemas
+
+Glaze uses three PostgreSQL schemas for clean separation:
+
+```
+├── public schema          ← Your application data
+│   ├── posts
+│   ├── users
+│   └── comments
+│
+├── drizzle schema         ← Migration history
+│   └── __drizzle_migrations
+│
+└── glaze schema           ← CMS infrastructure (Phase 4)
+    ├── settings
+    ├── entities
+    └── user_preferences
+```
+
+---
+
+## Custom Routes
+
+Add custom routes alongside auto-generated ones:
+
+```typescript
+import { Elysia } from 'elysia';
+import { glaze } from '@glaze/core';
+import * as schema from './schema';
+
+const customRoutes = new Elysia()
+	.get('/health-check', () => ({ status: 'healthy' }))
+	.post('/webhooks/stripe', handleStripeWebhook)
+	.get('/posts/published', getPublishedPosts);
+
+const app = glaze({
+	database: process.env.DATABASE_URL!,
+	schema,
+	routes: customRoutes,
+});
+
+app.start(4000);
+```
+
+Custom routes are merged after auto-generated routes, so you can override specific endpoints by method/path.
+
+---
+
+## The Convergence Engine (Phase 4)
 
 Schema drift is inevitable. Developers edit code, admins tweak settings, databases get modified directly. Most CMSs break silently when this happens. Glaze detects it.
 
-**Convergence** is a three-way sync engine that keeps your code, database, and admin UI in harmony:
+**Convergence** is a bidirectional sync engine that keeps your code, database, and admin UI in harmony:
 
 ```
 ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
@@ -70,111 +239,74 @@ Schema drift is inevitable. Developers edit code, admins tweak settings, databas
                     Convergence Engine
 ```
 
-**On startup in development**, Convergence tells you exactly what changed:
+**On startup in development**, Convergence detects and helps you resolve drift:
 
 ```
 ⚠️  Schema drift detected!
 
 Your database schema does not match your schema files.
 
-  1) Accept database schema (update code to match DB)
-  2) Reject database changes (revert DB to match code)
-  3) Show differences
-```
+  1) Generate migration from DB changes (accept DB state)
+  2) Generate migration from code changes (revert DB to code)
+  3) Show detailed diff
 
-### Three-Way Sync
+You must resolve this before continuing.
 
-| Direction     | Tool               | Purpose                            |
-| ------------- | ------------------ | ---------------------------------- |
-| **Code ↔ DB** | drizzle-kit        | Detect drift, generate migrations  |
-| **Code → UI** | `getTableConfig()` | Display schema in admin editor     |
-| **UI → Code** | ts-morph           | Write changes back to schema files |
-
-No silent failures. No mysterious bugs in production. You see the drift, you decide how to fix it.
-
----
-
-## Deployment Modes
-
-Like Payload, Glaze gives you flexibility in how you deploy:
-
-### Integrated Mode (Single Process)
-
-Run Glaze inside your TanStack Start app:
-
-```typescript
-// src/routes/api.glaze.$.ts
-import { createGlazeServer } from '@glaze/core';
-import { createFileRoute } from '@tanstack/react-router';
-
-const glaze = createGlazeServer({
-	schema: './src/schema.ts',
-	database: process.env.DATABASE_URL,
-});
-
-const handle = ({ request }: { request: Request }) => glaze.fetch(request);
-
-export const Route = createFileRoute('/api/glaze/$')({
-	server: {
-		handlers: { GET: handle, POST: handle, PUT: handle, DELETE: handle },
-	},
-});
-```
-
-**Best for:** Most projects, simpler deployments, smaller teams
-
-### Separate Mode (Two Processes)
-
-Run Glaze as a standalone server:
-
-```typescript
-// server.ts
-import { createGlazeServer } from '@glaze/core';
-
-const glaze = createGlazeServer({
-	schema: './src/schema.ts',
-	database: process.env.DATABASE_URL,
-});
-
-glaze.listen(4000);
-```
-
-**Best for:** Larger teams, microservices, multiple frontends sharing one CMS
-
-### End-to-End Type Safety with Eden
-
-Both modes support [Eden Treaty](https://elysiajs.com/eden/overview.html) for type-safe API calls — like tRPC, but without code generation:
-
-```typescript
-// Fully typed, no codegen needed
-const posts = await api().posts.get();
+Your choice [1-3]: _
 ```
 
 ---
 
-## Key Features
+## Roadmap
 
-| Feature                | Description                                                 |
-| ---------------------- | ----------------------------------------------------------- |
-| **⚡ Bun Native**      | Built exclusively for Bun — not a port, native from day one |
-| **🔒 Type-Safe**       | End-to-end type safety from database schema to admin UI     |
-| **🔄 Convergence**     | Bidirectional schema sync between code, database, and UI    |
-| **🎨 Modern Admin**    | SSR admin panel with TanStack Start                         |
-| **🔌 Extensible**      | Elysia plugin system for custom routes and webhooks         |
-| **📦 Flexible Deploy** | Run integrated or standalone — your choice                  |
+### ✅ Phase 1: Config System (Complete)
+
+- [x] Config validation
+- [x] Type-safe configuration
+- [x] Database connection
+- [x] Health/ready endpoints
+- [x] Logger integration
+
+### 🚧 Phase 2: Content API (In Progress)
+
+- [ ] Auto-generated CRUD endpoints
+- [ ] Request/response validation
+- [ ] Pagination support
+- [ ] OpenAPI documentation
+
+### 📋 Phase 3: Migrations
+
+- [ ] Schema migration workflow
+- [ ] Push vs migrate strategies
+- [ ] Migration history
+- [ ] Auto-run on startup
+
+### 🔮 Phase 4: Convergence Engine
+
+- [ ] Schema drift detection
+- [ ] Interactive resolution
+- [ ] Bidirectional sync
+- [ ] CLI integration
+
+### 🎨 Phase 5: Admin UI
+
+- [ ] TanStack Start admin
+- [ ] Content management
+- [ ] Schema editor (dev only)
+- [ ] Media library
 
 ---
 
 ## Technology Stack
 
-| Layer       | Technology             | Why?                                        |
-| ----------- | ---------------------- | ------------------------------------------- |
-| Runtime     | Bun                    | Native TypeScript, fast startup, low memory |
-| Database    | Bun.sql + Drizzle      | Native PostgreSQL bindings, type-safe ORM   |
-| Backend     | Elysia                 | Built for Bun, type-safe, fastest framework |
-| Admin UI    | TanStack Start         | SSR with typed server functions             |
-| Auth        | Better-Auth            | Framework-agnostic, battle-tested           |
-| Schema Sync | drizzle-kit + ts-morph | Bidirectional code ↔ DB ↔ UI sync           |
+| Layer      | Technology           | Why?                                        |
+| ---------- | -------------------- | ------------------------------------------- |
+| Runtime    | Bun                  | Native TypeScript, fast startup, low memory |
+| Database   | PostgreSQL + Drizzle | Type-safe ORM, native bindings              |
+| Backend    | Elysia               | Built for Bun, type-safe, fastest framework |
+| Admin UI   | TanStack Start       | SSR with typed server functions             |
+| Auth       | Better-Auth          | Framework-agnostic, battle-tested           |
+| Validation | drizzle-typebox      | Schema → validation → OpenAPI               |
 
 ---
 
@@ -185,19 +317,45 @@ const posts = await api().posts.get();
 
 ---
 
-## Quick Start
-
-> ⚠️ Glaze is in early development. APIs will change.
+## Development
 
 ```bash
-# Clone and install
+# Clone repository
 git clone git@github.com:glaze-cms/glaze.git
 cd glaze
+
+# Install dependencies
 bun install
 
-# Start development server
+# Run blog example
+cd examples/blog
 bun dev
 ```
+
+---
+
+## Project Structure
+
+```
+glaze/
+├── packages/
+│   ├── core/           # Core Glaze engine
+│   ├── shared/         # Shared types and utilities
+│   ├── logger/         # Pino-based logger
+│   ├── convergence/    # Schema drift detection (Phase 4)
+│   └── admin/          # Admin UI (Phase 5)
+│
+├── examples/
+│   └── blog/           # Simple blog example
+│
+└── docs/               # Documentation
+```
+
+---
+
+## Contributing
+
+Glaze is in active development. We're not accepting external contributions yet, but feedback and issue reports are welcome!
 
 ---
 

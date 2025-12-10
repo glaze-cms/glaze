@@ -1,4 +1,14 @@
-export type { GlazeConfig, GlazeDatabase, GlazeServer } from './server';
-export { createGlazeServer } from './server';
+import type { GlazeInitialConfig } from './config';
+import { createGlazeServer } from './server';
 
-export { GLAZE_VERSION } from '@glaze/shared';
+export function glaze(initialGlazeConfig: GlazeInitialConfig) {
+	const server = createGlazeServer(initialGlazeConfig);
+
+	return Object.assign(server, {
+		start(port?: number) {
+			const finalPort = port ?? initialGlazeConfig.port ?? 4000;
+			server.listen(finalPort);
+			return server;
+		},
+	});
+}

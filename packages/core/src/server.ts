@@ -1,118 +1,87 @@
-import { Elysia } from 'elysia';
-import { drizzle, type BunSQLDatabase } from 'drizzle-orm/bun-sql';
+import Elysia from 'elysia';
+import { drizzle } from 'drizzle-orm/bun-sql';
 import { sql } from 'drizzle-orm';
 
-import { createLogger, type LoggerOptions } from '@glaze/logger';
+import { createLogger } from '@glaze/logger';
 import { GLAZE_VERSION } from '@glaze/shared';
+import { glazeConfig, type GlazeInitialConfig } from './config';
 
 /**
- * Configuration options for creating a Glaze server
+ * Validate Glaze configuration
+ * Throws descriptive errors if config is invalid
  */
-export interface GlazeConfig {
-	/**
-	 * PostgreSQL connection URL
-	 * @example "postgres://user:pass@localhost:5432/mydb"
-	 */
-	database: string;
+function validateConfig(config: GlazeInitialConfig): void {
+	// 1. Check required fields
+	if (!config.database) {
+		throw new Error(
+			'❌ Missing required field: database\n' +
+				'   Provide a PostgreSQL connection URL in your config',
+		);
+	}
 
-	/**
-	 * Drizzle schema object(s).
-	 * Import your schema and pass it directly here.
-	 *
-	 * @example
-	 * ```typescript
-	 * import * as schema from './schema';
-	 *
-	 * createGlazeServer({
-	 *   database: '...',
-	 *   schema,
-	 * });
-	 * ```
-	 */
+	if (!config.schema) {
+		throw new Error(
+			'❌ Missing required field: schema\n' +
+				'   Provide path to your Drizzle schema or imported schema object',
+		);
+	}
 
-	schema?: Record<string, unknown>;
+	// 2. Validate database URL format
+	if (
+		!config.database.startsWith('postgres://') &&
+		!config.database.startsWith('postgresql://')
+	) {
+		throw new Error(
+			`❌ Invalid database URL: ${config.database}\n` +
+				'   Glaze requires PostgreSQL. Expected postgres:// or postgresql:// prefix.',
+		);
+	}
 
-	/**
-	 * API prefix for all Glaze routes
-	 * @default "/api"
-	 */
-	prefix?: string;
+	// 3. Validate strategy enum
+	if (
+		config.development?.strategy &&
+		!['migrate', 'push'].includes(config.development.strategy)
+	) {
+		throw new Error(
+			`❌ Invalid development.strategy: ${config.development.strategy}\n` +
+				'   Must be "migrate" or "push"',
+		);
+	}
 
-	/**
-	 * Custom Elysia routes to merge with Glaze
-	 * Build your routes first, then pass them here
-	 *
-	 * @example
-	 * ```typescript
-	 * const customRoutes = new Elysia()
-	 *   .get('/custom', () => 'hello')
-	 *   .post('/webhooks/stripe', handleStripe);
-	 *
-	 * createGlazeServer({
-	 *   database: '...',
-	 *   routes: customRoutes,
-	 * });
-	 * ```
-	 */
-	routes?: Elysia;
-
-	/**
-	 * Logger configuration
-	 */
-	logger?: LoggerOptions;
+	// 4. Block push mode in production
+	const isProduction = process.env.NODE_ENV === 'production';
+	if (isProduction && config.development?.strategy === 'push') {
+		throw new Error(
+			'❌ Push mode is not allowed in production!\n' +
+				'   Use migrations for production deployments.\n' +
+				'   Set development.strategy to "migrate"',
+		);
+	}
 }
 
-export type GlazeDatabase = BunSQLDatabase;
+export function createGlazeServer(config: GlazeInitialConfig) {
+	// Validate config first
+	validateConfig(config);
 
-/**
- * Creates a Glaze CMS server instance
- *
- * @example
- * ```typescript
- * // Standalone mode
- * const glaze = createGlazeServer({
- *   database: process.env.DATABASE_URL!,
- * });
- * glaze.listen(4000);
- *
- * // With custom routes
- * const api = new Elysia()
- *   .get('/custom', () => 'hello');
- *
- * const glaze = createGlazeServer({
- *   database: process.env.DATABASE_URL!,
- *   routes: api,
- * });
- * ```
- */
-export function createGlazeServer(config: GlazeConfig) {
-	const { database, schema, prefix = '/api', routes } = config;
+	// Apply defaults (in case user didn't use glazeConfig())
+	const finalConfig = glazeConfig(config);
+
+	// Destructure - no need for defaults, glazeConfig already handled them
+	const { database, schema, prefix, routes } = finalConfig;
 
 	const logger = createLogger({
 		name: 'glaze',
-		...config.logger,
+		...finalConfig.logger,
 	});
 
 	logger.info(`🍰 Glaze CMS v${GLAZE_VERSION} starting...`);
 
-	// Validate PostgreSQL connection string
-	if (
-		!database.startsWith('postgres://') &&
-		!database.startsWith('postgresql://')
-	) {
-		throw new Error(
-			`Invalid database URL: ${database}. ` +
-				`Glaze requires PostgreSQL. Expected postgres:// or postgresql:// prefix.`,
-		);
-	}
-
 	// Initialize PostgreSQL connection using Bun's native driver
 	logger.info('Connecting to PostgreSQL...');
-	const db = schema ? drizzle(database, { schema }) : drizzle(database);
+	const db = drizzle(database, { schema });
 
 	// Create Elysia app
 	const app = new Elysia({ prefix })
-		// Decorate context with database and logger
 		.decorate('db', db)
 		.decorate('logger', logger)
 		.decorate('schema', schema)
@@ -139,14 +108,26 @@ export function createGlazeServer(config: GlazeConfig) {
 				};
 			} catch (error) {
 				set.status = 503;
+
+				// Clean up the error message
+				const errorMessage =
+					error instanceof Error
+						? error.message.split('\n')[0] // Take only first line
+						: 'Unknown error';
+
 				return {
 					status: 'error' as const,
 					database: 'disconnected' as const,
-					error: error instanceof Error ? error.message : 'Unknown error',
+					error: errorMessage,
 					timestamp: new Date().toISOString(),
 				};
 			}
 		});
+
+	// TODO: Auto-generate Content API (Phase 2)
+	// if (schema && contentAPI.enabled) {
+	//   createContentAPI(app, schema, db, logger, contentAPI);
+	// }
 
 	// Merge user's custom routes if provided
 	if (routes) {
@@ -155,7 +136,7 @@ export function createGlazeServer(config: GlazeConfig) {
 
 	// Startup hook
 	app.onStart(() => {
-		logger.info(`🍰 Glaze CMS v${GLAZE_VERSION} ready`);
+		logger.info(`🍰 Glaze CMS v${GLAZE_VERSION} ready 🚀`);
 		logger.info(`   API prefix: ${prefix}`);
 	});
 
