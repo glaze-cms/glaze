@@ -22,10 +22,6 @@
       "dependencies": {
         "@glaze/core": "workspace:*",
       },
-      "devDependencies": {
-        "@types/bun": "latest",
-        "typescript": "catalog:development",
-      },
     },
     "packages/core": {
       "name": "@glaze/core",
