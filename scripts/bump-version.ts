@@ -5,7 +5,14 @@ import { readdir } from 'fs/promises';
 import { join } from 'path';
 
 const PACKAGES_DIR = './packages';
-const validBumps = ['patch', 'minor', 'major'];
+const validBumps = ['patch', 'minor', 'major'] as const;
+type BumpType = (typeof validBumps)[number];
+
+interface PackageJson {
+	name: string;
+	version: string;
+	private?: boolean;
+}
 
 function bumpVersion(
 	currentVersion: string,
@@ -22,7 +29,7 @@ function bumpVersion(
 		case 'patch':
 			return `${String(major)}.${String(minor)}.${String(patch + 1)}`;
 		default:
-			throw new Error(`Invalid bump type: ${bumpType}`);
+			throw new Error('Invalid bump type');
 	}
 }
 
@@ -33,8 +40,9 @@ function bumpVersion(
 async function main() {
 	const bumpType = process.argv[2] ?? 'patch';
 
-	if (!validBumps.includes(bumpType)) {
+	if (!validBumps.includes(bumpType as BumpType)) {
 		console.error(`❌ Invalid bump type: ${bumpType}`);
+
 		console.error(`   Valid options: ${validBumps.join(', ')}`);
 		process.exit(1);
 	}
@@ -42,6 +50,7 @@ async function main() {
 	console.log(`📦 Bumping all packages (${bumpType})...\n`);
 
 	const packages = await readdir(PACKAGES_DIR, { withFileTypes: true });
+	let hasErrors = false;
 
 	for (const pkg of packages) {
 		if (!pkg.isDirectory()) continue;
@@ -49,11 +58,7 @@ async function main() {
 		const pkgJsonPath = join(PACKAGES_DIR, pkg.name, 'package.json');
 
 		try {
-			const pkgJson = (await Bun.file(pkgJsonPath).json()) as {
-				name: string;
-				private: boolean;
-				version: string;
-			};
+			const pkgJson = (await Bun.file(pkgJsonPath).json()) as PackageJson;
 
 			// Skip private packages
 			if (pkgJson.private) {
@@ -62,7 +67,7 @@ async function main() {
 			}
 
 			const oldVersion = pkgJson.version;
-			const newVersion = bumpVersion(oldVersion, bumpType);
+			const newVersion = bumpVersion(oldVersion, bumpType as BumpType);
 
 			pkgJson.version = newVersion;
 
@@ -70,11 +75,24 @@ async function main() {
 
 			console.log(`✅ ${pkgJson.name}: ${oldVersion} → ${newVersion}`);
 		} catch (error) {
+			hasErrors = true;
+
 			console.error(`❌ Failed to bump ${pkg.name}:`, error);
 		}
 	}
 
 	console.log('\n✨ Done!');
+
+	if (hasErrors) {
+		process.exit(1);
+	}
 }
 
-main().catch(console.error);
+main().catch((error: unknown) => {
+	if (error instanceof Error) {
+		console.error(error.message);
+	} else {
+		console.error(error);
+	}
+	process.exitCode = 1;
+});
