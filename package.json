@@ -26,6 +26,10 @@
 			"typescript-eslint": "latest",
 			"prettier": "latest",
 			"typescript": "latest"
+		},
+		"system": {
+			"pino": "latest",
+			"pino-pretty": "latest"
 		}
 	},
 	"devDependencies": {

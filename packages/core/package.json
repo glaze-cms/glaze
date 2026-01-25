@@ -1,7 +1,7 @@
 {
 	"name": "@glaze/core",
 	"version": "0.0.3",
-	"description": "Core framework for Glaze CMS - a Bun-native headless CMS",
+	"description": "Core module of the Glaze framework, responsible for running the CMS server and providing essential functionality.",
 	"license": "MIT",
 	"type": "module",
 	"main": "./src/index.ts",
