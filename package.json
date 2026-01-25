@@ -1,0 +1,15 @@
+{
+  "name": "glaze",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "catalogs": {
+    "development": {
+      "typescript": "next"
+    }
+  },
+  "scripts": {
+    "dev": "./scripts/dev.sh"
+  }
+}

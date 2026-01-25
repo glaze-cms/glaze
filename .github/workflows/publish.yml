@@ -1,0 +1,40 @@
+name: Publish Packages
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Publish @glaze packages
+        env:
+          GLAZE_REGISTRY_URL: ${{ secrets.GLAZE_REGISTRY_URL }}
+          GLAZE_REGISTRY_TOKEN: ${{ secrets.GLAZE_REGISTRY_TOKEN }}
+        run: |
+          for dir in packages/*/ ; do
+            if [ -f "$dir/package.json" ]; then
+              # Check if package is private
+              is_private=$(jq -r '.private' "$dir/package.json")
+              if [ "$is_private" = "true" ]; then
+                echo "Skipping $(basename $dir) (private: true)"
+                continue
+              fi
+
+              echo "Publishing $(basename $dir)..."
+              cd $dir
+              bun publish --non-interactive || echo "Skipping $(basename $dir) (likely already published)"
+              cd ../..
+            fi
+          done
