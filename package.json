@@ -3,6 +3,7 @@
 	"private": true,
 	"scripts": {
 		"dev": "./scripts/dev.sh",
+		"build": "bun run --filter '*' prepare",
 		"test": "bun test",
 		"lint": "bun --filter '*' lint",
 		"lint:fix": "bun --filter '*' lint --fix",

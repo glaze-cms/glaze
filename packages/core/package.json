@@ -1,10 +1,24 @@
 {
 	"name": "@glaze/core",
 	"version": "0.0.1",
-	"module": "index.ts",
-	"main": "index.ts",
+	"description": "Core framework for Glaze CMS - a Bun-native headless CMS",
+	"license": "MIT",
 	"type": "module",
+	"main": "./src/index.ts",
+	"module": "./src/index.ts",
+	"types": "./src/index.d.ts",
+	"exports": {
+		".": {
+			"bun": "./src/index.ts",
+			"types": "./src/index.d.ts",
+			"default": "./src/index.ts"
+		}
+	},
+	"files": [
+		"src"
+	],
 	"scripts": {
+		"prepare": "tsc",
 		"start": "bun run src/index.ts",
 		"lint": "eslint src/**/*.ts",
 		"lint:fix": "eslint src/**/*.ts --fix",
@@ -14,6 +28,7 @@
 		"test": "bun test"
 	},
 	"devDependencies": {
-		"@types/bun": "latest"
+		"@types/bun": "latest",
+		"typescript": "catalog:development"
 	}
 }

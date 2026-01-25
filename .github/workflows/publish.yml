@@ -34,6 +34,7 @@ jobs:
 
               echo "Publishing $(basename $dir)..."
               cd $dir
+              # prepare script runs automatically before publish
               bun publish --non-interactive || echo "Skipping $(basename $dir) (likely already published)"
               cd ../..
             fi
