@@ -1,6 +1,6 @@
 {
 	"name": "@glaze/core",
-	"version": "0.0.1",
+	"version": "0.0.2",
 	"description": "Core framework for Glaze CMS - a Bun-native headless CMS",
 	"license": "MIT",
 	"type": "module",
