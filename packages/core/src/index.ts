@@ -1,1 +1,1 @@
-console.log("Hello from @glaze/core!");
+console.log('Hello from @glaze/core!');
