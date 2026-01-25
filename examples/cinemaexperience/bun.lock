@@ -1,0 +1,17 @@
+{
+  "lockfileVersion": 1,
+  "configVersion": 1,
+  "workspaces": {
+    "": {
+      "name": "cinemaxperience",
+      "dependencies": {
+        "@glaze/cms": "latest",
+      },
+    },
+  },
+  "packages": {
+    "@glaze/cms": ["@glaze/cms@0.0.3", "https://glaze-verdaccio.up.railway.app/@glaze/cms/-/cms-0.0.3.tgz", { "dependencies": { "@glaze/core": "0.0.3" } }, "sha512-WxPBIoZU4XhbMGnx3q4nfLQE6O4ldOnUjoYj5kudAkfznfIA0Eu7zwYbosZjhVAVK4fExDLS892gAnKMXZkhbg=="],
+
+    "@glaze/core": ["@glaze/core@0.0.3", "https://glaze-verdaccio.up.railway.app/@glaze/core/-/core-0.0.3.tgz", {}, "sha512-hXLIVCP7HMpTj5LUbmMUDbjXN6P0SEeydhwHETW/FWwPzYMdRRAgSGiBn6wZAHBsAe9qrHjPhLPU/q0jXPwj9w=="],
+  }
+}

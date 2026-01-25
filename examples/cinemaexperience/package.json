@@ -1,0 +1,10 @@
+{
+	"name": "cinemaxperience",
+	"private": true,
+	"scripts": {
+		"dev": "bun run src/index.ts"
+	},
+	"dependencies": {
+		"@glaze/cms": "latest"
+	}
+}
