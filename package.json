@@ -4,7 +4,6 @@
 	"scripts": {
 		"dev": "./scripts/dev.sh",
 		"bump": "bun run scripts/bump-version.ts",
-		"build": "bun run --filter '*' prepare",
 		"test": "bun test",
 		"lint": "bun --filter '*' lint",
 		"lint:fix": "bun --filter '*' lint --fix",
