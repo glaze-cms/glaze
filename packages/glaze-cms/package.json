@@ -1,6 +1,7 @@
 {
-  "name": "glaze-cms",
-  "dependencies": {
-    "@glaze/core": "workspace:*"
-  }
+	"name": "glaze-cms",
+	"version": "0.0.1",
+	"dependencies": {
+		"@glaze/core": "workspace:*"
+	}
 }

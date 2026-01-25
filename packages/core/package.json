@@ -1,13 +1,19 @@
 {
-  "name": "@glaze/core",
-  "version": "0.0.1",
-  "module": "index.ts",
-  "main": "index.ts",
-  "type": "module",
-  "scripts": {
-    "start": "bun run src/index.ts"
-  },
-  "devDependencies": {
-    "@types/bun": "latest"
-  }
+	"name": "@glaze/core",
+	"version": "0.0.1",
+	"module": "index.ts",
+	"main": "index.ts",
+	"type": "module",
+	"scripts": {
+		"start": "bun run src/index.ts",
+		"lint": "eslint src/**/*.ts",
+		"lint:fix": "eslint src/**/*.ts --fix",
+		"format": "prettier --check src/**/*.ts",
+		"format:fix": "prettier --write src/**/*.ts",
+		"typecheck": "tsc --noEmit",
+		"test": "bun test"
+	},
+	"devDependencies": {
+		"@types/bun": "latest"
+	}
 }
