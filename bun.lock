@@ -25,10 +25,7 @@
   },
   "catalogs": {
     "development": {
-      "typescript": "next",
-    },
-    "scripts": {
-      "dev": "./scripts/dev.sh",
+      "typescript": "@typescript/native-preview",
     },
   },
   "packages": {

@@ -6,7 +6,7 @@
   ],
   "catalogs": {
     "development": {
-      "typescript": "next"
+      "typescript": "@typescript/native-preview"
     }
   },
   "scripts": {
