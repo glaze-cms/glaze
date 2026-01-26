@@ -23,7 +23,9 @@
 			"@glaze/core": ["./packages/core/src/index.ts"],
 			"@glaze/core/*": ["./packages/core/src/*"],
 			"@glaze/development": ["./packages/development/src"],
-			"@glaze/development/*": ["./packages/development/src/*"]
+			"@glaze/development/*": ["./packages/development/src/*"],
+			"@glaze/logger": ["./packages/logger/src"],
+			"@glaze/logger/*": ["./packages/logger/src/*"]
 		}
 	}
 }

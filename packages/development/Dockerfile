@@ -9,7 +9,9 @@ WORKDIR /app
 ##################################
 FROM base AS deps
 COPY package.json bun.lock bunfig.toml ./
+COPY packages/core/package.json ./packages/core/package.json
 COPY packages/development/package.json ./packages/development/package.json
+COPY packages/logger/package.json ./packages/logger/package.json
 
 RUN bun install --frozen-lockfile
 
@@ -18,6 +20,10 @@ RUN bun install --frozen-lockfile
 ##################################
 FROM base AS dev
 COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/packages/cms/node_modules ./packages/cms/node_modules
+COPY --from=deps /app/packages/core/node_modules ./packages/core/node_modules
+COPY --from=deps /app/packages/development/node_modules ./packages/development/node_modules
+COPY --from=deps /app/packages/logger/node_modules ./packages/logger/node_modules
 COPY . .
 WORKDIR /app/packages/development
 ENV NODE_ENV=development

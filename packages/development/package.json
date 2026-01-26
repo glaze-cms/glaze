@@ -9,5 +9,8 @@
 		"format:fix": "prettier --write src/**/*.ts",
 		"typecheck": "tsc --noEmit",
 		"test": "bun test"
+	},
+	"dependencies": {
+		"@glaze/core": "workspace:*"
 	}
 }

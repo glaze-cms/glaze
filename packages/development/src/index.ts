@@ -1,1 +1,3 @@
-console.log('Hello World!');
+import { glaze } from '@glaze/core';
+
+glaze();
