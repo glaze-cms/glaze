@@ -27,9 +27,16 @@
 			"prettier": "latest",
 			"typescript": "latest"
 		},
+		"elysia": {
+			"elysia": "latest",
+			"@elysiajs/cors": "latest"
+		},
 		"system": {
 			"pino": "latest",
 			"pino-pretty": "latest"
+		},
+		"validation": {
+			"@sinclair/typebox": "latest"
 		}
 	},
 	"devDependencies": {
