@@ -326,7 +326,7 @@ describe('validateEnv', () => {
 		// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
 		process.exit = mockProcessExit as any;
 
-		// Create mock logger
+		// Create mock logger (only mocking methods used in tests)
 		mockLogger = {
 			error: mock(() => {}),
 			info: mock(() => {}),
@@ -346,7 +346,8 @@ describe('validateEnv', () => {
 			NODE_ENV: 'test',
 		};
 
-		const env = validateEnv(mockLogger);
+		// eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+		const env = validateEnv(mockLogger as any);
 
 		expect(env.DATABASE_URL).toBe('postgres://localhost/test');
 		expect(env.AUTH_SECRET).toBe('a'.repeat(32));
@@ -362,7 +363,8 @@ describe('validateEnv', () => {
 		};
 
 		expect(() => {
-			validateEnv(mockLogger);
+			// eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+			validateEnv(mockLogger as any);
 		}).toThrow('process.exit called');
 
 		expect(mockProcessExit).toHaveBeenCalledWith(1);
@@ -376,7 +378,8 @@ describe('validateEnv', () => {
 		};
 
 		expect(() => {
-			validateEnv(mockLogger);
+			// eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+			validateEnv(mockLogger as any);
 		}).toThrow('process.exit called');
 
 		// Should log the main error message
