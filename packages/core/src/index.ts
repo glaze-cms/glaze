@@ -10,7 +10,6 @@ export function glaze() {
 	/* Parse and validate environment variables */
 	validateEnv(logger);
 
-	// ../../ resolves to the 'packages' directory
 	const currentDir = dirname(fileURLToPath(import.meta.url));
 	const packagesRoot = resolve(currentDir, '../../');
 	const port = process.env.PORT ? parseInt(process.env.PORT) : 4000;
@@ -24,7 +23,7 @@ export function glaze() {
 			// Development: Proxy to Vite
 			if (process.env.NODE_ENV !== 'production') {
 				const viteUrl = new URL(request.url);
-				// rewrite port to 5173 and keep path
+				// Rewrite port to 5173 and keep path
 				const target = `http://localhost:5173${path}${viteUrl.search}`;
 				try {
 					return await fetch(target, {
@@ -41,7 +40,7 @@ export function glaze() {
 			}
 
 			// Production: Serve Static Vite Build
-			// Handle /admin -> /admin/ redirect
+
 			if (path === '/admin') {
 				return Response.redirect('/admin/', 301);
 			}
@@ -61,7 +60,12 @@ export function glaze() {
 				return new Response('Not found', { status: 404 });
 			}
 
-			return Bun.file(resolvedPath);
+			const file = Bun.file(resolvedPath);
+			if (!(await file.exists())) {
+				return new Response('Not found', { status: 404 });
+			}
+
+			return file;
 		})
 		.get('/', () => ({ status: 'ok', message: 'Glaze server is running' }))
 		.listen(port);

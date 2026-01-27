@@ -9,8 +9,8 @@ function App() {
 	useEffect(() => {
 		fetch('/api/health')
 			.then((res) => res.json())
-			.then((data) => {
-				setMessage(data.message as string);
+			.then((data: { message: string }) => {
+				setMessage(data.message);
 			})
 			.catch(() => {
 				setMessage('Error connecting to server');
@@ -21,11 +21,7 @@ function App() {
 		<main>
 			<div>
 				<a href="https://react.dev" target="_blank">
-					<img
-						src={reactLogo as string}
-						className="logo react"
-						alt="React logo"
-					/>
+					<img src={reactLogo} className="logo react" alt="React logo" />
 				</a>
 			</div>
 			<Button>hola</Button>
