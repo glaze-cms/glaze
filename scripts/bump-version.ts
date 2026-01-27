@@ -60,12 +60,6 @@ async function main() {
 		try {
 			const pkgJson = (await Bun.file(pkgJsonPath).json()) as PackageJson;
 
-			// Skip private packages
-			if (pkgJson.private) {
-				console.log(`⏭️  Skipping ${pkgJson.name} (private)`);
-				continue;
-			}
-
 			const oldVersion = pkgJson.version;
 			const newVersion = bumpVersion(oldVersion, bumpType as BumpType);
 
