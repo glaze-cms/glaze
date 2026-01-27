@@ -11,9 +11,10 @@ FROM base AS deps
 COPY package.json bun.lock bunfig.toml ./
 COPY packages/core/package.json ./packages/core/package.json
 COPY packages/development/package.json ./packages/development/package.json
+COPY packages/cms/package.json ./packages/cms/package.json
 COPY packages/logger/package.json ./packages/logger/package.json
 
-RUN bun install --frozen-lockfile
+RUN bun install
 
 ##################################
 # dev
