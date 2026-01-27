@@ -1,6 +1,6 @@
 {
 	"name": "@glaze/cms",
-	"version": "0.0.3",
+	"version": "0.0.4",
 	"description": "Glaze CMS - A Bun-native headless CMS framework",
 	"license": "MIT",
 	"main": "./index.ts",

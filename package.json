@@ -2,7 +2,8 @@
 	"name": "glaze",
 	"private": true,
 	"scripts": {
-		"dev": "./scripts/dev.sh",
+		"dev": "bun --filter '*' dev",
+		"dev:docker": "./scripts/dev.sh",
 		"bump": "bun run scripts/bump-version.ts",
 		"test": "bun test",
 		"lint": "bun --filter '*' lint",
@@ -30,6 +31,12 @@
 		"elysia": {
 			"elysia": "latest",
 			"@elysiajs/cors": "latest"
+		},
+		"react": {
+			"@types/react": "latest",
+			"@types/react-dom": "latest",
+			"react": "latest",
+			"react-dom": "latest"
 		},
 		"system": {
 			"pino": "latest",

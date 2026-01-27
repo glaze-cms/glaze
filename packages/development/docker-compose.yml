@@ -11,9 +11,12 @@ services:
       - .env
     ports:
       - '4000:4000'
+      - '5173:5173'
     volumes:
       - ../../:/app
       - /app/node_modules
+      - /app/packages/admin/node_modules
+      - /app/packages/cms/node_modules
       - /app/packages/core/node_modules
       - /app/packages/development/node_modules
       - /app/packages/logger/node_modules
