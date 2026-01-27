@@ -1,9 +1,8 @@
 import { Elysia } from 'elysia';
 import { validateEnv } from '@glaze/core/server/validators';
 import { createLogger } from '@glaze/logger';
-
 import { fileURLToPath } from 'node:url';
-import { resolve, dirname } from 'node:path';
+import { resolve, dirname, sep } from 'node:path';
 
 export function glaze() {
 	const logger = createLogger({ name: 'GLAZE' });
@@ -54,7 +53,15 @@ export function glaze() {
 					? 'index.html'
 					: relative.replace(/^\//, '');
 
-			return Bun.file(resolve(packagesRoot, 'admin/dist', filePath));
+			const assetsRoot = resolve(packagesRoot, 'admin/dist');
+			const resolvedPath = resolve(assetsRoot, filePath);
+
+			// Security Check: Prevent path traversal
+			if (!resolvedPath.startsWith(assetsRoot + sep)) {
+				return new Response('Not found', { status: 404 });
+			}
+
+			return Bun.file(resolvedPath);
 		})
 		.get('/', () => ({ status: 'ok', message: 'Glaze server is running' }))
 		.listen(port);

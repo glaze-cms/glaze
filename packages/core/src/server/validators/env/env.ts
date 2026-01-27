@@ -112,7 +112,7 @@ export function validateEnv(logger: Logger): GlazeEnv {
 		logger.error('Environment validation failed:');
 		for (const error of parsedEnv.errors) {
 			logger.error(`${error.variable}: ${error.message}`);
-			logger.info(`${error.hint}`);
+			logger.info(error.hint);
 		}
 		process.exit(1);
 	}
