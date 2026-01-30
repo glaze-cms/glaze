@@ -5,7 +5,16 @@
 	"type": "module",
 	"sideEffects": false,
 	"main": "index.ts",
-	"types": "index.ts",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"default": "./index.ts"
+		}
+	},
+	"scripts": {
+		"prepublishOnly": "tsc -p tsconfig.build.json"
+	},
 	"dependencies": {
 		"pino": "latest",
 		"pino-pretty": "latest"

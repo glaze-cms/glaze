@@ -6,10 +6,16 @@
 	"type": "module",
 	"main": "./index.ts",
 	"module": "./index.ts",
-	"types": "./index.ts",
+	"types": "./dist/index.d.ts",
 	"exports": {
-		".": "./index.ts",
-		"./types": "./types.ts"
+		".": {
+			"types": "./dist/index.d.ts",
+			"default": "./index.ts"
+		},
+		"./types": {
+			"types": "./dist/types.d.ts",
+			"default": "./types.ts"
+		}
 	},
 	"scripts": {
 		"start": "bun run index.ts",
@@ -18,7 +24,8 @@
 		"format": "prettier --check /**/*.ts",
 		"format:fix": "prettier --write /**/*.ts",
 		"typecheck": "tsc --noEmit",
-		"test": "bun test"
+		"test": "bun test",
+		"prepublishOnly": "tsc -p tsconfig.build.json"
 	},
 	"dependencies": {
 		"@glaze/logger": "workspace:*",

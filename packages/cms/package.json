@@ -6,12 +6,15 @@
 	"main": "./index.ts",
 	"module": "./index.ts",
 	"type": "module",
-	"types": "./index.ts",
+	"types": "./dist/index.d.ts",
 	"exports": {
 		".": {
-			"default": "./index.ts",
-			"types": "./index.ts"
+			"types": "./dist/index.d.ts",
+			"default": "./index.ts"
 		}
+	},
+	"scripts": {
+		"prepublishOnly": "tsc -p tsconfig.build.json"
 	},
 	"dependencies": {
 		"@glaze/core": "latest"
