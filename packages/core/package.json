@@ -1,0 +1,33 @@
+{
+	"name": "@glaze/core",
+	"version": "0.0.1",
+	"description": "Core module of the Glaze framework, responsible for running the CMS server and providing essential functionality.",
+	"license": "MIT",
+	"type": "module",
+	"main": "./index.ts",
+	"module": "./index.ts",
+	"types": "./index.ts",
+	"exports": {
+		".": "./index.ts",
+		"./types": "./types.ts"
+	},
+	"scripts": {
+		"start": "bun run index.ts",
+		"lint": "eslint /**/*.ts",
+		"lint:fix": "eslint /**/*.ts --fix",
+		"format": "prettier --check /**/*.ts",
+		"format:fix": "prettier --write /**/*.ts",
+		"typecheck": "tsc --noEmit",
+		"test": "bun test"
+	},
+	"dependencies": {
+		"@glaze/logger": "workspace:*",
+		"elysia": "latest",
+		"@sinclair/typebox": "latest",
+		"pino": "catalog:system"
+	},
+	"devDependencies": {
+		"@types/bun": "latest",
+		"typescript": "latest"
+	}
+}

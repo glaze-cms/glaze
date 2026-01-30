@@ -1,0 +1,17 @@
+{
+	"name": "@glaze/development",
+	"private": true,
+	"version": "0.0.1",
+	"scripts": {
+		"dev": "bun --hot index.ts",
+		"lint": "eslint /**/*.ts",
+		"lint:fix": "eslint /**/*.ts --fix",
+		"format": "prettier --check /**/*.ts",
+		"format:fix": "prettier --write /**/*.ts",
+		"typecheck": "tsc --noEmit",
+		"test": "bun test"
+	},
+	"dependencies": {
+		"@glaze/core": "workspace:*"
+	}
+}

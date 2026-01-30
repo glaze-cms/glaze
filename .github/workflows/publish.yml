@@ -1,0 +1,57 @@
+name: Publish Packages
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      GLAZE_REGISTRY_URL: ${{ secrets.GLAZE_REGISTRY_URL }}
+      GLAZE_REGISTRY_TOKEN: ${{ secrets.GLAZE_REGISTRY_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Wake up Registry
+        run: |
+          echo "Waking up registry..."
+          # Extract domain from auth URL if needed, or just hit the base
+          # Assuming the URL is secret, we try to curl it
+          for i in {1..10}; do
+            # -I head request, -L follow redirects, -f fail on error
+            if curl -s -I -f -L "$GLAZE_REGISTRY_URL" > /dev/null; then
+              echo "Registry is awake!"
+              exit 0
+            fi
+            echo "Waiting for registry to wake up (attempt $i/10)..."
+            sleep 5
+          done
+          echo "WARNING: Registry might still be sleeping or unreachable."
+
+      - name: Publish @glaze packages
+        run: |
+          for dir in packages/*/ ; do
+            if [ -f "$dir/package.json" ]; then
+              # Check if package is private
+              is_private=$(jq -r '.private' "$dir/package.json")
+              if [ "$is_private" = "true" ]; then
+                echo "Skipping $(basename $dir) (private: true)"
+                continue
+              fi
+
+              echo "Publishing $(basename $dir)..."
+              cd $dir
+              # prepublishOnly script runs automatically before publish
+              bun publish --non-interactive || echo "Skipping $(basename $dir) (likely already published)"
+              cd ../..
+            fi
+          done

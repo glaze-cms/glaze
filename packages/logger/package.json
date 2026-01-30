@@ -1,0 +1,17 @@
+{
+	"name": "@glaze/logger",
+	"version": "0.0.1",
+	"description": "Pino-powered logger with Glaze defaults for production and development.",
+	"type": "module",
+	"sideEffects": false,
+	"main": "index.ts",
+	"types": "index.ts",
+	"dependencies": {
+		"pino": "latest",
+		"pino-pretty": "latest"
+	},
+	"devDependencies": {
+		"@types/bun": "latest",
+		"typescript": "latest"
+	}
+}

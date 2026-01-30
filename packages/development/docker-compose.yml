@@ -1,0 +1,57 @@
+name: glaze-dev
+
+services:
+  server:
+    build:
+      context: ../..
+      dockerfile: packages/development/Dockerfile
+      target: dev
+    container_name: glaze-dev
+    env_file:
+      - .env
+    ports:
+      - "4000:4000"
+      - "5173:5173"
+    volumes:
+      - ../../:/app
+      - /app/node_modules
+      - /app/packages/admin/node_modules
+      - /app/packages/cms/node_modules
+      - /app/packages/core/node_modules
+      - /app/packages/development/node_modules
+      - /app/packages/logger/node_modules
+      - bun_cache:/root/.bun
+    environment:
+      NODE_ENV: local
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - internal
+
+  postgres:
+    image: postgres:16
+    container_name: glaze-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-glaze}
+      POSTGRES_USER: ${POSTGRES_USER:-glaze}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-glaze}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-glaze}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+networks:
+  internal:
+    driver: bridge
+
+volumes:
+  bun_cache:
+  postgres_data:

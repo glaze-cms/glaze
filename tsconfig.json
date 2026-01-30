@@ -1,0 +1,30 @@
+{
+	"compilerOptions": {
+		"lib": ["ESNext"],
+		"target": "ESNext",
+		"module": "Preserve",
+		"moduleDetection": "force",
+		"jsx": "react-jsx",
+		"allowJs": true,
+		"resolveJsonModule": true,
+		"moduleResolution": "bundler",
+
+		"allowImportingTsExtensions": true,
+		"verbatimModuleSyntax": true,
+		"noEmit": true,
+		"baseUrl": ".",
+
+		"strict": true,
+		"skipLibCheck": true,
+		"noFallthroughCasesInSwitch": true,
+		"noUncheckedIndexedAccess": true,
+		"noImplicitOverride": true,
+
+		"paths": {
+			"@glaze/core": ["./packages/core/index.ts"],
+			"@glaze/core/types": ["./packages/core/server/types.ts"],
+			"@glaze/development": ["./packages/development/index.ts"],
+			"@glaze/logger": ["./packages/logger/index.ts"]
+		}
+	}
+}
