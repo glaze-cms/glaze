@@ -17,6 +17,6 @@
 		"prepublishOnly": "tsc -p tsconfig.build.json"
 	},
 	"dependencies": {
-		"@glaze/core": "latest"
+		"@glaze/core": "workspace:*"
 	}
 }
