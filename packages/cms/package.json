@@ -1,0 +1,19 @@
+{
+	"name": "@glaze/cms",
+	"version": "0.0.1",
+	"description": "Open source, Bun-native headless CMS framework for modern web applications.",
+	"license": "MIT",
+	"main": "./index.ts",
+	"module": "./index.ts",
+	"type": "module",
+	"types": "./index.ts",
+	"exports": {
+		".": {
+			"default": "./index.ts",
+			"types": "./index.ts"
+		}
+	},
+	"dependencies": {
+		"@glaze/core": "latest"
+	}
+}
