@@ -7,6 +7,7 @@
 	"main": "./index.ts",
 	"module": "./index.ts",
 	"types": "./dist/index.d.ts",
+	"files": ["dist", "*.ts", "server", "!**/*.test.ts"],
 	"exports": {
 		".": {
 			"types": "./dist/index.d.ts",
@@ -25,7 +26,7 @@
 		"format:fix": "prettier --write /**/*.ts",
 		"typecheck": "tsc --noEmit",
 		"test": "bun test",
-		"prepublishOnly": "tsc -p tsconfig.build.json"
+		"prepublishOnly": "bunx tsc -p tsconfig.build.json"
 	},
 	"dependencies": {
 		"@glaze/logger": "workspace:*",

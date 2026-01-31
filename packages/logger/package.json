@@ -6,6 +6,7 @@
 	"sideEffects": false,
 	"main": "index.ts",
 	"types": "./dist/index.d.ts",
+	"files": ["dist", "*.ts", "!*.test.ts"],
 	"exports": {
 		".": {
 			"types": "./dist/index.d.ts",
@@ -13,7 +14,7 @@
 		}
 	},
 	"scripts": {
-		"prepublishOnly": "tsc -p tsconfig.build.json"
+		"prepublishOnly": "bunx tsc -p tsconfig.build.json"
 	},
 	"dependencies": {
 		"pino": "latest",
