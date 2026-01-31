@@ -30,8 +30,8 @@ type HandleAdminParams = {
  * @param env - Glaze environment configuration
  * @returns A proxied response from Vite (dev) or a static admin asset / SPA entry (prod)
  */
-export async function handleAdmin({ request, path, env }: HandleAdminParams) {
-	if (env.NODE_ENV === 'local') {
+export async function handleAdmin({ request, path }: HandleAdminParams) {
+	if (process.env.GLAZE_INTERNAL__ADMIN_PROXY === 'true') {
 		const viteUrl = new URL(request.url);
 		const target = `http://localhost:5173${path}${viteUrl.search}`;
 
