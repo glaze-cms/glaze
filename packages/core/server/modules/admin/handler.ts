@@ -60,9 +60,9 @@ export async function handleAdmin({ request, path }: HandleAdminParams) {
 			? 'index.html'
 			: relativePath.replace(/^\//, '');
 
-	const currentDir = dirname(fileURLToPath(import.meta.url));
-	const packagesRoot = resolve(currentDir, '../../');
-	const dist = resolve(packagesRoot, 'admin/dist');
+	const adminEntry = import.meta.resolve('@glaze/admin');
+	const adminRoot = dirname(fileURLToPath(adminEntry));
+	const dist = resolve(adminRoot, 'dist');
 	const resolvedDistPath = resolve(dist, filePath);
 
 	// Prevent path traversal

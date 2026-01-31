@@ -18,7 +18,7 @@
     },
     "packages/admin": {
       "name": "@glaze/admin",
-      "version": "0.0.1",
+      "version": "0.0.4",
       "dependencies": {
         "react": "catalog:react",
         "react-dom": "catalog:react",
@@ -41,15 +41,16 @@
     },
     "packages/cms": {
       "name": "@glaze/cms",
-      "version": "0.0.1",
+      "version": "0.0.4",
       "dependencies": {
         "@glaze/core": "workspace:*",
       },
     },
     "packages/core": {
       "name": "@glaze/core",
-      "version": "0.0.1",
+      "version": "0.0.4",
       "dependencies": {
+        "@glaze/admin": "workspace:*",
         "@glaze/logger": "workspace:*",
         "@sinclair/typebox": "latest",
         "elysia": "latest",
@@ -69,7 +70,7 @@
     },
     "packages/logger": {
       "name": "@glaze/logger",
-      "version": "0.0.1",
+      "version": "0.0.4",
       "dependencies": {
         "pino": "latest",
         "pino-pretty": "latest",
