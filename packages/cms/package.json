@@ -21,6 +21,6 @@
 		"prepublishOnly": "bunx tsc -p tsconfig.build.json"
 	},
 	"dependencies": {
-		"@glaze/core": "0.0.6"
+		"@glaze/core": "0.0.7"
 	}
 }

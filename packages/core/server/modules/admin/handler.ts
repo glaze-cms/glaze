@@ -31,50 +31,56 @@ type HandleAdminParams = {
  * @returns A proxied response from Vite (dev) or a static admin asset / SPA entry (prod)
  */
 export async function handleAdmin({ request, path }: HandleAdminParams) {
-	if (process.env.GLAZE_INTERNAL__ADMIN_PROXY === 'true') {
-		const viteUrl = new URL(request.url);
-		const target = `http://localhost:5173${path}${viteUrl.search}`;
+	try {
+		if (process.env.GLAZE_INTERNAL__ADMIN_PROXY === 'true') {
+			console.log('Proxying /admin request to Vite dev server:');
+			console.log();
+			const viteUrl = new URL(request.url);
+			const target = `http://localhost:5173${path}${viteUrl.search}`;
 
-		try {
-			return await fetch(target, {
-				method: request.method,
-				headers: request.headers,
-				body: request.body,
-			});
-		} catch {
-			return new Response(
-				'Vite Dev Server Not Ready. Is it running on port 5173?',
-				{ status: 502 },
-			);
+			try {
+				return await fetch(target, {
+					method: request.method,
+					headers: request.headers,
+					body: request.body,
+				});
+			} catch {
+				return new Response(
+					'Vite Dev Server Not Ready. Is it running on port 5173?',
+					{ status: 502 },
+				);
+			}
 		}
+
+		if (path === '/admin') {
+			console.log('Redirecting /admin to /admin/ for proper asset loading');
+			return Response.redirect('/admin/', 301);
+		}
+
+		const relativePath = path.replace(/^\/admin/, '');
+
+		const filePath =
+			!relativePath || relativePath === '/'
+				? 'index.html'
+				: relativePath.replace(/^\//, '');
+
+		const adminEntry = import.meta.resolve('@glaze/admin');
+		const dist = dirname(fileURLToPath(adminEntry));
+		const resolvedDistPath = resolve(dist, filePath);
+
+		// Prevent path traversal
+		if (!resolvedDistPath.startsWith(dist + sep)) {
+			return new Response('Not found', { status: 404 });
+		}
+
+		const adminBuild = Bun.file(resolvedDistPath);
+
+		if (!(await adminBuild.exists())) {
+			return new Response('Not found', { status: 404 });
+		}
+
+		return adminBuild;
+	} catch (error) {
+		console.error(error);
 	}
-
-	if (path === '/admin') {
-		return Response.redirect('/admin/', 301);
-	}
-
-	const relativePath = path.replace(/^\/admin/, '');
-
-	const filePath =
-		!relativePath || relativePath === '/'
-			? 'index.html'
-			: relativePath.replace(/^\//, '');
-
-	const adminEntry = import.meta.resolve('@glaze/admin');
-	const adminRoot = dirname(fileURLToPath(adminEntry));
-	const dist = resolve(adminRoot, 'dist');
-	const resolvedDistPath = resolve(dist, filePath);
-
-	// Prevent path traversal
-	if (!resolvedDistPath.startsWith(dist + sep)) {
-		return new Response('Not found', { status: 404 });
-	}
-
-	const adminBuild = Bun.file(resolvedDistPath);
-
-	if (!(await adminBuild.exists())) {
-		return new Response('Not found', { status: 404 });
-	}
-
-	return adminBuild;
 }
