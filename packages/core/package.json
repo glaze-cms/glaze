@@ -1,13 +1,18 @@
 {
 	"name": "@glaze/core",
-	"version": "0.0.3",
+	"version": "0.0.4",
 	"description": "Core module of the Glaze framework, responsible for running the CMS server and providing essential functionality.",
 	"license": "MIT",
 	"type": "module",
 	"main": "./index.ts",
 	"module": "./index.ts",
 	"types": "./dist/index.d.ts",
-	"files": ["dist", "*.ts", "server", "!**/*.test.ts"],
+	"files": [
+		"dist",
+		"*.ts",
+		"server",
+		"!**/*.test.ts"
+	],
 	"exports": {
 		".": {
 			"types": "./dist/index.d.ts",
