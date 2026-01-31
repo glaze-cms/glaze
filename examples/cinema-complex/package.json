@@ -14,7 +14,7 @@
 		"check": "prettier --write . && eslint --fix"
 	},
 	"dependencies": {
-		"@glaze/cms": "^0.0.4",
+		"@glaze/cms": "^0.0.5",
 		"@tailwindcss/vite": "^4.0.6",
 		"@tanstack/react-devtools": "^0.7.0",
 		"@tanstack/react-router": "^1.132.0",
