@@ -5,7 +5,7 @@
     "": {
       "name": "cinema-complex",
       "dependencies": {
-        "@glaze/cms": "^0.0.5",
+        "@glaze/cms": "^0.0.6",
         "@tailwindcss/vite": "^4.0.6",
         "@tanstack/react-devtools": "^0.7.0",
         "@tanstack/react-router": "^1.132.0",
@@ -183,11 +183,13 @@
 
     "@exodus/bytes": ["@exodus/bytes@1.10.0", "", { "peerDependencies": { "@noble/hashes": "^1.8.0 || ^2.0.0" }, "optionalPeers": ["@noble/hashes"] }, "sha512-tf8YdcbirXdPnJ+Nd4UN1EXnz+IP2DI45YVEr3vvzcVTOyrApkmIB4zvOQVd3XPr7RXnfBtAx+PXImXOIU0Ajg=="],
 
-    "@glaze/cms": ["@glaze/cms@0.0.5", "https://glaze-verdaccio.up.railway.app/@glaze/cms/-/cms-0.0.5.tgz", { "dependencies": { "@glaze/core": "0.0.4" } }, "sha512-goNiPEg0OCEKqkAVpF55QfFo8Tt/An9F0IWj38QALZPjrEBN0VgcR+W1ZnvWjmLUBGn7O+RtOd5sDDge7lqPkA=="],
+    "@glaze/admin": ["@glaze/admin@0.0.6", "https://glaze-verdaccio.up.railway.app/@glaze/admin/-/admin-0.0.6.tgz", { "dependencies": { "react": "latest", "react-dom": "latest" } }, "sha512-EhekHtO4BlG6KBpjhrZ39u1KJSeQbs4vLxW+4BUP8oftqFIJZ7JrCS3q71G9hZAm/kmH4jggU2NmMISAUOPuoA=="],
 
-    "@glaze/core": ["@glaze/core@0.0.4", "https://glaze-verdaccio.up.railway.app/@glaze/core/-/core-0.0.4.tgz", { "dependencies": { "@glaze/logger": "0.0.1", "@sinclair/typebox": "latest", "elysia": "latest", "pino": "latest" } }, "sha512-+0edkPAlgNaWETHl0uiBfzI0bl0xUxX2X5O4RlntoH0AlhZjkbVbuQQgG1QGjIZ3e9x6SeMwlfWU99uE6jR/Rg=="],
+    "@glaze/cms": ["@glaze/cms@0.0.6", "https://glaze-verdaccio.up.railway.app/@glaze/cms/-/cms-0.0.6.tgz", { "dependencies": { "@glaze/core": "0.0.6" } }, "sha512-/vo9XyqcNj/SLqHrI6HQYuSUpjepDV1ugtnWmJZ+Tsv4NBGoAzHJkn7BD5+OQACeFrMLwAs6I/vt0d57V8K6bw=="],
 
-    "@glaze/logger": ["@glaze/logger@0.0.1", "https://glaze-verdaccio.up.railway.app/@glaze/logger/-/logger-0.0.1.tgz", { "dependencies": { "pino": "latest", "pino-pretty": "latest" } }, "sha512-A6u2dsC12orr9mk1c8GvAOS+Q2819J2d3kn24UgZMufBEiLTA/EO9b8dH3axTRUe5pLCMRS9efcUfpQEi/lnFA=="],
+    "@glaze/core": ["@glaze/core@0.0.6", "https://glaze-verdaccio.up.railway.app/@glaze/core/-/core-0.0.6.tgz", { "dependencies": { "@glaze/admin": "0.0.6", "@glaze/logger": "0.0.6", "@sinclair/typebox": "latest", "elysia": "latest", "pino": "latest" } }, "sha512-0YpFG8GeVkOIwstXag9cmxClDaAHPaTTU8B/Jck3RsQVvN6ErC2VHBNvXlBGUONzpRuXjcsxz6lShUk/VoDLbA=="],
+
+    "@glaze/logger": ["@glaze/logger@0.0.6", "https://glaze-verdaccio.up.railway.app/@glaze/logger/-/logger-0.0.6.tgz", { "dependencies": { "pino": "latest", "pino-pretty": "latest" } }, "sha512-UylSS6Di6oioFt8BP8Z5lA+mdUAmoXa1bBvMwvRBpbAjCWA1wbBETSbmkcD+muVSZXyHVdUoXbLQIUtcwNaVrw=="],
 
     "@humanfs/core": ["@humanfs/core@0.19.1", "", {}, "sha512-5DyQ4+1JEUzejeK1JGICcideyfUbGixgS9jNgex5nqkW+cY7WZhxBigmieN5Qnw9ZosSNVC9KQKyb+GUaGyKUA=="],
 
