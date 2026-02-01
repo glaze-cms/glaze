@@ -1,6 +1,6 @@
 {
 	"name": "@glaze/logger",
-	"version": "0.0.13",
+	"version": "0.0.14",
 	"description": "Pino-powered logger with Glaze defaults for production and development.",
 	"type": "module",
 	"sideEffects": false,
