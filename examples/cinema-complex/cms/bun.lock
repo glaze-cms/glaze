@@ -5,20 +5,20 @@
     "": {
       "name": "cinema-complex-cms",
       "dependencies": {
-        "@glaze/cms": "^0.0.17",
+        "@glaze/cms": "^0.0.18",
       },
     },
   },
   "packages": {
     "@borewit/text-codec": ["@borewit/text-codec@0.2.1", "", {}, "sha512-k7vvKPbf7J2fZ5klGRD9AeKfUvojuZIQ3BT5u7Jfv+puwXkUBUT5PVyMDfJZpy30CBDXGMgw7fguK/lpOMBvgw=="],
 
-    "@glaze/admin": ["@glaze/admin@0.0.9", "https://glaze-verdaccio.up.railway.app/@glaze/admin/-/admin-0.0.9.tgz", { "dependencies": { "react": "latest", "react-dom": "latest" } }, "sha512-8wcmF+Pg2BcUu3TWGPyF89d6eBEn7zrodOyAl4939Cl296wBMVej3ulnbX1NDVOAUSM9HYA3EaCEEYkZSoTwLg=="],
+    "@glaze/admin": ["@glaze/admin@0.0.18", "https://glaze-verdaccio.up.railway.app/@glaze/admin/-/admin-0.0.18.tgz", { "dependencies": { "react": "latest", "react-dom": "latest" } }, "sha512-ma9CyhW2nUzw3UaXWPVwJ0Mx6ExFt5L5fVGa2D/f1CrqPo48xQR1iJncnGfMlLUep51j0rhtvVopKA83kQVJag=="],
 
-    "@glaze/cms": ["@glaze/cms@0.0.17", "https://glaze-verdaccio.up.railway.app/@glaze/cms/-/cms-0.0.17.tgz", { "dependencies": { "@glaze/core": "0.0.9" } }, "sha512-QIfLhoOaUALHUm0drYuEYFPoCDcJb812GG6opPEqUCufL70RFpio5JcIjotqv+monDRZrJXaAbFhCS5EHDaASg=="],
+    "@glaze/cms": ["@glaze/cms@0.0.18", "https://glaze-verdaccio.up.railway.app/@glaze/cms/-/cms-0.0.18.tgz", { "dependencies": { "@glaze/core": "0.0.18" } }, "sha512-Q/iAeAQ+nWZKHK2e8bo0MwEKfXBwxGRKAQC9GQAqDBuAUU1+p9OhNSLi20e048jC9yLQte8SiU0ZREEIIVDAbw=="],
 
-    "@glaze/core": ["@glaze/core@0.0.9", "https://glaze-verdaccio.up.railway.app/@glaze/core/-/core-0.0.9.tgz", { "dependencies": { "@glaze/admin": "0.0.9", "@glaze/logger": "0.0.9", "@sinclair/typebox": "latest", "elysia": "latest", "pino": "latest" } }, "sha512-6/qvw1fXzWJE4cIwfW6syXnNj08VvCXIYM56wfBS4xZq7HoR+oDKxgRoMyHxqhKvN1WzK/k/wplJ2Ebv735fQg=="],
+    "@glaze/core": ["@glaze/core@0.0.18", "https://glaze-verdaccio.up.railway.app/@glaze/core/-/core-0.0.18.tgz", { "dependencies": { "@glaze/admin": "0.0.18", "@glaze/logger": "0.0.18", "@sinclair/typebox": "latest", "elysia": "latest", "pino": "latest" } }, "sha512-K7K7KiBQE4Wu/U8Biy7N7C2+Rox9uY5KMZTkJkXtEWmxoxhnRdIldfSaWxsfHMymLCJ3t1xkejMvp6NFPU4miQ=="],
 
-    "@glaze/logger": ["@glaze/logger@0.0.9", "https://glaze-verdaccio.up.railway.app/@glaze/logger/-/logger-0.0.9.tgz", { "dependencies": { "pino": "latest", "pino-pretty": "latest" } }, "sha512-wyNTTvxsDXtwG4PulQD7SBxMpJurpo13JVhwweMgVR1CFpPynIq0Qg4eJe0Nu1YahqOC8SIdT+gvFZSJYm1lRA=="],
+    "@glaze/logger": ["@glaze/logger@0.0.18", "https://glaze-verdaccio.up.railway.app/@glaze/logger/-/logger-0.0.18.tgz", { "dependencies": { "pino": "latest", "pino-pretty": "latest" } }, "sha512-gUWNpPNzcSvYJHQQxhVq3XYNkyO9zvuxqigLTCk97nbIifkJh1BPASpxe7AUsVff+Aar5jkpKMeTRHOdIm/Tqg=="],
 
     "@pinojs/redact": ["@pinojs/redact@0.4.0", "", {}, "sha512-k2ENnmBugE/rzQfEcdWHcCY+/FM3VLzH9cYEsbdsoqrvzAKRhUZeRNhAZvB8OitQJ1TBed3yqWtdjzS6wJKBwg=="],
 
