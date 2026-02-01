@@ -102,11 +102,6 @@ async function bumpPackages(bumpType: BumpType): Promise<BumpResult[]> {
 		try {
 			const pkgJson = (await Bun.file(pkgJsonPath).json()) as PackageJson;
 
-			if (pkgJson.private) {
-				console.log(`⏭️  ${pkgJson.name} (private)`);
-				continue;
-			}
-
 			const oldVersion = pkgJson.version;
 			const newVersion = bumpVersion(oldVersion, bumpType);
 
@@ -184,8 +179,6 @@ async function resolveWorkspaceDeps(bumped: BumpResult[]): Promise<void> {
 
 		try {
 			const pkgJson = (await Bun.file(pkgJsonPath).json()) as PackageJson;
-
-			if (pkgJson.private) continue;
 
 			let modified = false;
 
