@@ -5,6 +5,9 @@
 	"dependencies": {
 		"@glaze/cms": "^0.0.9"
 	},
+	"engines": {
+		"bun": "1"
+	},
 	"scripts": {
 		"dev": "bun --bun index.ts",
 		"start": "bun --bun index.ts",
