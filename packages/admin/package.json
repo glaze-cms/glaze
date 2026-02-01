@@ -1,6 +1,6 @@
 {
 	"name": "@glaze/admin",
-	"version": "0.0.12",
+	"version": "0.0.13",
 	"type": "module",
 	"main": "./dist/index.html",
 	"scripts": {

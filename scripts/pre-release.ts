@@ -25,6 +25,9 @@ const validBumps = ['patch', 'minor', 'major'] as const;
 
 // Always resolve from repo root
 const PACKAGES_DIR = join(__dirname, '..', 'packages');
+const EXAMPLE_PACKAGES = [
+	join(__dirname, '..', 'examples', 'cinema-complex', 'cms'),
+];
 
 function bumpVersion(
 	currentVersion: string,
@@ -53,12 +56,13 @@ function bumpVersion(
  * Phase 1: bump versions of workspace packages
  */
 async function bumpPackages(bumpType: BumpType): Promise<BumpResult[]> {
+	const results: BumpResult[] = [];
+	let hasErrors = false;
+
+	// Process packages directory
 	const entries = (await readdir(PACKAGES_DIR, { withFileTypes: true }))
 		.filter((e) => e.isDirectory())
 		.sort((a, b) => a.name.localeCompare(b.name));
-
-	const results: BumpResult[] = [];
-	let hasErrors = false;
 
 	for (const entry of entries) {
 		const pkgJsonPath = join(PACKAGES_DIR, entry.name, 'package.json');
@@ -88,6 +92,38 @@ async function bumpPackages(bumpType: BumpType): Promise<BumpResult[]> {
 		} catch (error) {
 			hasErrors = true;
 			console.error(`❌ Failed to bump ${entry.name}:`, error);
+		}
+	}
+
+	// Process example packages
+	for (const pkgDir of EXAMPLE_PACKAGES) {
+		const pkgJsonPath = join(pkgDir, 'package.json');
+
+		try {
+			const pkgJson = (await Bun.file(pkgJsonPath).json()) as PackageJson;
+
+			if (pkgJson.private) {
+				console.log(`⏭️  ${pkgJson.name} (private)`);
+				continue;
+			}
+
+			const oldVersion = pkgJson.version;
+			const newVersion = bumpVersion(oldVersion, bumpType);
+
+			pkgJson.version = newVersion;
+
+			await Bun.write(pkgJsonPath, JSON.stringify(pkgJson, null, '\t') + '\n');
+
+			results.push({
+				name: pkgJson.name,
+				oldVersion,
+				newVersion,
+			});
+
+			console.log(`✅ ${pkgJson.name}: ${oldVersion} → ${newVersion}`);
+		} catch (error) {
+			hasErrors = true;
+			console.error(`❌ Failed to bump ${pkgDir}:`, error);
 		}
 	}
 
@@ -132,10 +168,48 @@ async function resolveWorkspaceDeps(bumped: BumpResult[]): Promise<void> {
 			}
 
 			if (modified) {
-				await Bun.write(pkgJsonPath, JSON.stringify(pkgJson, null, '\t') + '\n');
+				await Bun.write(
+					pkgJsonPath,
+					JSON.stringify(pkgJson, null, '\t') + '\n',
+				);
 			}
 		} catch (error) {
 			console.error(`❌ Failed to resolve deps for ${entry.name}:`, error);
+		}
+	}
+
+	// Process example packages
+	for (const pkgDir of EXAMPLE_PACKAGES) {
+		const pkgJsonPath = join(pkgDir, 'package.json');
+
+		try {
+			const pkgJson = (await Bun.file(pkgJsonPath).json()) as PackageJson;
+
+			if (pkgJson.private) continue;
+
+			let modified = false;
+
+			for (const depType of ['dependencies', 'devDependencies'] as const) {
+				const deps = pkgJson[depType];
+				if (!deps) continue;
+
+				for (const [depName, depVersion] of Object.entries(deps)) {
+					if (depVersion === 'workspace:*' && versionMap.has(depName)) {
+						deps[depName] = versionMap.get(depName)!;
+						modified = true;
+						console.log(`  📎 ${pkgJson.name}: ${depName} → ${deps[depName]}`);
+					}
+				}
+			}
+
+			if (modified) {
+				await Bun.write(
+					pkgJsonPath,
+					JSON.stringify(pkgJson, null, '\t') + '\n',
+				);
+			}
+		} catch (error) {
+			console.error(`❌ Failed to resolve deps for ${pkgDir}:`, error);
 		}
 	}
 }
