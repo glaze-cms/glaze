@@ -55,9 +55,12 @@ type ParseEnvResult =
 export function parseEnv(): ParseEnvResult {
 	const data = {
 		...process.env,
-		GLAZE_PORT: process.env.GLAZE_PORT
-			? parseInt(process.env.GLAZE_PORT, 10)
-			: undefined,
+		GLAZE_PORT:
+			process.env.GLAZE_PORT || process.env.PORT
+				? parseInt((process.env.GLAZE_PORT || process.env.PORT)!, 10)
+				: undefined,
+		GLAZE_DATABASE_URL:
+			process.env.GLAZE_DATABASE_URL || process.env.DATABASE_URL,
 	};
 
 	// 1. Clone and apply defaults first

@@ -79,6 +79,84 @@ describe('parseEnv', () => {
 				expect(result.env.NODE_ENV).toBe('development');
 			}
 		});
+
+		test('should apply default for GLAZE_PORT when missing', () => {
+			process.env = {
+				GLAZE_DATABASE_URL: 'postgresql://localhost:5432/test',
+				GLAZE_AUTH_SECRET: 'a'.repeat(32),
+			};
+
+			const result = parseEnv();
+
+			expect(result.success).toBe(true);
+			if (result.success) {
+				expect(result.env.GLAZE_PORT).toBe(4000);
+			}
+		});
+
+		test('should fallback to PORT when GLAZE_PORT is missing', () => {
+			process.env = {
+				GLAZE_DATABASE_URL: 'postgresql://localhost:5432/test',
+				GLAZE_AUTH_SECRET: 'a'.repeat(32),
+				PORT: '8080',
+			};
+
+			const result = parseEnv();
+
+			expect(result.success).toBe(true);
+			if (result.success) {
+				expect(result.env.GLAZE_PORT).toBe(8080);
+			}
+		});
+
+		test('should prefer GLAZE_PORT over PORT when both are set', () => {
+			process.env = {
+				GLAZE_DATABASE_URL: 'postgresql://localhost:5432/test',
+				GLAZE_AUTH_SECRET: 'a'.repeat(32),
+				GLAZE_PORT: '3000',
+				PORT: '8080',
+			};
+
+			const result = parseEnv();
+
+			expect(result.success).toBe(true);
+			if (result.success) {
+				expect(result.env.GLAZE_PORT).toBe(3000);
+			}
+		});
+
+		test('should fallback to DATABASE_URL when GLAZE_DATABASE_URL is missing', () => {
+			process.env = {
+				DATABASE_URL: 'postgresql://railway:5432/db',
+				GLAZE_AUTH_SECRET: 'a'.repeat(32),
+			};
+
+			const result = parseEnv();
+
+			expect(result.success).toBe(true);
+			if (result.success) {
+				expect(result.env.GLAZE_DATABASE_URL).toBe(
+					'postgresql://railway:5432/db',
+				);
+			}
+		});
+
+		test('should prefer GLAZE_DATABASE_URL over DATABASE_URL when both are set', () => {
+			process.env = {
+				GLAZE_DATABASE_URL: 'postgresql://localhost:5432/test',
+				DATABASE_URL: 'postgresql://railway:5432/db',
+				GLAZE_AUTH_SECRET: 'a'.repeat(32),
+			};
+
+			const result = parseEnv();
+
+			expect(result.success).toBe(true);
+			if (result.success) {
+				expect(result.env.GLAZE_DATABASE_URL).toBe(
+					'postgresql://localhost:5432/test',
+				);
+			}
+		});
 	});
 
 	describe('Validation errors', () => {
