@@ -33,8 +33,10 @@ export function createGlazeServer({
 	/* Modules */
 	glaze.use(adminModule()).use(healthCheckModule());
 
-	glaze.listen({ port: env.PORT }, () => {
-		logger.info(`🧁 Glaze server running on http://localhost:${env.PORT}`);
+	glaze.listen({ port: env.GLAZE_PORT }, () => {
+		logger.info(
+			`🧁 Glaze server running on http://localhost:${env.GLAZE_PORT}`,
+		);
 	});
 
 	return glaze;

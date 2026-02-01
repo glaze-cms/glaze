@@ -1,6 +1,6 @@
 {
 	"name": "@glaze/core",
-	"version": "0.0.8",
+	"version": "0.0.9",
 	"description": "Core module of the Glaze framework, responsible for running the CMS server and providing essential functionality.",
 	"license": "MIT",
 	"type": "module",
@@ -34,8 +34,8 @@
 		"prepublishOnly": "bunx tsc -p tsconfig.build.json"
 	},
 	"dependencies": {
-		"@glaze/admin": "workspace:*",
-		"@glaze/logger": "workspace:*",
+		"@glaze/admin": "0.0.9",
+		"@glaze/logger": "0.0.9",
 		"elysia": "latest",
 		"@sinclair/typebox": "latest",
 		"pino": "catalog:system"

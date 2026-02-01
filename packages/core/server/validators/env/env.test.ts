@@ -17,8 +17,8 @@ describe('parseEnv', () => {
 	describe('Successful parsing', () => {
 		test('should successfully parse when all required variables are present', () => {
 			process.env = {
-				DATABASE_URL: 'postgresql://localhost:5432/test',
-				AUTH_SECRET: 'a'.repeat(32),
+				GLAZE_DATABASE_URL: 'postgresql://localhost:5432/test',
+				GLAZE_AUTH_SECRET: 'a'.repeat(32),
 				NODE_ENV: 'development',
 			};
 
@@ -26,18 +26,18 @@ describe('parseEnv', () => {
 
 			expect(result.success).toBe(true);
 			if (result.success) {
-				expect(result.env.DATABASE_URL).toBe(
+				expect(result.env.GLAZE_DATABASE_URL).toBe(
 					'postgresql://localhost:5432/test',
 				);
-				expect(result.env.AUTH_SECRET).toBe('a'.repeat(32));
+				expect(result.env.GLAZE_AUTH_SECRET).toBe('a'.repeat(32));
 				expect(result.env.NODE_ENV).toBe('development');
 			}
 		});
 
 		test('should accept production NODE_ENV', () => {
 			process.env = {
-				DATABASE_URL: 'postgresql://localhost:5432/test',
-				AUTH_SECRET: 'a'.repeat(32),
+				GLAZE_DATABASE_URL: 'postgresql://localhost:5432/test',
+				GLAZE_AUTH_SECRET: 'a'.repeat(32),
 				NODE_ENV: 'production',
 			};
 
@@ -51,8 +51,8 @@ describe('parseEnv', () => {
 
 		test('should accept test NODE_ENV', () => {
 			process.env = {
-				DATABASE_URL: 'postgresql://localhost:5432/test',
-				AUTH_SECRET: 'a'.repeat(32),
+				GLAZE_DATABASE_URL: 'postgresql://localhost:5432/test',
+				GLAZE_AUTH_SECRET: 'a'.repeat(32),
 				NODE_ENV: 'test',
 			};
 
@@ -68,8 +68,8 @@ describe('parseEnv', () => {
 	describe('Default handling', () => {
 		test('should apply default for NODE_ENV when missing', () => {
 			process.env = {
-				DATABASE_URL: 'postgresql://localhost:5432/test',
-				AUTH_SECRET: 'a'.repeat(32),
+				GLAZE_DATABASE_URL: 'postgresql://localhost:5432/test',
+				GLAZE_AUTH_SECRET: 'a'.repeat(32),
 			};
 
 			const result = parseEnv();
@@ -84,7 +84,7 @@ describe('parseEnv', () => {
 	describe('Validation errors', () => {
 		test('should fail when DATABASE_URL is missing', () => {
 			process.env = {
-				AUTH_SECRET: 'a'.repeat(32),
+				GLAZE_AUTH_SECRET: 'a'.repeat(32),
 				NODE_ENV: 'development',
 			};
 
@@ -93,15 +93,15 @@ describe('parseEnv', () => {
 			expect(result.success).toBe(false);
 			if (!result.success) {
 				expect(result.errors.length).toBeGreaterThan(0);
-				expect(result.errors[0]?.variable).toBe('DATABASE_URL');
-				expect(result.errors[0]?.hint).toContain('DATABASE_URL');
+				expect(result.errors[0]?.variable).toBe('GLAZE_DATABASE_URL');
+				expect(result.errors[0]?.hint).toContain('GLAZE_DATABASE_URL');
 			}
 		});
 
-		test('should fail when DATABASE_URL is empty string', () => {
+		test('should fail when GLAZE_DATABASE_URL is empty string', () => {
 			process.env = {
-				DATABASE_URL: '',
-				AUTH_SECRET: 'a'.repeat(32),
+				GLAZE_DATABASE_URL: '',
+				GLAZE_AUTH_SECRET: 'a'.repeat(32),
 				NODE_ENV: 'development',
 			};
 
@@ -109,16 +109,16 @@ describe('parseEnv', () => {
 
 			expect(result.success).toBe(false);
 			if (!result.success) {
-				expect(result.errors.some((e) => e.variable === 'DATABASE_URL')).toBe(
-					true,
-				);
+				expect(
+					result.errors.some((e) => e.variable === 'GLAZE_DATABASE_URL'),
+				).toBe(true);
 			}
 		});
 
 		test('should accept postgres:// URL scheme', () => {
 			process.env = {
-				DATABASE_URL: 'postgres://localhost:5432/test',
-				AUTH_SECRET: 'a'.repeat(32),
+				GLAZE_DATABASE_URL: 'postgres://localhost:5432/test',
+				GLAZE_AUTH_SECRET: 'a'.repeat(32),
 				NODE_ENV: 'development',
 			};
 
@@ -126,14 +126,16 @@ describe('parseEnv', () => {
 
 			expect(result.success).toBe(true);
 			if (result.success) {
-				expect(result.env.DATABASE_URL).toBe('postgres://localhost:5432/test');
+				expect(result.env.GLAZE_DATABASE_URL).toBe(
+					'postgres://localhost:5432/test',
+				);
 			}
 		});
 
 		test('should accept postgresql:// URL scheme', () => {
 			process.env = {
-				DATABASE_URL: 'postgresql://localhost:5432/test',
-				AUTH_SECRET: 'a'.repeat(32),
+				GLAZE_DATABASE_URL: 'postgresql://localhost:5432/test',
+				GLAZE_AUTH_SECRET: 'a'.repeat(32),
 				NODE_ENV: 'development',
 			};
 
@@ -141,7 +143,7 @@ describe('parseEnv', () => {
 
 			expect(result.success).toBe(true);
 			if (result.success) {
-				expect(result.env.DATABASE_URL).toBe(
+				expect(result.env.GLAZE_DATABASE_URL).toBe(
 					'postgresql://localhost:5432/test',
 				);
 			}
@@ -149,8 +151,8 @@ describe('parseEnv', () => {
 
 		test('should reject MySQL database URLs', () => {
 			process.env = {
-				DATABASE_URL: 'mysql://localhost:3306/test',
-				AUTH_SECRET: 'a'.repeat(32),
+				GLAZE_DATABASE_URL: 'mysql://localhost:3306/test',
+				GLAZE_AUTH_SECRET: 'a'.repeat(32),
 				NODE_ENV: 'development',
 			};
 
@@ -158,11 +160,11 @@ describe('parseEnv', () => {
 
 			expect(result.success).toBe(false);
 			if (!result.success) {
-				expect(result.errors.some((e) => e.variable === 'DATABASE_URL')).toBe(
-					true,
-				);
+				expect(
+					result.errors.some((e) => e.variable === 'GLAZE_DATABASE_URL'),
+				).toBe(true);
 				const dbError = result.errors.find(
-					(e) => e.variable === 'DATABASE_URL',
+					(e) => e.variable === 'GLAZE_DATABASE_URL',
 				);
 				// TypeBox generates this standard pattern error message
 				expect(dbError?.message).toContain(
@@ -173,8 +175,8 @@ describe('parseEnv', () => {
 
 		test('should reject MongoDB database URLs', () => {
 			process.env = {
-				DATABASE_URL: 'mongodb://localhost:27017/test',
-				AUTH_SECRET: 'a'.repeat(32),
+				GLAZE_DATABASE_URL: 'mongodb://localhost:27017/test',
+				GLAZE_AUTH_SECRET: 'a'.repeat(32),
 				NODE_ENV: 'development',
 			};
 
@@ -182,16 +184,16 @@ describe('parseEnv', () => {
 
 			expect(result.success).toBe(false);
 			if (!result.success) {
-				expect(result.errors.some((e) => e.variable === 'DATABASE_URL')).toBe(
-					true,
-				);
+				expect(
+					result.errors.some((e) => e.variable === 'GLAZE_DATABASE_URL'),
+				).toBe(true);
 			}
 		});
 
 		test('should reject SQLite database URLs', () => {
 			process.env = {
-				DATABASE_URL: 'sqlite://./test.db',
-				AUTH_SECRET: 'a'.repeat(32),
+				GLAZE_DATABASE_URL: 'sqlite://./test.db',
+				GLAZE_AUTH_SECRET: 'a'.repeat(32),
 				NODE_ENV: 'development',
 			};
 
@@ -199,15 +201,15 @@ describe('parseEnv', () => {
 
 			expect(result.success).toBe(false);
 			if (!result.success) {
-				expect(result.errors.some((e) => e.variable === 'DATABASE_URL')).toBe(
-					true,
-				);
+				expect(
+					result.errors.some((e) => e.variable === 'GLAZE_DATABASE_URL'),
+				).toBe(true);
 			}
 		});
 
 		test('should fail when AUTH_SECRET is missing', () => {
 			process.env = {
-				DATABASE_URL: 'postgresql://localhost:5432/test',
+				GLAZE_DATABASE_URL: 'postgresql://localhost:5432/test',
 				NODE_ENV: 'development',
 			};
 
@@ -215,15 +217,15 @@ describe('parseEnv', () => {
 
 			expect(result.success).toBe(false);
 			if (!result.success) {
-				expect(result.errors[0]?.variable).toBe('AUTH_SECRET');
-				expect(result.errors[0]?.hint).toContain('AUTH_SECRET');
+				expect(result.errors[0]?.variable).toBe('GLAZE_AUTH_SECRET');
+				expect(result.errors[0]?.hint).toContain('GLAZE_AUTH_SECRET');
 			}
 		});
 
-		test('should fail when AUTH_SECRET is too short', () => {
+		test('should fail when GLAZE_AUTH_SECRET is too short', () => {
 			process.env = {
-				DATABASE_URL: 'postgresql://localhost:5432/test',
-				AUTH_SECRET: 'short',
+				GLAZE_DATABASE_URL: 'postgresql://localhost:5432/test',
+				GLAZE_AUTH_SECRET: 'short',
 				NODE_ENV: 'development',
 			};
 
@@ -231,16 +233,16 @@ describe('parseEnv', () => {
 
 			expect(result.success).toBe(false);
 			if (!result.success) {
-				expect(result.errors.some((e) => e.variable === 'AUTH_SECRET')).toBe(
-					true,
-				);
+				expect(
+					result.errors.some((e) => e.variable === 'GLAZE_AUTH_SECRET'),
+				).toBe(true);
 			}
 		});
 
 		test('should fail when NODE_ENV is invalid', () => {
 			process.env = {
-				DATABASE_URL: 'postgresql://localhost:5432/test',
-				AUTH_SECRET: 'a'.repeat(32),
+				GLAZE_DATABASE_URL: 'postgresql://localhost:5432/test',
+				GLAZE_AUTH_SECRET: 'a'.repeat(32),
 				NODE_ENV: 'invalid',
 			};
 
@@ -254,7 +256,7 @@ describe('parseEnv', () => {
 
 		test('should return multiple errors when multiple variables are invalid', () => {
 			process.env = {
-				// Missing DATABASE_URL and AUTH_SECRET
+				// Missing GLAZE_DATABASE_URL and GLAZE_AUTH_SECRET
 				NODE_ENV: 'invalid',
 			};
 
@@ -270,8 +272,8 @@ describe('parseEnv', () => {
 	describe('Error message formatting', () => {
 		test('should format error messages with variable name, message, and hint', () => {
 			process.env = {
-				AUTH_SECRET: 'a'.repeat(32),
-				// Missing DATABASE_URL
+				GLAZE_AUTH_SECRET: 'a'.repeat(32),
+				// Missing GLAZE_DATABASE_URL
 			};
 
 			const result = parseEnv();
@@ -282,15 +284,15 @@ describe('parseEnv', () => {
 				expect(error).toHaveProperty('variable');
 				expect(error).toHaveProperty('message');
 				expect(error).toHaveProperty('hint');
-				expect(error?.variable).toBe('DATABASE_URL');
+				expect(error?.variable).toBe('GLAZE_DATABASE_URL');
 				expect(error?.hint).toContain('.env');
 			}
 		});
 
 		test('should include custom error messages from schema', () => {
 			process.env = {
-				DATABASE_URL: '',
-				AUTH_SECRET: 'a'.repeat(32),
+				GLAZE_DATABASE_URL: '',
+				GLAZE_AUTH_SECRET: 'a'.repeat(32),
 			};
 
 			const result = parseEnv();
@@ -298,7 +300,7 @@ describe('parseEnv', () => {
 			expect(result.success).toBe(false);
 			if (!result.success) {
 				const dbError = result.errors.find(
-					(e) => e.variable === 'DATABASE_URL',
+					(e) => e.variable === 'GLAZE_DATABASE_URL',
 				);
 				expect(dbError?.message).toBeDefined();
 			}
@@ -341,16 +343,16 @@ describe('validateEnv', () => {
 
 	test('should return env when validation succeeds', () => {
 		process.env = {
-			DATABASE_URL: 'postgres://localhost/test',
-			AUTH_SECRET: 'a'.repeat(32),
+			GLAZE_DATABASE_URL: 'postgres://localhost/test',
+			GLAZE_AUTH_SECRET: 'a'.repeat(32),
 			NODE_ENV: 'test',
 		};
 
 		// eslint-disable-next-line @typescript-eslint/no-unsafe-argument
 		const env = validateEnv(mockLogger as any);
 
-		expect(env.DATABASE_URL).toBe('postgres://localhost/test');
-		expect(env.AUTH_SECRET).toBe('a'.repeat(32));
+		expect(env.GLAZE_DATABASE_URL).toBe('postgres://localhost/test');
+		expect(env.GLAZE_AUTH_SECRET).toBe('a'.repeat(32));
 		expect(env.NODE_ENV).toBe('test');
 		expect(mockProcessExit).not.toHaveBeenCalled();
 		expect(mockLogger.error).not.toHaveBeenCalled();
@@ -358,7 +360,7 @@ describe('validateEnv', () => {
 
 	test('should exit with code 1 when validation fails', () => {
 		process.env = {
-			// Missing DATABASE_URL and AUTH_SECRET
+			// Missing GLAZE_DATABASE_URL and GLAZE_AUTH_SECRET
 			NODE_ENV: 'development',
 		};
 
@@ -373,7 +375,7 @@ describe('validateEnv', () => {
 
 	test('should log all errors via logger when validation fails', () => {
 		process.env = {
-			// Missing DATABASE_URL and AUTH_SECRET
+			// Missing GLAZE_DATABASE_URL and GLAZE_AUTH_SECRET
 			NODE_ENV: 'development',
 		};
 

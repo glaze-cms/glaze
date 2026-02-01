@@ -8,10 +8,6 @@ import type { Logger } from '@glaze/logger';
  * Includes automatic defaults for non-critical infrastructure.
  */
 const GlazeEnvSchema = Type.Object({
-	AUTH_SECRET: Type.String({
-		minLength: 32,
-		error: 'For security reasons, AUTH_SECRET must be at least 32 characters',
-	}),
 	NODE_ENV: Type.Union(
 		[
 			Type.Literal('local'),
@@ -22,8 +18,12 @@ const GlazeEnvSchema = Type.Object({
 		],
 		{ default: 'development' },
 	),
-	PORT: Type.Integer({ default: 4000, minimum: 1, maximum: 65535 }),
-	DATABASE_URL: Type.String({
+	GLAZE_AUTH_SECRET: Type.String({
+		minLength: 32,
+		error: 'For security reasons, AUTH_SECRET must be at least 32 characters',
+	}),
+	GLAZE_PORT: Type.Integer({ default: 4000, minimum: 1, maximum: 65535 }),
+	GLAZE_DATABASE_URL: Type.String({
 		minLength: 1,
 		pattern: '^(postgres|postgresql)://',
 	}),

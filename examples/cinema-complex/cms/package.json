@@ -1,0 +1,12 @@
+{
+	"name": "cinema-complex-cms",
+	"private": true,
+	"type": "module",
+	"dependencies": {
+		"@glaze/cms": "^0.0.8"
+	},
+	"scripts": {
+		"dev": "bun --bun index.ts",
+		"start": "bun --bun index.ts"
+	}
+}

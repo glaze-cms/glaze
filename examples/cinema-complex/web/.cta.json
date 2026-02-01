@@ -1,5 +1,5 @@
 {
-  "projectName": "cinema-complex",
+  "projectName": "web",
   "mode": "file-router",
   "typescript": true,
   "packageManager": "bun",
@@ -10,6 +10,8 @@
   "framework": "react-cra",
   "chosenAddOns": [
     "eslint",
-    "start"
+    "nitro",
+    "start",
+    "tanstack-query"
   ]
 }

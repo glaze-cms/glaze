@@ -1,6 +1,6 @@
 {
 	"name": "@glaze/cms",
-	"version": "0.0.8",
+	"version": "0.0.9",
 	"description": "Open source, Bun-native headless CMS framework for modern web applications.",
 	"license": "MIT",
 	"main": "./index.ts",
@@ -21,6 +21,6 @@
 		"prepublishOnly": "bunx tsc -p tsconfig.build.json"
 	},
 	"dependencies": {
-		"@glaze/core": "workspace:*"
+		"@glaze/core": "0.0.9"
 	}
 }
