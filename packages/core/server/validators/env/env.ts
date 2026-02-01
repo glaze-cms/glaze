@@ -53,8 +53,6 @@ type ParseEnvResult =
  * const { DATABASE_URL } = result.env;
  */
 export function parseEnv(): ParseEnvResult {
-	console.log('DEBUG: GLAZE_PORT =', process.env.GLAZE_PORT);
-	console.log('DEBUG: PORT =', process.env.PORT);
 	const data = {
 		...process.env,
 		GLAZE_PORT:
