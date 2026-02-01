@@ -1,6 +1,6 @@
 {
 	"name": "@glaze/core",
-	"version": "0.0.14",
+	"version": "0.0.15",
 	"description": "Core module of the Glaze framework, responsible for running the CMS server and providing essential functionality.",
 	"license": "MIT",
 	"type": "module",

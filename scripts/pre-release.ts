@@ -95,33 +95,6 @@ async function bumpPackages(bumpType: BumpType): Promise<BumpResult[]> {
 		}
 	}
 
-	// Process example packages
-	for (const pkgDir of EXAMPLE_PACKAGES) {
-		const pkgJsonPath = join(pkgDir, 'package.json');
-
-		try {
-			const pkgJson = (await Bun.file(pkgJsonPath).json()) as PackageJson;
-
-			const oldVersion = pkgJson.version;
-			const newVersion = bumpVersion(oldVersion, bumpType);
-
-			pkgJson.version = newVersion;
-
-			await Bun.write(pkgJsonPath, JSON.stringify(pkgJson, null, '\t') + '\n');
-
-			results.push({
-				name: pkgJson.name,
-				oldVersion,
-				newVersion,
-			});
-
-			console.log(`✅ ${pkgJson.name}: ${oldVersion} → ${newVersion}`);
-		} catch (error) {
-			hasErrors = true;
-			console.error(`❌ Failed to bump ${pkgDir}:`, error);
-		}
-	}
-
 	if (hasErrors) {
 		throw new Error('One or more packages failed to bump');
 	}
@@ -187,10 +160,19 @@ async function resolveWorkspaceDeps(bumped: BumpResult[]): Promise<void> {
 				if (!deps) continue;
 
 				for (const [depName, depVersion] of Object.entries(deps)) {
-					if (depVersion === 'workspace:*' && versionMap.has(depName)) {
-						deps[depName] = versionMap.get(depName)!;
-						modified = true;
-						console.log(`  📎 ${pkgJson.name}: ${depName} → ${deps[depName]}`);
+					if (versionMap.has(depName)) {
+						const newVersion = versionMap.get(depName)!;
+						if (
+							depVersion === 'workspace:*' ||
+							depVersion.startsWith('^') ||
+							depVersion.startsWith('~')
+						) {
+							deps[depName] = `^${newVersion}`;
+							modified = true;
+							console.log(
+								`  📎 ${pkgJson.name}: ${depName} → ${deps[depName]}`,
+							);
+						}
 					}
 				}
 			}

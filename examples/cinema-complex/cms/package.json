@@ -3,7 +3,7 @@
 	"private": true,
 	"type": "module",
 	"dependencies": {
-		"@glaze/cms": "^0.0.14"
+		"@glaze/cms": "^0.0.15"
 	},
 	"scripts": {
 		"dev": "bun --bun index.ts",
