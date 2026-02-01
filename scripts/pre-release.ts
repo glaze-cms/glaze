@@ -103,48 +103,11 @@ async function bumpPackages(bumpType: BumpType): Promise<BumpResult[]> {
 }
 
 /**
- * Phase 2: resolve workspace:* dependencies to actual versions
+ * Phase 2: update example app dependencies to new versions
+ * Note: workspace packages use workspace:* which bun publish auto-converts
  */
-async function resolveWorkspaceDeps(bumped: BumpResult[]): Promise<void> {
+async function updateExampleDeps(bumped: BumpResult[]): Promise<void> {
 	const versionMap = new Map(bumped.map((p) => [p.name, p.newVersion]));
-
-	const entries = (await readdir(PACKAGES_DIR, { withFileTypes: true }))
-		.filter((e) => e.isDirectory())
-		.sort((a, b) => a.name.localeCompare(b.name));
-
-	for (const entry of entries) {
-		const pkgJsonPath = join(PACKAGES_DIR, entry.name, 'package.json');
-
-		try {
-			const pkgJson = (await Bun.file(pkgJsonPath).json()) as PackageJson;
-
-			if (pkgJson.private) continue;
-
-			let modified = false;
-
-			for (const depType of ['dependencies', 'devDependencies'] as const) {
-				const deps = pkgJson[depType];
-				if (!deps) continue;
-
-				for (const [depName, depVersion] of Object.entries(deps)) {
-					if (depVersion === 'workspace:*' && versionMap.has(depName)) {
-						deps[depName] = versionMap.get(depName)!;
-						modified = true;
-						console.log(`  📎 ${pkgJson.name}: ${depName} → ${deps[depName]}`);
-					}
-				}
-			}
-
-			if (modified) {
-				await Bun.write(
-					pkgJsonPath,
-					JSON.stringify(pkgJson, null, '\t') + '\n',
-				);
-			}
-		} catch (error) {
-			console.error(`❌ Failed to resolve deps for ${entry.name}:`, error);
-		}
-	}
 
 	// Process example packages
 	for (const pkgDir of EXAMPLE_PACKAGES) {
@@ -194,8 +157,8 @@ async function preRelease(bumpType: BumpType) {
 
 	const bumped = await bumpPackages(bumpType);
 
-	console.log('\n🔗 Resolving workspace dependencies...');
-	await resolveWorkspaceDeps(bumped);
+	console.log('\n🔗 Updating example dependencies...');
+	await updateExampleDeps(bumped);
 
 	console.log('\n✨ Version bump complete');
 	console.log(
