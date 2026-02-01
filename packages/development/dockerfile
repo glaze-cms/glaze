@@ -28,7 +28,7 @@ COPY --from=deps /app/packages/core/node_modules ./packages/core/node_modules
 COPY --from=deps /app/packages/development/node_modules ./packages/development/node_modules
 COPY --from=deps /app/packages/logger/node_modules ./packages/logger/node_modules
 COPY . .
-WORKDIR /app
+WORKDIR /app/packages/development
 ENV NODE_ENV=development
 EXPOSE 4000
 EXPOSE 5173
