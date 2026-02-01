@@ -3,14 +3,11 @@
 	"private": true,
 	"type": "module",
 	"dependencies": {
-		"@glaze/cms": "^0.0.9"
-	},
-	"engines": {
-		"bun": "1"
+		"@glaze/cms": "^0.0.12"
 	},
 	"scripts": {
 		"dev": "bun --bun index.ts",
-		"start": "bun --bun index.ts",
-		"build": "echo 'No build step required for this project'"
+		"start": "bun --bun dist/index.js",
+		"build": "bun build ./index.ts --outdir dist --target bun"
 	}
 }
