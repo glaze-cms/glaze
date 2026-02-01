@@ -11,5 +11,8 @@ export function adminModule() {
 		.decorate('env', {} as GlazeEnv)
 		.all('/admin/*', ({ env, request, path }) =>
 			handleAdmin({ env, request, path }),
+		)
+		.all('/admin', ({ env, request, path }) =>
+			handleAdmin({ env, request, path }),
 		);
 }

@@ -32,9 +32,11 @@ type HandleAdminParams = {
  */
 export async function handleAdmin({ request, path }: HandleAdminParams) {
 	try {
+		if (path === '/admin') {
+			return Response.redirect('/admin/', 301);
+		}
+
 		if (process.env.GLAZE_INTERNAL__ADMIN_PROXY === 'true') {
-			console.log('Proxying /admin request to Vite dev server:');
-			console.log();
 			const viteUrl = new URL(request.url);
 			const target = `http://localhost:5173${path}${viteUrl.search}`;
 
@@ -50,11 +52,6 @@ export async function handleAdmin({ request, path }: HandleAdminParams) {
 					{ status: 502 },
 				);
 			}
-		}
-
-		if (path === '/admin') {
-			console.log('Redirecting /admin to /admin/ for proper asset loading');
-			return Response.redirect('/admin/', 301);
 		}
 
 		const relativePath = path.replace(/^\/admin/, '');

@@ -35,7 +35,7 @@ export function createGlazeServer({
 
 	glaze.listen({ port: env.GLAZE_PORT }, () => {
 		logger.info(
-			`🧁 Glaze server running on http://localhost:${env.GLAZE_PORT}`,
+			`🧁 Glaze admin dashboard available on http://localhost:${env.GLAZE_PORT}/admin`,
 		);
 	});
 
