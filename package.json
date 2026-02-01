@@ -4,7 +4,8 @@
 	"description": "Glaze CMS - A Bun native CMS",
 	"scripts": {
 		"dev": "bun --elide-lines 0 --filter '*' dev",
-		"dev:docker": "bun scripts/docker-dev.ts",
+		"dev:docker": "bun --filter '*' dev",
+		"dev:docker:up": "bun scripts/docker-dev.ts",
 		"test": "bun test",
 		"lint": "bun --filter '*' lint",
 		"lint:fix": "bun --filter '*' lint --fix",
