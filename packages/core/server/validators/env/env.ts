@@ -84,14 +84,23 @@ export function parseEnv(): ParseEnvResult {
 			{ variable: string; message: string; hint: string }
 		>();
 
+		// Determine if we're in a local development environment
+		const nodeEnv =
+			(convertedEnv as GlazeEnv).NODE_ENV || data.NODE_ENV || 'development';
+		const isLocalEnv = nodeEnv === 'local' || nodeEnv === 'development';
+
 		for (const err of errors) {
 			// TypeBox paths start with '/' for top-level properties (e.g., '/DATABASE_URL'), slice(1) removes the leading '/' to get the variable name
 			const variable = err.path.slice(1);
 			if (!errorMap.has(variable)) {
+				const hint = isLocalEnv
+					? ` 👉  Set ${variable} to a valid value in your .env file`
+					: ` 👉  Set ${variable} as an environment variable in your hosting provider or cloud platform`;
+
 				errorMap.set(variable, {
 					variable,
 					message: err.message,
-					hint: ` 👉  Set ${variable} to a valid value in your .env file`,
+					hint,
 				});
 			}
 		}
