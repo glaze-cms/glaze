@@ -3,7 +3,7 @@
 	"private": true,
 	"description": "A fictional cinema complex management system to showcase Bun CMS feataures and capabilities.",
 	"scripts": {
-		"dev": "bun --elide-lines 0 --filter '*' dev",
+		"dev": "bun --elide-lines 0 --filter './web' --filter './cms' dev",
 		"test": "bun test",
 		"lint": "bun --filter '*' lint",
 		"lint:fix": "bun --filter '*' lint --fix",
