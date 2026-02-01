@@ -1,7 +1,7 @@
 {
 	"name": "glaze-cms",
 	"private": true,
-	"description": "Glaze CMS - A Bun native CMS.",
+	"description": "Glaze CMS - A Bun native CMS",
 	"scripts": {
 		"dev": "bun --elide-lines 0 --filter '*' dev",
 		"dev:docker": "bun scripts/docker-dev.ts",
