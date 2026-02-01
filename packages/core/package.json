@@ -34,8 +34,8 @@
 		"prepublishOnly": "bunx tsc -p tsconfig.build.json"
 	},
 	"dependencies": {
-		"@glaze/admin": "0.0.9",
-		"@glaze/logger": "0.0.9",
+		"@glaze/admin": "workspace:*",
+		"@glaze/logger": "workspace:*",
 		"elysia": "latest",
 		"@sinclair/typebox": "latest",
 		"pino": "catalog:system"
