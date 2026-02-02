@@ -1,1 +1,0 @@
-export { handleHealthCheck } from './health';

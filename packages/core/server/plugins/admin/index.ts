@@ -1,0 +1,1 @@
+export { adminPlugin } from './admin';
