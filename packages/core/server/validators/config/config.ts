@@ -67,7 +67,12 @@ function parseConfig(config: GlazeConfig): ValidateConfigResult {
 	const configToValidate = {
 		apiPrefix: config.apiPrefix?.replace(/\/+$/, ''),
 		adminPrefix: config.adminPrefix?.replace(/\/+$/, ''),
-		healthCheck: config.healthCheck,
+		healthCheck: config.healthCheck
+			? {
+					...config.healthCheck,
+					path: config.healthCheck.path?.replace(/\/+$/, ''),
+				}
+			: undefined,
 	};
 
 	// Apply defaults
