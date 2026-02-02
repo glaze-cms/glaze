@@ -1,7 +1,11 @@
 import { Type, type Static } from '@sinclair/typebox';
 import { Value } from '@sinclair/typebox/value';
 
+/* Types */
 import type { Logger } from '@glaze/logger';
+
+/* Consts */
+import { DEFAULT_SERVER_PORT } from '../../lib/consts/defaults';
 
 /**
  * Internal schema defining the required environment variables for Glaze.
@@ -22,7 +26,11 @@ const GlazeEnvSchema = Type.Object({
 		minLength: 32,
 		error: 'For security reasons, AUTH_SECRET must be at least 32 characters',
 	}),
-	GLAZE_PORT: Type.Integer({ default: 4000, minimum: 1, maximum: 65535 }),
+	GLAZE_PORT: Type.Integer({
+		default: DEFAULT_SERVER_PORT,
+		minimum: 1,
+		maximum: 65535,
+	}),
 	GLAZE_DATABASE_URL: Type.String({
 		minLength: 1,
 		pattern: '^(postgres|postgresql)://',
@@ -53,14 +61,12 @@ type ParseEnvResult =
  * const { DATABASE_URL } = result.env;
  */
 export function parseEnv(): ParseEnvResult {
+	const portValue = process.env.GLAZE_PORT ?? process.env.PORT;
 	const data = {
 		...process.env,
-		GLAZE_PORT:
-			process.env.GLAZE_PORT || process.env.PORT
-				? parseInt((process.env.GLAZE_PORT || process.env.PORT)!, 10)
-				: undefined,
+		GLAZE_PORT: portValue ? parseInt(portValue, 10) : undefined,
 		GLAZE_DATABASE_URL:
-			process.env.GLAZE_DATABASE_URL || process.env.DATABASE_URL,
+			process.env.GLAZE_DATABASE_URL ?? process.env.DATABASE_URL,
 	};
 
 	// 1. Clone and apply defaults first
@@ -83,8 +89,7 @@ export function parseEnv(): ParseEnvResult {
 		>();
 
 		// Determine if we're in a local development environment
-		const nodeEnv =
-			(convertedEnv as GlazeEnv).NODE_ENV || data.NODE_ENV || 'development';
+		const nodeEnv = (convertedEnv as GlazeEnv).NODE_ENV;
 		const isLocalEnv = nodeEnv === 'local' || nodeEnv === 'development';
 
 		for (const err of errors) {

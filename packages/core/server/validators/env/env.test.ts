@@ -1,5 +1,6 @@
 import { expect, test, describe, beforeEach, afterEach, mock } from 'bun:test';
 import { parseEnv, validateEnv } from './env';
+import { DEFAULT_SERVER_PORT } from '../../lib/consts/defaults';
 
 describe('parseEnv', () => {
 	let originalEnv: NodeJS.ProcessEnv;
@@ -90,7 +91,7 @@ describe('parseEnv', () => {
 
 			expect(result.success).toBe(true);
 			if (result.success) {
-				expect(result.env.GLAZE_PORT).toBe(4000);
+				expect(result.env.GLAZE_PORT).toBe(DEFAULT_SERVER_PORT);
 			}
 		});
 

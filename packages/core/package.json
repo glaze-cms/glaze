@@ -25,10 +25,10 @@
 	},
 	"scripts": {
 		"start": "bun run index.ts",
-		"lint": "eslint /**/*.ts",
-		"lint:fix": "eslint /**/*.ts --fix",
-		"format": "prettier --check /**/*.ts",
-		"format:fix": "prettier --write /**/*.ts",
+		"lint": "eslint .",
+		"lint:fix": "eslint . --fix",
+		"format": "prettier --check .",
+		"format:fix": "prettier --write .",
 		"typecheck": "tsc --noEmit",
 		"test": "bun test",
 		"prepublishOnly": "bunx tsc -p tsconfig.build.json"
@@ -37,6 +37,7 @@
 		"@glaze/admin": "workspace:*",
 		"@glaze/logger": "workspace:*",
 		"elysia": "latest",
+		"@elysiajs/cors": "latest",
 		"@sinclair/typebox": "latest",
 		"pino": "catalog:system"
 	},

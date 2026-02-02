@@ -1,3 +1,11 @@
 import { glaze } from '@glaze/core';
 
-glaze();
+glaze({
+	config: {
+		adminPrefix: '/administrador',
+		healthCheck: {
+			enabled: true,
+			path: '/status',
+		},
+	},
+});
