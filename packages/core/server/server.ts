@@ -4,9 +4,9 @@ import { Elysia } from 'elysia';
 import { envPlugin } from './plugins/env';
 import { loggerPlugin } from './plugins/logger';
 
-/* Modules */
-import { adminModule } from './modules/admin';
-import { healthCheckModule } from './modules/health';
+/* Handlers */
+import { handleAdmin } from './modules/admin';
+import { createHealthCheckResponse } from './modules/health';
 
 /*  Types */
 import type { GlazeEnv } from './validators/env';
@@ -25,13 +25,13 @@ export function createGlazeServer({
 	env: GlazeEnv;
 	logger: Logger;
 }) {
-	const glaze = new Elysia({ name: '@glaze/server' });
-
-	/* Plugins */
-	glaze.use(envPlugin(env)).use(loggerPlugin(logger));
-
-	/* Modules */
-	glaze.use(adminModule()).use(healthCheckModule());
+	/* Create and configure server with chained methods for type inference */
+	const glaze = new Elysia({ name: '@glaze/server' })
+		.use(envPlugin(env))
+		.use(loggerPlugin(logger))
+		.all('/admin/*', ({ request, path }) => handleAdmin({ request, path }))
+		.all('/admin', ({ request, path }) => handleAdmin({ request, path }))
+		.get('/_health', ({ env }) => createHealthCheckResponse(env));
 
 	glaze.listen({ port: env.GLAZE_PORT }, () => {
 		logger.info(

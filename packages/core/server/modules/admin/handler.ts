@@ -1,10 +1,7 @@
 import { dirname, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import type { GlazeEnv } from '../../validators/env';
-
 type HandleAdminParams = {
-	env: GlazeEnv;
 	request: Request;
 	path: string;
 };
