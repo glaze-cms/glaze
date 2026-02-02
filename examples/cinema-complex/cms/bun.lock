@@ -5,7 +5,7 @@
     "": {
       "name": "cinema-complex-cms",
       "dependencies": {
-        "@glaze/cms": "^0.0.18",
+        "@glaze/cms": "^0.0.19",
       },
     },
   },
@@ -14,7 +14,7 @@
 
     "@glaze/admin": ["@glaze/admin@0.0.18", "https://glaze-verdaccio.up.railway.app/@glaze/admin/-/admin-0.0.18.tgz", { "dependencies": { "react": "latest", "react-dom": "latest" } }, "sha512-ma9CyhW2nUzw3UaXWPVwJ0Mx6ExFt5L5fVGa2D/f1CrqPo48xQR1iJncnGfMlLUep51j0rhtvVopKA83kQVJag=="],
 
-    "@glaze/cms": ["@glaze/cms@0.0.18", "https://glaze-verdaccio.up.railway.app/@glaze/cms/-/cms-0.0.18.tgz", { "dependencies": { "@glaze/core": "0.0.18" } }, "sha512-Q/iAeAQ+nWZKHK2e8bo0MwEKfXBwxGRKAQC9GQAqDBuAUU1+p9OhNSLi20e048jC9yLQte8SiU0ZREEIIVDAbw=="],
+    "@glaze/cms": ["@glaze/cms@0.0.19", "https://glaze-verdaccio.up.railway.app/@glaze/cms/-/cms-0.0.19.tgz", { "dependencies": { "@glaze/core": "0.0.18" } }, "sha512-g+9847+OhdXhSg1abv17YX59mhVo6nKKGMPEWN2jjPGcNx17SKS9zQOs4ePDXGzniFqZ9T3Gjhkr0hyuLH/nFg=="],
 
     "@glaze/core": ["@glaze/core@0.0.18", "https://glaze-verdaccio.up.railway.app/@glaze/core/-/core-0.0.18.tgz", { "dependencies": { "@glaze/admin": "0.0.18", "@glaze/logger": "0.0.18", "@sinclair/typebox": "latest", "elysia": "latest", "pino": "latest" } }, "sha512-K7K7KiBQE4Wu/U8Biy7N7C2+Rox9uY5KMZTkJkXtEWmxoxhnRdIldfSaWxsfHMymLCJ3t1xkejMvp6NFPU4miQ=="],
 
