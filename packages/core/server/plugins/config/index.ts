@@ -1,0 +1,1 @@
+export { configPlugin } from './config';

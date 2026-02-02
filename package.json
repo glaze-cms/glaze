@@ -31,7 +31,8 @@
 			"typescript": "latest"
 		},
 		"elysia": {
-			"elysia": "latest"
+			"elysia": "latest",
+			"@elysiajs/cors": "latest"
 		},
 		"react": {
 			"@types/react": "latest",

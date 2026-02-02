@@ -1,3 +1,7 @@
 import { glaze } from '@glaze/core';
 
-glaze();
+glaze({
+	config: {
+		adminPrefix: '/admin-ui',
+	},
+});
