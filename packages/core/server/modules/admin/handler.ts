@@ -24,7 +24,6 @@ type HandleAdminParams = {
  *
  * @param request - The incoming Request object
  * @param path - The matched path for the admin route
- * @param env - Glaze environment configuration
  * @returns A proxied response from Vite (dev) or a static admin asset / SPA entry (prod)
  */
 export async function handleAdmin({ request, path }: HandleAdminParams) {
@@ -75,6 +74,7 @@ export async function handleAdmin({ request, path }: HandleAdminParams) {
 
 		return adminBuild;
 	} catch (error) {
-		console.error(error);
+		console.error('Admin handler error:', error);
+		return new Response('Internal Server Error', { status: 500 });
 	}
 }
