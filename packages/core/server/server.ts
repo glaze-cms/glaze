@@ -43,9 +43,7 @@ export function createGlazeServer({
 		.use(configPlugin(config))
 		.use((app) =>
 			config.healthCheck.enabled
-				? app.get(config.healthCheck.path, ({ env, config }) =>
-						handleHealthCheck(config, env),
-					)
+				? app.get(config.healthCheck.path, ({ env }) => handleHealthCheck(env))
 				: app,
 		)
 		.all(adminRoute, ({ request, path }) =>

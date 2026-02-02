@@ -65,8 +65,8 @@ type ValidateConfigResult =
 function parseConfig(config: GlazeConfig): ValidateConfigResult {
 	// Extract fields that need validation with defaults
 	const configToValidate = {
-		apiPrefix: config.apiPrefix,
-		adminPrefix: config.adminPrefix,
+		apiPrefix: config.apiPrefix?.replace(/\/+$/, ''),
+		adminPrefix: config.adminPrefix?.replace(/\/+$/, ''),
 		healthCheck: config.healthCheck,
 	};
 

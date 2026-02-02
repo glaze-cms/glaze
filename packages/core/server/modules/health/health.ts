@@ -1,6 +1,6 @@
 import type { GlazeEnv } from '../../validators/env';
 
-export function handleHealthCheck(_config: unknown, env: GlazeEnv) {
+export function handleHealthCheck(env: GlazeEnv) {
 	return {
 		status: 'ok' as const,
 		service: 'glaze',

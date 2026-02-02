@@ -61,10 +61,10 @@ type ParseEnvResult =
  * const { DATABASE_URL } = result.env;
  */
 export function parseEnv(): ParseEnvResult {
-	const portValue = process.env.GLAZE_PORT ?? process.env.PORT;
+	const port = process.env.GLAZE_PORT ?? process.env.PORT;
 	const data = {
 		...process.env,
-		GLAZE_PORT: portValue ? parseInt(portValue, 10) : undefined,
+		GLAZE_PORT: port ? parseInt(port, 10) : undefined,
 		GLAZE_DATABASE_URL:
 			process.env.GLAZE_DATABASE_URL ?? process.env.DATABASE_URL,
 	};
