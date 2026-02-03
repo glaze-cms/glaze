@@ -2,6 +2,7 @@ import { Elysia } from 'elysia';
 import cors from '@elysiajs/cors';
 
 import type { SecurityConfig } from '../../../config/types/security';
+import type { Logger } from '@glaze/logger';
 
 /**
  * Creates Elysia CORS middleware with environment-aware defaults.
@@ -15,6 +16,7 @@ import type { SecurityConfig } from '../../../config/types/security';
  * - Always configure explicit origins in production (e.g., `['https://myapp.com']`)
  *
  * @param config - The security configuration containing CORS settings.
+ * @param logger - The logger instance for diagnostics.
  * @returns The Elysia instance with CORS middleware applied.
  *
  * @example
@@ -28,13 +30,20 @@ import type { SecurityConfig } from '../../../config/types/security';
  * const app = new Elysia().use(corsPlugin());
  * ```
  */
-export const corsPlugin = (config?: SecurityConfig) => {
+export const corsPlugin = (config?: SecurityConfig, logger?: Logger) => {
 	const app = new Elysia({ name: '@glaze/cors' });
 	const corsConfig = config?.cors;
 	const isDevelopment = process.env.NODE_ENV === 'development';
 
 	// Environment-aware default: permissive in dev, restrictive in prod
 	const defaultOrigin = isDevelopment;
+
+	// Warn if production is running without explicit CORS origins
+	if (!isDevelopment && !corsConfig?.origin && logger) {
+		logger.warn(
+			'[@glaze/cors] No CORS origins configured in production. All cross-origin requests will be blocked.',
+		);
+	}
 
 	return app.use(
 		cors({

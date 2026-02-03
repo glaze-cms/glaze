@@ -33,9 +33,14 @@ describe('adminPlugin', () => {
 			const response = await app.handle(
 				new Request('http://localhost/dashboard/'),
 			);
-			// Route is registered; may return 200 (file served) or 404 (file not found)
-			// but should NOT be a routing 404 (which would indicate route not registered)
-			expect([200, 404]).toContain(response.status);
+			// Route handler runs: returns 200 (file served), 404 (file not found),
+			// or 502 (Vite proxy error). Any of these proves the route is registered.
+			// A router 404 would NOT reach the handler.
+			expect(
+				response.status === 200 ||
+					response.status === 404 ||
+					response.status === 502,
+			).toBe(true);
 		});
 
 		it('should register routes at the configured prefix - subpaths', async () => {
@@ -44,12 +49,12 @@ describe('adminPlugin', () => {
 			const response = await app.handle(
 				new Request('http://localhost/dashboard/users'),
 			);
-			// Route should be registered (not a routing 404)
+			// Route handler runs: 200 (file), 404 (file not found), or 502 (Vite proxy)
+			// Any of these proves the route is registered vs a router 404
 			expect(
-				response.status === 301 ||
+				response.status === 200 ||
 					response.status === 404 ||
-					response.status === 502 ||
-					response.status === 200,
+					response.status === 502,
 			).toBe(true);
 		});
 
@@ -59,12 +64,12 @@ describe('adminPlugin', () => {
 			const response = await app.handle(
 				new Request('http://localhost/admin/content/posts/123/edit'),
 			);
-			// Route should be registered (not a routing 404)
+			// Route handler runs: 200 (file), 404 (file not found), or 502 (Vite proxy)
+			// Any of these proves the route is registered vs a router 404
 			expect(
-				response.status === 301 ||
+				response.status === 200 ||
 					response.status === 404 ||
-					response.status === 502 ||
-					response.status === 200,
+					response.status === 502,
 			).toBe(true);
 		});
 	});
@@ -76,12 +81,9 @@ describe('adminPlugin', () => {
 			const response = await app.handle(
 				new Request('http://localhost/admin', { method: 'GET' }),
 			);
-			expect(
-				response.status === 301 ||
-					response.status === 404 ||
-					response.status === 502 ||
-					response.status === 200,
-			).toBe(true);
+			// 301 (redirect) is the strongest proof - only the handler does this
+			expect(response.status).toBe(301);
+			expect(response.headers.get('Location')).toBe('/admin/');
 		});
 
 		it('should handle POST requests', async () => {
@@ -90,12 +92,9 @@ describe('adminPlugin', () => {
 			const response = await app.handle(
 				new Request('http://localhost/admin', { method: 'POST' }),
 			);
-			expect(
-				response.status === 301 ||
-					response.status === 404 ||
-					response.status === 502 ||
-					response.status === 200,
-			).toBe(true);
+			// 301 (redirect) proves the route handler ran - only it redirects exact prefix
+			expect(response.status).toBe(301);
+			expect(response.headers.get('Location')).toBe('/admin/');
 		});
 
 		it('should handle PUT requests', async () => {
@@ -104,11 +103,12 @@ describe('adminPlugin', () => {
 			const response = await app.handle(
 				new Request('http://localhost/admin/api/users/1', { method: 'PUT' }),
 			);
+			// Route handler runs: 200 (file), 404 (file not found), or 502 (Vite proxy)
+			// Any of these proves the route is registered vs a router 404
 			expect(
-				response.status === 301 ||
+				response.status === 200 ||
 					response.status === 404 ||
-					response.status === 502 ||
-					response.status === 200,
+					response.status === 502,
 			).toBe(true);
 		});
 
@@ -118,11 +118,12 @@ describe('adminPlugin', () => {
 			const response = await app.handle(
 				new Request('http://localhost/admin/api/users/1', { method: 'DELETE' }),
 			);
+			// Route handler runs: 200 (file), 404 (file not found), or 502 (Vite proxy)
+			// Any of these proves the route is registered vs a router 404
 			expect(
-				response.status === 301 ||
+				response.status === 200 ||
 					response.status === 404 ||
-					response.status === 502 ||
-					response.status === 200,
+					response.status === 502,
 			).toBe(true);
 		});
 	});
@@ -159,12 +160,9 @@ describe('adminPlugin', () => {
 			// With default prefix, there's no duplicate registration needed
 			// The primary routes handle /admin already
 			const response = await app.handle(new Request('http://localhost/admin'));
-			expect(
-				response.status === 301 ||
-					response.status === 404 ||
-					response.status === 502 ||
-					response.status === 200,
-			).toBe(true);
+			// 301 (redirect) proves the primary route handler ran
+			expect(response.status).toBe(301);
+			expect(response.headers.get('Location')).toBe('/admin/');
 		});
 
 		it('should register /admin fallback when using custom prefix in dev mode', async () => {
@@ -172,35 +170,29 @@ describe('adminPlugin', () => {
 
 			const app = new Elysia().use(adminPlugin(createTestConfig('/cms')));
 
-			// Test /admin exact match
+			// Test /admin exact match - should redirect (proves handler ran)
 			const response1 = await app.handle(new Request('http://localhost/admin'));
-			expect(
-				response1.status === 301 ||
-					response1.status === 404 ||
-					response1.status === 502 ||
-					response1.status === 200,
-			).toBe(true);
+			expect(response1.status).toBe(301);
+			expect(response1.headers.get('Location')).toBe('/admin/');
 
-			// Test /admin/ wildcard
+			// Test /admin/ wildcard - handler runs (200, 404, or 502)
 			const response2 = await app.handle(
 				new Request('http://localhost/admin/'),
 			);
 			expect(
-				response2.status === 301 ||
+				response2.status === 200 ||
 					response2.status === 404 ||
-					response2.status === 502 ||
-					response2.status === 200,
+					response2.status === 502,
 			).toBe(true);
 
-			// Test /admin subpath (Vite assets)
+			// Test /admin subpath (Vite assets) - handler runs (200, 404, or 502)
 			const response3 = await app.handle(
 				new Request('http://localhost/admin/assets/main.js'),
 			);
 			expect(
-				response3.status === 301 ||
+				response3.status === 200 ||
 					response3.status === 404 ||
-					response3.status === 502 ||
-					response3.status === 200,
+					response3.status === 502,
 			).toBe(true);
 		});
 	});
@@ -242,12 +234,9 @@ describe('adminPlugin', () => {
 			const response = await app.handle(
 				new Request('http://localhost/dashboard'),
 			);
-			expect(
-				response.status === 301 ||
-					response.status === 404 ||
-					response.status === 502 ||
-					response.status === 200,
-			).toBe(true);
+			// 301 (redirect) proves the route handler ran with correct path context
+			expect(response.status).toBe(301);
+			expect(response.headers.get('Location')).toBe('/dashboard/');
 		});
 
 		it('should receive correct path in context for wildcard match', async () => {
@@ -256,11 +245,12 @@ describe('adminPlugin', () => {
 			const response = await app.handle(
 				new Request('http://localhost/dashboard/content/posts'),
 			);
+			// Route handler runs: 200 (file), 404 (file not found), or 502 (Vite proxy)
+			// Any of these proves the route is registered vs a router 404
 			expect(
-				response.status === 301 ||
+				response.status === 200 ||
 					response.status === 404 ||
-					response.status === 502 ||
-					response.status === 200,
+					response.status === 502,
 			).toBe(true);
 		});
 	});

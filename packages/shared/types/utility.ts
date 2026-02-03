@@ -4,9 +4,17 @@
  *
  * @example
  * ```typescript
- * type Config = Strict<{ apiKey: string }, { apiKey: string; debug?: boolean }>;
- * // ❌ Error: { apiKey: string, debbug: true } - 'debbug' is not in Shape
- * // ✓ OK:   { apiKey: 'abc123' }
+ * type AllowedConfig = { apiKey: string; debug?: boolean };
+ *
+ * function configure<T extends AllowedConfig>(config: Strict<T, AllowedConfig>) {
+ *   // implementation
+ * }
+ *
+ * // ❌ Error: 'debbug' is not in AllowedConfig (typo detection)
+ * configure({ apiKey: 'abc', debbug: true });
+ *
+ * // ✓ OK: All keys match AllowedConfig exactly
+ * configure({ apiKey: 'abc', debug: true });
  * ```
  */
 export type Strict<T, Shape> = T & Record<Exclude<keyof T, keyof Shape>, never>;

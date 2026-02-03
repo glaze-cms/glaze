@@ -32,7 +32,7 @@ export function createGlazeServer({
 		.decorate('config', config)
 		.use(healthCheckPlugin(config.healthCheck))
 		.use(adminPlugin(config))
-		.use(corsPlugin(config.security));
+		.use(corsPlugin(config.security, logger));
 
 	glaze.listen({ port: env.GLAZE_PORT }, () => {
 		logger.info(

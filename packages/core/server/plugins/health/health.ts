@@ -19,7 +19,8 @@ export const healthCheckPlugin = (config?: HealthCheckConfig) => {
 	}
 
 	// Normalize path: ensure leading slash, fallback to default if empty
-	let path = config?.path?.trim() ?? DEFAULT_HEALTH_CHECK_PATH;
+	// eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- Intentionally using || to treat empty strings as falsy
+	let path = config?.path?.trim() || DEFAULT_HEALTH_CHECK_PATH;
 	if (!path.startsWith('/')) {
 		path = `/${path}`;
 	}
