@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { Elysia } from 'elysia';
 
 import { adminPlugin } from './index';
@@ -15,35 +15,27 @@ const createTestConfig = (adminPrefix: string): GlazeInternalConfig =>
 
 describe('adminPlugin', () => {
 	describe('basic routing', () => {
-		it('should register routes at the configured prefix - exact match', async () => {
+		it('should redirect exact prefix to trailing slash', async () => {
 			const app = new Elysia().use(adminPlugin(createTestConfig('/dashboard')));
 
 			const response = await app.handle(
 				new Request('http://localhost/dashboard'),
 			);
-			// Route should be registered (not a routing 404)
-			// The handler may return 404 for missing files, but route exists
-			expect(
-				response.status === 301 ||
-					response.status === 404 ||
-					response.status === 502 ||
-					response.status === 200,
-			).toBe(true);
+
+			// Exact match should redirect to trailing slash (301)
+			expect(response.status).toBe(301);
+			expect(response.headers.get('Location')).toBe('/dashboard/');
 		});
 
-		it('should register routes at the configured prefix - with trailing slash', async () => {
+		it('should handle requests at trailing slash path', async () => {
 			const app = new Elysia().use(adminPlugin(createTestConfig('/dashboard')));
 
 			const response = await app.handle(
 				new Request('http://localhost/dashboard/'),
 			);
-			// Route should be registered (not a routing 404)
-			expect(
-				response.status === 301 ||
-					response.status === 404 ||
-					response.status === 502 ||
-					response.status === 200,
-			).toBe(true);
+			// Route is registered; may return 200 (file served) or 404 (file not found)
+			// but should NOT be a routing 404 (which would indicate route not registered)
+			expect([200, 404]).toContain(response.status);
 		});
 
 		it('should register routes at the configured prefix - subpaths', async () => {
@@ -136,7 +128,19 @@ describe('adminPlugin', () => {
 	});
 
 	describe('Vite fallback routes (non-default prefix in dev mode)', () => {
-		const originalEnv = process.env.GLAZE_INTERNAL__ADMIN_PROXY;
+		let originalEnv: string | undefined;
+
+		beforeEach(() => {
+			originalEnv = process.env.GLAZE_INTERNAL__ADMIN_PROXY;
+		});
+
+		afterEach(() => {
+			if (originalEnv === undefined) {
+				delete process.env.GLAZE_INTERNAL__ADMIN_PROXY;
+			} else {
+				process.env.GLAZE_INTERNAL__ADMIN_PROXY = originalEnv;
+			}
+		});
 
 		it('should NOT register /admin fallback when env var is not set', async () => {
 			delete process.env.GLAZE_INTERNAL__ADMIN_PROXY;
@@ -145,9 +149,6 @@ describe('adminPlugin', () => {
 
 			const response = await app.handle(new Request('http://localhost/admin'));
 			expect(response.status).toBe(404);
-
-			// Restore
-			process.env.GLAZE_INTERNAL__ADMIN_PROXY = originalEnv;
 		});
 
 		it('should NOT register /admin fallback when using default /admin prefix', async () => {
@@ -164,9 +165,6 @@ describe('adminPlugin', () => {
 					response.status === 502 ||
 					response.status === 200,
 			).toBe(true);
-
-			// Restore
-			process.env.GLAZE_INTERNAL__ADMIN_PROXY = originalEnv;
 		});
 
 		it('should register /admin fallback when using custom prefix in dev mode', async () => {
@@ -204,9 +202,6 @@ describe('adminPlugin', () => {
 					response3.status === 502 ||
 					response3.status === 200,
 			).toBe(true);
-
-			// Restore
-			process.env.GLAZE_INTERNAL__ADMIN_PROXY = originalEnv;
 		});
 	});
 

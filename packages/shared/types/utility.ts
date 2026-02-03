@@ -13,6 +13,7 @@ export type Strict<T, Shape> = T & Record<Exclude<keyof T, keyof Shape>, never>;
 
 /**
  * Recursively makes all properties required, removing optional modifiers at every level.
+ * Handles arrays by making elements required while preserving array structure.
  * Useful for ensuring complete configuration objects with no undefined values.
  *
  * @example
@@ -20,13 +21,17 @@ export type Strict<T, Shape> = T & Record<Exclude<keyof T, keyof Shape>, never>;
  * type Config = { db?: { host?: string; port?: number } };
  * type RequiredConfig = DeepRequired<Config>;
  * // Result: { db: { host: string; port: number } }
+ *
+ * type WithArray = { items?: { id?: number }[] };
+ * type RequiredWithArray = DeepRequired<WithArray>;
+ * // Result: { items: { id: number }[] }
  * ```
  */
-export type DeepRequired<T> = {
-	[P in keyof T]-?: T[P] extends object
-		? // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
-			T[P] extends Function
-			? T[P]
-			: DeepRequired<T[P]>
-		: T[P];
-};
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type DeepRequired<T> = T extends readonly any[]
+	? { [K in keyof T]: DeepRequired<T[K]> }
+	: T extends Function
+		? T
+		: T extends object
+			? { [P in keyof T]-?: DeepRequired<T[P]> }
+			: T;

@@ -1,6 +1,6 @@
+import { Elysia } from 'elysia';
 import { dirname, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import Elysia from 'elysia';
 
 import type { GlazeInternalConfig } from '../../validators/config/config';
 
@@ -39,19 +39,17 @@ function normalizePrefix(prefix: string): string {
  * @returns A proxied response from Vite (dev) or a static admin asset / SPA entry (prod)
  */
 async function handleAdmin({ request, path, adminPrefix }: HandleAdminParams) {
-	const normalizedPrefix = normalizePrefix(adminPrefix);
-
 	try {
 		// Redirect {prefix} → {prefix}/ for asset loading
-		if (path === normalizedPrefix) {
-			return Response.redirect(`${normalizedPrefix}/`, 301);
+		if (path === adminPrefix) {
+			return Response.redirect(`${adminPrefix}/`, 301);
 		}
 
 		if (process.env.GLAZE_INTERNAL__ADMIN_PROXY === 'true') {
 			const viteUrl = new URL(request.url);
 			// Vite dev server is configured with base: '/admin/', so we need to
 			// translate the custom admin prefix to '/admin' when proxying
-			const vitePath = path.replace(normalizedPrefix, '/admin');
+			const vitePath = path.replace(adminPrefix, '/admin');
 			const target = `http://localhost:5173${vitePath}${viteUrl.search}`;
 
 			try {
@@ -69,7 +67,7 @@ async function handleAdmin({ request, path, adminPrefix }: HandleAdminParams) {
 		}
 
 		// Remove the admin prefix to get the relative path
-		const relativePath = path.replace(normalizedPrefix, '');
+		const relativePath = path.replace(adminPrefix, '');
 
 		const filePath =
 			!relativePath || relativePath === '/'
@@ -110,7 +108,8 @@ async function handleAdmin({ request, path, adminPrefix }: HandleAdminParams) {
  * @returns An Elysia plugin with all admin routes registered
  */
 export const adminPlugin = (config: GlazeInternalConfig) => {
-	const adminPrefix = config.adminPrefix;
+	// Normalize prefix once at plugin entry to ensure routes match
+	const adminPrefix = normalizePrefix(config.adminPrefix);
 	const app = new Elysia({ name: '@glaze/admin' });
 	const adminRoute = `${adminPrefix}/*`;
 

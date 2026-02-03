@@ -1,5 +1,5 @@
+import { Elysia } from 'elysia';
 import cors from '@elysiajs/cors';
-import Elysia from 'elysia';
 
 import type { SecurityConfig } from '../../../config/types/security';
 

@@ -1,4 +1,4 @@
-import Elysia from 'elysia';
+import { Elysia } from 'elysia';
 import { uptime } from 'node:process';
 
 import { DEFAULT_HEALTH_CHECK_PATH } from '../../lib/consts';
@@ -18,7 +18,11 @@ export const healthCheckPlugin = (config?: HealthCheckConfig) => {
 		return app;
 	}
 
-	const path = config?.path ?? DEFAULT_HEALTH_CHECK_PATH;
+	// Normalize path: ensure leading slash, fallback to default if empty
+	let path = config?.path?.trim() ?? DEFAULT_HEALTH_CHECK_PATH;
+	if (!path.startsWith('/')) {
+		path = `/${path}`;
+	}
 
 	return app.get(path, () => ({
 		status: 'ok',

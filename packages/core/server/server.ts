@@ -3,6 +3,7 @@ import { Elysia } from 'elysia';
 /* Plugins */
 import { healthCheckPlugin } from './plugins/health';
 import { adminPlugin } from './plugins/admin';
+import { corsPlugin } from './plugins/security';
 
 /*  Types */
 import type { GlazeEnv } from './validators/env';
@@ -30,7 +31,8 @@ export function createGlazeServer({
 		.decorate('logger', logger)
 		.decorate('config', config)
 		.use(healthCheckPlugin(config.healthCheck))
-		.use(adminPlugin(config));
+		.use(adminPlugin(config))
+		.use(corsPlugin(config.security));
 
 	glaze.listen({ port: env.GLAZE_PORT }, () => {
 		logger.info(
