@@ -7,7 +7,7 @@ import { adminPlugin } from './plugins/admin';
 /*  Types */
 import type { GlazeEnv } from './validators/env';
 import type { Logger } from '@glaze/logger';
-import type { GlazeInternalConfig } from './validators/config/config';
+import type { GlazeInternalConfig } from './validators/config';
 
 /**
  * Creates a Glaze server instance.

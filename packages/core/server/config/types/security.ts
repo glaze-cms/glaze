@@ -1,7 +1,7 @@
 import type { CORSConfig } from '@elysiajs/cors';
 
 export interface SecurityConfig {
-	cors: {
+	cors?: {
 		/**
 		 * Control which websites can access your API from a browser.
 		 *
