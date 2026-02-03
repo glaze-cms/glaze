@@ -1,16 +1,15 @@
 {
-	"name": "@glaze/core",
+	"name": "@glaze/shared",
 	"version": "0.0.19",
-	"description": "Core module of the Glaze framework, responsible for running the CMS server and providing essential functionality.",
+	"description": "Shared utilities and types for Glaze packages.",
 	"license": "MIT",
 	"type": "module",
-	"main": "./index.ts",
-	"module": "./index.ts",
+	"main": "index.ts",
 	"types": "./dist/index.d.ts",
 	"files": [
 		"dist",
 		"*.ts",
-		"server",
+		"types/**/*.ts",
 		"!**/*.test.ts"
 	],
 	"exports": {
@@ -19,12 +18,11 @@
 			"default": "./index.ts"
 		},
 		"./types": {
-			"types": "./dist/types.d.ts",
-			"default": "./types.ts"
+			"types": "./dist/types/index.d.ts",
+			"default": "./types/index.ts"
 		}
 	},
 	"scripts": {
-		"start": "bun run index.ts",
 		"lint": "eslint .",
 		"lint:fix": "eslint . --fix",
 		"format": "prettier --check .",
@@ -32,15 +30,6 @@
 		"typecheck": "tsc --noEmit",
 		"test": "bun test",
 		"prepublishOnly": "bunx tsc -p tsconfig.build.json"
-	},
-	"dependencies": {
-		"@glaze/admin": "workspace:*",
-		"@glaze/logger": "workspace:*",
-		"@glaze/shared": "workspace:*",
-		"elysia": "latest",
-		"@elysiajs/cors": "latest",
-		"@sinclair/typebox": "latest",
-		"pino": "catalog:system"
 	},
 	"devDependencies": {
 		"@types/bun": "latest",

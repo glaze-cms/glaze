@@ -1,1 +1,0 @@
-export { envPlugin } from './env';

@@ -1,1 +1,1 @@
-export { validateConfig } from './config';
+export { validateConfig, type GlazeInternalConfig } from './config';
