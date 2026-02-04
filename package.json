@@ -30,6 +30,10 @@
 			"prettier": "latest",
 			"typescript": "latest"
 		},
+		"drizzle": {
+			"drizzle-kit": "beta",
+			"drizzle-orm": "beta"
+		},
 		"elysia": {
 			"elysia": "latest",
 			"@elysiajs/cors": "latest"

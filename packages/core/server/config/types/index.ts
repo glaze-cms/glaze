@@ -1,6 +1,6 @@
 import type { LoggerOptions } from '@glaze/logger';
-import type { HealthCheckConfig } from './types/health';
-import type { SecurityConfig } from './types/security';
+import type { HealthCheckConfig } from './health';
+import type { SecurityConfig } from './security';
 
 /**
  * Configuration for Glaze server
@@ -14,6 +14,23 @@ export interface GlazeConfig {
 
 	/** Logger configuration */
 	logger?: LoggerOptions;
+
+	/**
+	 * Drizzle schema containing your database table definitions.
+	 *
+	 * Import all table definitions from your Drizzle schema files and pass them as an object.
+	 *
+	 * @example
+	 * ```ts
+	 * import * as schema from './schema';
+	 *
+	 * const config: GlazeConfig = {
+	 *   schema,
+	 *   // ...other options
+	 * };
+	 * ```
+	 */
+	schema: Record<string, unknown>;
 
 	/** Security configuration (CORS, etc.) */
 	security?: SecurityConfig;

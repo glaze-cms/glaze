@@ -6,11 +6,13 @@ import {
 	DEFAULT_ADMIN_PREFIX,
 	DEFAULT_API_PREFIX,
 	DEFAULT_HEALTH_CHECK_PATH,
+	DEFAULT_CORS_METHODS,
+	DEFAULT_CORS_ALLOWED_HEADERS,
 } from '../../lib/consts';
 
 /* Types */
 import type { Logger } from '@glaze/logger';
-import type { GlazeConfig } from '../../config';
+import type { GlazeConfig } from '../../config/types';
 
 /**
  * Internal schema for validating GlazeConfig runtime values.
@@ -35,6 +37,30 @@ const GlazeConfigSchema = Type.Object({
 				pattern: '^/',
 				default: DEFAULT_HEALTH_CHECK_PATH,
 			}),
+		},
+		{ default: {} },
+	),
+	security: Type.Object(
+		{
+			cors: Type.Object(
+				{
+					origin: Type.Optional(
+						Type.Union([
+							Type.Boolean(),
+							Type.String(),
+							Type.RegExp('.*'),
+							Type.Array(Type.Union([Type.String(), Type.RegExp('.*')])),
+						]),
+					),
+					methods: Type.Array(Type.String(), {
+						default: [...DEFAULT_CORS_METHODS],
+					}),
+					allowedHeaders: Type.Array(Type.String(), {
+						default: [...DEFAULT_CORS_ALLOWED_HEADERS],
+					}),
+				},
+				{ default: {} },
+			),
 		},
 		{ default: {} },
 	),
@@ -67,12 +93,13 @@ function parseConfig(config: GlazeConfig): ValidateConfigResult {
 	const configToValidate = {
 		apiPrefix: config.apiPrefix?.replace(/\/+$/, ''),
 		adminPrefix: config.adminPrefix?.replace(/\/+$/, ''),
-		healthCheck: config.healthCheck
-			? {
-					...config.healthCheck,
-					path: config.healthCheck.path?.replace(/\/+$/, ''),
-				}
-			: undefined,
+		healthCheck: {
+			enabled: config.healthCheck?.enabled,
+			path: config.healthCheck?.path?.replace(/\/+$/, ''),
+		},
+		security: {
+			cors: config.security?.cors,
+		},
 	};
 
 	// Apply defaults
@@ -152,5 +179,6 @@ export function validateConfig(
 		apiPrefix: parsedConfig.config.apiPrefix,
 		adminPrefix: parsedConfig.config.adminPrefix,
 		healthCheck: parsedConfig.config.healthCheck,
+		security: parsedConfig.config.security,
 	};
 }

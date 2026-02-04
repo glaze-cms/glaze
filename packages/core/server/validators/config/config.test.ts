@@ -3,9 +3,14 @@ import { describe, it, expect, mock, beforeEach, afterEach } from 'bun:test';
 import { createLogger } from '@glaze/logger';
 
 import { validateConfig } from './config';
-import type { GlazeConfig } from '../../config';
+import type { GlazeConfig } from '../../config/types';
+import {
+	DEFAULT_CORS_METHODS,
+	DEFAULT_CORS_ALLOWED_HEADERS,
+} from '../../lib/consts';
 
 const logger = createLogger({ name: 'TEST' });
+const mockSchema = {};
 
 describe('validateConfig', () => {
 	let mockProcessExit: ReturnType<typeof mock>;
@@ -27,6 +32,7 @@ describe('validateConfig', () => {
 	describe('Successful validation', () => {
 		it('should return validated config with all fields provided', () => {
 			const config: GlazeConfig = {
+				schema: mockSchema,
 				apiPrefix: '/api/v1',
 				adminPrefix: '/dashboard',
 				healthCheck: { enabled: true, path: '/healthz' },
@@ -42,7 +48,9 @@ describe('validateConfig', () => {
 		});
 
 		it('should apply default apiPrefix when not provided', () => {
-			const config: GlazeConfig = {};
+			const config: GlazeConfig = {
+				schema: mockSchema,
+			};
 
 			const result = validateConfig(logger, config);
 
@@ -51,7 +59,9 @@ describe('validateConfig', () => {
 		});
 
 		it('should apply default adminPrefix when not provided', () => {
-			const config: GlazeConfig = {};
+			const config: GlazeConfig = {
+				schema: mockSchema,
+			};
 
 			const result = validateConfig(logger, config);
 
@@ -60,7 +70,9 @@ describe('validateConfig', () => {
 		});
 
 		it('should apply default healthCheck when not provided', () => {
-			const config: GlazeConfig = {};
+			const config: GlazeConfig = {
+				schema: mockSchema,
+			};
 
 			const result = validateConfig(logger, config);
 
@@ -71,6 +83,7 @@ describe('validateConfig', () => {
 
 		it('should apply healthCheck defaults when partially provided', () => {
 			const config: GlazeConfig = {
+				schema: mockSchema,
 				healthCheck: { enabled: false },
 			};
 
@@ -83,6 +96,7 @@ describe('validateConfig', () => {
 
 		it('should apply healthCheck path default when only path is omitted', () => {
 			const config: GlazeConfig = {
+				schema: mockSchema,
 				healthCheck: { path: '/custom-health' },
 			};
 
@@ -102,8 +116,23 @@ describe('validateConfig', () => {
 			expect(result.healthCheck.path).toBe('/_health');
 		});
 
+		it('should apply default security.cors when not provided', () => {
+			const config: GlazeConfig = {
+				schema: mockSchema,
+			};
+
+			const result = validateConfig(logger, config);
+
+			expect(result.security.cors.methods).toEqual([...DEFAULT_CORS_METHODS]);
+			expect(result.security.cors.allowedHeaders).toEqual([
+				...DEFAULT_CORS_ALLOWED_HEADERS,
+			]);
+			expect(mockProcessExit).not.toHaveBeenCalled();
+		});
+
 		it('should preserve other config fields', () => {
 			const config: GlazeConfig = {
+				schema: mockSchema,
 				logger: {
 					name: 'custom-logger',
 				},
@@ -113,12 +142,14 @@ describe('validateConfig', () => {
 			const result = validateConfig(logger, config);
 
 			expect(result.logger).toEqual({ name: 'custom-logger' });
-			expect(result.security).toEqual({ cors: { origin: '*' } });
+			expect(result.security.cors.origin).toBe('*');
+			expect(result.security.cors.methods).toEqual([...DEFAULT_CORS_METHODS]);
 			expect(mockProcessExit).not.toHaveBeenCalled();
 		});
 
 		it('should allow disabling healthCheck', () => {
 			const config: GlazeConfig = {
+				schema: mockSchema,
 				healthCheck: { enabled: false },
 			};
 
@@ -133,6 +164,7 @@ describe('validateConfig', () => {
 	describe('Validation errors', () => {
 		it('should exit with code 1 when apiPrefix does not start with /', () => {
 			const config: GlazeConfig = {
+				schema: mockSchema,
 				apiPrefix: 'api', // Missing leading slash
 			};
 
@@ -145,6 +177,7 @@ describe('validateConfig', () => {
 
 		it('should exit with code 1 when adminPrefix does not start with /', () => {
 			const config: GlazeConfig = {
+				schema: mockSchema,
 				adminPrefix: 'admin', // Missing leading slash
 			};
 
@@ -157,6 +190,7 @@ describe('validateConfig', () => {
 
 		it('should exit with code 1 when adminPrefix is empty', () => {
 			const config: GlazeConfig = {
+				schema: mockSchema,
 				adminPrefix: '',
 			};
 
@@ -169,6 +203,7 @@ describe('validateConfig', () => {
 
 		it('should exit with code 1 when apiPrefix is empty', () => {
 			const config: GlazeConfig = {
+				schema: mockSchema,
 				apiPrefix: '',
 			};
 
@@ -181,6 +216,7 @@ describe('validateConfig', () => {
 
 		it('should exit with code 1 when healthCheck.path does not start with /', () => {
 			const config: GlazeConfig = {
+				schema: mockSchema,
 				healthCheck: { path: 'health' }, // Missing leading slash
 			};
 
@@ -193,6 +229,7 @@ describe('validateConfig', () => {
 
 		it('should exit with code 1 when healthCheck.path is empty', () => {
 			const config: GlazeConfig = {
+				schema: mockSchema,
 				healthCheck: { path: '' },
 			};
 

@@ -1,4 +1,5 @@
 import { Elysia } from 'elysia';
+import { drizzle } from 'drizzle-orm/node-postgres';
 
 /* Plugins */
 import { healthCheckPlugin } from './plugins/health';
@@ -30,9 +31,10 @@ export function createGlazeServer({
 		.decorate('env', env)
 		.decorate('logger', logger)
 		.decorate('config', config)
+		.decorate('db', drizzle(env.GLAZE_DATABASE_URL, { schema: config.schema }))
 		.use(healthCheckPlugin(config.healthCheck))
 		.use(adminPlugin(config))
-		.use(corsPlugin(config.security, logger));
+		.use(corsPlugin(config.security, env, logger));
 
 	glaze.listen({ port: env.GLAZE_PORT }, () => {
 		logger.info(

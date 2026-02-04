@@ -1,14 +1,15 @@
 import { Elysia } from 'elysia';
 import cors from '@elysiajs/cors';
 
-import type { SecurityConfig } from '../../../config/types/security';
+import type { GlazeEnv } from '../../../validators/env';
 import type { Logger } from '@glaze/logger';
+import type { GlazeInternalConfig } from '../../../validators/config';
 
 /**
  * Creates Elysia CORS middleware with environment-aware defaults.
  *
  * **Default Behavior:**
- * - Development (`NODE_ENV === 'development'`): `origin: true` (allow all)
+ * - Development (`NODE_ENV === 'development' or NODE_ENV === 'local'`): `origin: true` (allow all)
  * - Production: `origin: false` (deny all - explicit configuration required)
  *
  * **Security Notes:**
@@ -16,6 +17,7 @@ import type { Logger } from '@glaze/logger';
  * - Always configure explicit origins in production (e.g., `['https://myapp.com']`)
  *
  * @param config - The security configuration containing CORS settings.
+ * @param env - The Glaze environment variables.
  * @param logger - The logger instance for diagnostics.
  * @returns The Elysia instance with CORS middleware applied.
  *
@@ -30,32 +32,36 @@ import type { Logger } from '@glaze/logger';
  * const app = new Elysia().use(corsPlugin());
  * ```
  */
-export const corsPlugin = (config?: SecurityConfig, logger?: Logger) => {
+export const corsPlugin = (
+	config: GlazeInternalConfig['security'],
+	env: GlazeEnv,
+	logger: Logger,
+) => {
 	const app = new Elysia({ name: '@glaze/cors' });
-	const corsConfig = config?.cors;
-	const isDevelopment = process.env.NODE_ENV === 'development';
+	const corsConfig = config.cors;
 
 	// Environment-aware default: permissive in dev, restrictive in prod
-	const defaultOrigin = isDevelopment;
+	const shouldBePermissive =
+		env.NODE_ENV === 'development' || env.NODE_ENV === 'local';
 
 	// Warn if production is running without explicit CORS origins
-	if (!isDevelopment && !corsConfig?.origin && logger) {
+	if (!shouldBePermissive && !corsConfig.origin) {
 		logger.warn(
-			'[@glaze/cors] No CORS origins configured in production. All cross-origin requests will be blocked.',
+			'No CORS origins configured in production. All cross-origin requests will be blocked.',
 		);
 	}
 
 	return app.use(
 		cors({
 			// Use user config if provided, otherwise apply environment-based default
-			origin: corsConfig?.origin ?? defaultOrigin,
+			origin: corsConfig.origin ?? shouldBePermissive,
 
 			// Always enable credentials for Better Auth cookie-based authentication
 			credentials: true,
 
-			// Optional advanced options - use user config or undefined
-			methods: corsConfig?.methods,
-			allowedHeaders: corsConfig?.allowedHeaders,
+			// Use defaults from validateConfig (or user config if provided)
+			methods: corsConfig.methods,
+			allowedHeaders: corsConfig.allowedHeaders,
 		}),
 	);
 };

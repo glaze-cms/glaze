@@ -9,7 +9,7 @@ import { createGlazeServer } from './server/server';
 
 /* Types */
 import type { Strict } from '@glaze/shared';
-import type { GlazeConfig } from './server/config';
+import type { GlazeConfig } from './server/config/types';
 
 export function glaze<T extends GlazeConfig>({
 	config,
