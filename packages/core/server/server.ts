@@ -15,7 +15,7 @@ import type { GlazeInternalConfig } from './validators/config';
  * Creates a Glaze server instance.
  * @param env - The Glaze environment variables
  * @param logger - The Glaze logger instance
- * @param config - The Glaze configuration object
+ * @param config - The Glaze configuration object, validated and resolved - includes defaults
  * @returns The Glaze server instance
  */
 export function createGlazeServer({

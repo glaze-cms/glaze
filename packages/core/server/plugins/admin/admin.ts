@@ -2,7 +2,7 @@ import { Elysia } from 'elysia';
 import { dirname, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import type { GlazeInternalConfig } from '../../validators/config/config';
+import type { GlazeInternalConfig } from '../../config/types';
 
 type HandleAdminParams = {
 	request: Request;

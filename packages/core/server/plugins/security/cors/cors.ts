@@ -35,7 +35,7 @@ import type { GlazeInternalConfig } from '../../../validators/config';
 export const corsPlugin = (
 	config: GlazeInternalConfig['security'],
 	env: GlazeEnv,
-	logger: Logger,
+	logger?: Logger,
 ) => {
 	const app = new Elysia({ name: '@glaze/cors' });
 	const corsConfig = config.cors;
@@ -45,7 +45,7 @@ export const corsPlugin = (
 		env.NODE_ENV === 'development' || env.NODE_ENV === 'local';
 
 	// Warn if production is running without explicit CORS origins
-	if (!shouldBePermissive && !corsConfig.origin) {
+	if (!shouldBePermissive && !corsConfig.origin && logger) {
 		logger.warn(
 			'No CORS origins configured in production. All cross-origin requests will be blocked.',
 		);

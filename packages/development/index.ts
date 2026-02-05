@@ -2,7 +2,7 @@ import { glaze } from '@glaze/core';
 
 glaze({
 	config: {
-		schema: [],
+		schema: {},
 		healthCheck: {
 			path: '/health',
 		},

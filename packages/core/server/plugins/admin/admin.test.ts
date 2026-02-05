@@ -3,14 +3,21 @@ import { Elysia } from 'elysia';
 
 import { adminPlugin } from './index';
 
-import type { GlazeInternalConfig } from '../../validators/config/config';
+import type { GlazeInternalConfig } from '../../config/types';
 
 // Helper to create minimal config for testing
 const createTestConfig = (adminPrefix: string): GlazeInternalConfig =>
 	({
 		adminPrefix,
 		apiPrefix: '/api',
+		schema: {},
 		healthCheck: { enabled: true, path: '/_health' },
+		security: {
+			cors: {
+				methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+				allowedHeaders: ['Content-Type', 'Authorization'],
+			},
+		},
 	}) as GlazeInternalConfig;
 
 describe('adminPlugin', () => {

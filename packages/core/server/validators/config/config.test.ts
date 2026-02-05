@@ -4,10 +4,6 @@ import { createLogger } from '@glaze/logger';
 
 import { validateConfig } from './config';
 import type { GlazeConfig } from '../../config/types';
-import {
-	DEFAULT_CORS_METHODS,
-	DEFAULT_CORS_ALLOWED_HEADERS,
-} from '../../lib/consts';
 
 const logger = createLogger({ name: 'TEST' });
 const mockSchema = {};
@@ -40,97 +36,39 @@ describe('validateConfig', () => {
 
 			const result = validateConfig(logger, config);
 
+			// Should return original config (no defaults applied in validation)
 			expect(result.apiPrefix).toBe('/api/v1');
 			expect(result.adminPrefix).toBe('/dashboard');
-			expect(result.healthCheck.enabled).toBe(true);
-			expect(result.healthCheck.path).toBe('/healthz');
+			expect(result.healthCheck?.enabled).toBe(true);
+			expect(result.healthCheck?.path).toBe('/healthz');
 			expect(mockProcessExit).not.toHaveBeenCalled();
 		});
 
-		it('should apply default apiPrefix when not provided', () => {
+		it('should allow undefined optional fields', () => {
 			const config: GlazeConfig = {
 				schema: mockSchema,
 			};
 
 			const result = validateConfig(logger, config);
 
-			expect(result.apiPrefix).toBe('/api');
+			// Optional fields should remain undefined (defaults applied later by resolver)
+			expect(result.apiPrefix).toBeUndefined();
+			expect(result.adminPrefix).toBeUndefined();
+			expect(result.healthCheck).toBeUndefined();
 			expect(mockProcessExit).not.toHaveBeenCalled();
 		});
 
-		it('should apply default adminPrefix when not provided', () => {
-			const config: GlazeConfig = {
-				schema: mockSchema,
-			};
-
-			const result = validateConfig(logger, config);
-
-			expect(result.adminPrefix).toBe('/admin');
-			expect(mockProcessExit).not.toHaveBeenCalled();
-		});
-
-		it('should apply default healthCheck when not provided', () => {
-			const config: GlazeConfig = {
-				schema: mockSchema,
-			};
-
-			const result = validateConfig(logger, config);
-
-			expect(result.healthCheck.enabled).toBe(true);
-			expect(result.healthCheck.path).toBe('/_health');
-			expect(mockProcessExit).not.toHaveBeenCalled();
-		});
-
-		it('should apply healthCheck defaults when partially provided', () => {
-			const config: GlazeConfig = {
-				schema: mockSchema,
-				healthCheck: { enabled: false },
-			};
-
-			const result = validateConfig(logger, config);
-
-			expect(result.healthCheck.enabled).toBe(false);
-			expect(result.healthCheck.path).toBe('/_health'); // default
-			expect(mockProcessExit).not.toHaveBeenCalled();
-		});
-
-		it('should apply healthCheck path default when only path is omitted', () => {
-			const config: GlazeConfig = {
-				schema: mockSchema,
-				healthCheck: { path: '/custom-health' },
-			};
-
-			const result = validateConfig(logger, config);
-
-			expect(result.healthCheck.enabled).toBe(true); // default
-			expect(result.healthCheck.path).toBe('/custom-health');
-			expect(mockProcessExit).not.toHaveBeenCalled();
-		});
-
-		it('should apply all defaults when no config is provided', () => {
+		it('should return minimal config when no config provided', () => {
 			const result = validateConfig(logger);
 
-			expect(result.apiPrefix).toBe('/api');
-			expect(result.adminPrefix).toBe('/admin');
-			expect(result.healthCheck.enabled).toBe(true);
-			expect(result.healthCheck.path).toBe('/_health');
+			// Should return minimal valid config with just schema
+			expect(result.schema).toEqual({});
+			expect(result.apiPrefix).toBeUndefined();
+			expect(result.adminPrefix).toBeUndefined();
+			expect(result.healthCheck).toBeUndefined();
 		});
 
-		it('should apply default security.cors when not provided', () => {
-			const config: GlazeConfig = {
-				schema: mockSchema,
-			};
-
-			const result = validateConfig(logger, config);
-
-			expect(result.security.cors.methods).toEqual([...DEFAULT_CORS_METHODS]);
-			expect(result.security.cors.allowedHeaders).toEqual([
-				...DEFAULT_CORS_ALLOWED_HEADERS,
-			]);
-			expect(mockProcessExit).not.toHaveBeenCalled();
-		});
-
-		it('should preserve other config fields', () => {
+		it('should preserve all user-provided fields', () => {
 			const config: GlazeConfig = {
 				schema: mockSchema,
 				logger: {
@@ -142,12 +80,11 @@ describe('validateConfig', () => {
 			const result = validateConfig(logger, config);
 
 			expect(result.logger).toEqual({ name: 'custom-logger' });
-			expect(result.security.cors.origin).toBe('*');
-			expect(result.security.cors.methods).toEqual([...DEFAULT_CORS_METHODS]);
+			expect(result.security).toEqual({ cors: { origin: '*' } });
 			expect(mockProcessExit).not.toHaveBeenCalled();
 		});
 
-		it('should allow disabling healthCheck', () => {
+		it('should allow partial healthCheck config', () => {
 			const config: GlazeConfig = {
 				schema: mockSchema,
 				healthCheck: { enabled: false },
@@ -155,8 +92,21 @@ describe('validateConfig', () => {
 
 			const result = validateConfig(logger, config);
 
-			expect(result.healthCheck.enabled).toBe(false);
-			expect(result.healthCheck.path).toBe('/_health');
+			expect(result.healthCheck?.enabled).toBe(false);
+			expect(result.healthCheck?.path).toBeUndefined(); // Not defaulted yet
+			expect(mockProcessExit).not.toHaveBeenCalled();
+		});
+
+		it('should allow partial security.cors config', () => {
+			const config: GlazeConfig = {
+				schema: mockSchema,
+				security: { cors: { origin: '*' } },
+			};
+
+			const result = validateConfig(logger, config);
+
+			expect(result.security?.cors?.origin).toBe('*');
+			expect(result.security?.cors?.methods).toBeUndefined(); // Not defaulted yet
 			expect(mockProcessExit).not.toHaveBeenCalled();
 		});
 	});
