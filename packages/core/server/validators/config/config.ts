@@ -86,14 +86,30 @@ function validateStructure(config: GlazeConfig): ValidationResult {
 
 		for (const err of errors) {
 			// TypeBox instancePath starts with '/' for top-level properties
-			const field = err.instancePath.slice(1);
-			if (!errorMap.has(field)) {
-				errorMap.set(field, {
-					field,
-					message: err.message,
-					hint: ` 👉 Ensure "${field}" is set correctly in your Glaze config`,
-				});
+			// For missing required properties, instancePath is empty and the property name is in params
+			let field: string;
+			if (err.instancePath === '' && 'requiredProperties' in err.params) {
+				// Required property error - get the first missing property
+				field =
+					(err.params as { requiredProperties: string[] })
+						.requiredProperties[0] ?? '';
+			} else if (err.instancePath === '' && 'missingProperty' in err.params) {
+				// Single missing property error
+				field = (err.params as { missingProperty: string }).missingProperty;
+			} else {
+				// Regular property error - slice(1) removes the leading '/'
+				field = err.instancePath.slice(1);
 			}
+
+			if (!field || errorMap.has(field)) {
+				continue;
+			}
+
+			errorMap.set(field, {
+				field,
+				message: err.message,
+				hint: ` 👉 Ensure "${field}" is set correctly in your Glaze config`,
+			});
 		}
 
 		return {

@@ -98,9 +98,15 @@ export function parseEnv(): ParseEnvResult {
 
 		for (const err of errors) {
 			// TypeBox instancePath starts with '/' for top-level properties (e.g., '/DATABASE_URL')
-			// For missing required properties, instancePath is empty and the property name is in params.requiredProperties
+			// For missing required properties, instancePath is empty and the property name is in params
 			let variable: string;
-			if (err.instancePath === '' && 'requiredProperties' in err.params) {
+			if (err.instancePath === '' && 'missingProperty' in err.params) {
+				// Single missing property error
+				variable = (err.params as { missingProperty: string }).missingProperty;
+			} else if (
+				err.instancePath === '' &&
+				'requiredProperties' in err.params
+			) {
 				// Required property error - get the first missing property
 				variable =
 					(err.params as { requiredProperties: string[] })
