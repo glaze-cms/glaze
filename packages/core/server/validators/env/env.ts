@@ -1,5 +1,6 @@
-import { Type, type Static } from '@sinclair/typebox';
-import { Value } from '@sinclair/typebox/value';
+import Type, { type Static } from 'typebox';
+import Compile from 'typebox/compile';
+import { Value } from 'typebox/value';
 
 /* Types */
 import type { Logger } from '@glaze/logger';
@@ -36,6 +37,9 @@ const GlazeEnvSchema = Type.Object({
 		pattern: '^(postgres|postgresql)://',
 	}),
 });
+
+// Compile schema once for efficient validation
+const EnvValidator = Compile(GlazeEnvSchema);
 
 type ParseEnvResult =
 	| { success: true; env: GlazeEnv }
@@ -76,10 +80,10 @@ export function parseEnv(): ParseEnvResult {
 	) as GlazeEnv;
 
 	// 2. Convert/cast types before validation (e.g., string -> number)
-	const convertedEnv = Value.Convert(GlazeEnvSchema, defaultedEnv);
+	const convertedEnv = Value.Convert(GlazeEnvSchema, defaultedEnv) as GlazeEnv;
 
-	// 3. Validate against converted data
-	const errors = [...Value.Errors(GlazeEnvSchema, convertedEnv)];
+	// 3. Use compiled validator to check for errors
+	const errors = [...EnvValidator.Errors(convertedEnv)];
 
 	if (errors.length > 0) {
 		// Keep only the first error per variable to avoid redundant messages
@@ -89,23 +93,36 @@ export function parseEnv(): ParseEnvResult {
 		>();
 
 		// Determine if we're in a local development environment
-		const nodeEnv = (convertedEnv as GlazeEnv).NODE_ENV;
+		const nodeEnv = convertedEnv.NODE_ENV;
 		const isLocalEnv = nodeEnv === 'local' || nodeEnv === 'development';
 
 		for (const err of errors) {
-			// TypeBox paths start with '/' for top-level properties (e.g., '/DATABASE_URL'), slice(1) removes the leading '/' to get the variable name
-			const variable = err.path.slice(1);
-			if (!errorMap.has(variable)) {
-				const hint = isLocalEnv
-					? ` 👉  Set ${variable} to a valid value in your .env file`
-					: ` 👉  Set ${variable} as an environment variable in your hosting provider or cloud platform`;
-
-				errorMap.set(variable, {
-					variable,
-					message: err.message,
-					hint,
-				});
+			// TypeBox instancePath starts with '/' for top-level properties (e.g., '/DATABASE_URL')
+			// For missing required properties, instancePath is empty and the property name is in params.requiredProperties
+			let variable: string;
+			if (err.instancePath === '' && 'requiredProperties' in err.params) {
+				// Required property error - get the first missing property
+				variable =
+					(err.params as { requiredProperties: string[] })
+						.requiredProperties[0] ?? '';
+			} else {
+				// Regular property error - slice(1) removes the leading '/'
+				variable = err.instancePath.slice(1);
 			}
+
+			if (!variable || errorMap.has(variable)) {
+				continue;
+			}
+
+			const hint = isLocalEnv
+				? ` 👉  Set ${variable} to a valid value in your .env file`
+				: ` 👉  Set ${variable} as an environment variable in your hosting provider or cloud platform`;
+
+			errorMap.set(variable, {
+				variable,
+				message: err.message,
+				hint,
+			});
 		}
 
 		return {
@@ -114,10 +131,10 @@ export function parseEnv(): ParseEnvResult {
 		};
 	}
 
-	// 4. Success: return already converted env
+	// 4. Success: return converted env
 	return {
 		success: true,
-		env: convertedEnv as GlazeEnv,
+		env: convertedEnv,
 	};
 }
 

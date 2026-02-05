@@ -39,7 +39,7 @@
 		"@glaze/shared": "workspace:*",
 		"elysia": "latest",
 		"@elysiajs/cors": "latest",
-		"@sinclair/typebox": "latest",
+		"typebox": "latest",
 		"drizzle-kit": "catalog:drizzle",
 		"drizzle-orm": "catalog:drizzle",
 		"pg": "latest",

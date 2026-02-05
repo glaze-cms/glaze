@@ -245,9 +245,9 @@ describe('parseEnv', () => {
 				const dbError = result.errors.find(
 					(e) => e.variable === 'GLAZE_DATABASE_URL',
 				);
-				// TypeBox generates this standard pattern error message
+				// TypeBox 1.0 generates this standard pattern error message
 				expect(dbError?.message).toContain(
-					"Expected string to match '^(postgres|postgresql)://'",
+					'must match pattern "^(postgres|postgresql)://"',
 				);
 			}
 		});

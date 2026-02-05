@@ -1,5 +1,5 @@
-import { Type } from '@sinclair/typebox';
-import { Value } from '@sinclair/typebox/value';
+import Type from 'typebox';
+import Compile from 'typebox/compile';
 
 /* Types */
 import type { Logger } from '@glaze/logger';
@@ -43,8 +43,10 @@ const GlazeConfigValidationSchema = Type.Object({
 						Type.Union([
 							Type.Boolean(),
 							Type.String(),
-							Type.RegExp('.*'),
-							Type.Array(Type.Union([Type.String(), Type.RegExp('.*')])),
+							Type.String({ pattern: '.*' }),
+							Type.Array(
+								Type.Union([Type.String(), Type.String({ pattern: '.*' })]),
+							),
 						]),
 					),
 					methods: Type.Optional(Type.Array(Type.String())),
@@ -55,6 +57,9 @@ const GlazeConfigValidationSchema = Type.Object({
 	),
 	logger: Type.Optional(Type.Record(Type.String(), Type.Unknown())),
 });
+
+// Compile schema once for efficient validation
+const ConfigValidator = Compile(GlazeConfigValidationSchema);
 
 type ValidationResult =
 	| { success: true }
@@ -71,7 +76,7 @@ type ValidationResult =
  * @returns Validation result
  */
 function validateStructure(config: GlazeConfig): ValidationResult {
-	const errors = [...Value.Errors(GlazeConfigValidationSchema, config)];
+	const errors = [...ConfigValidator.Errors(config)];
 
 	if (errors.length > 0) {
 		const errorMap = new Map<
@@ -80,8 +85,8 @@ function validateStructure(config: GlazeConfig): ValidationResult {
 		>();
 
 		for (const err of errors) {
-			// TypeBox paths start with '/' for top-level properties
-			const field = err.path.slice(1);
+			// TypeBox instancePath starts with '/' for top-level properties
+			const field = err.instancePath.slice(1);
 			if (!errorMap.has(field)) {
 				errorMap.set(field, {
 					field,

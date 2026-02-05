@@ -1,4 +1,4 @@
-import { describe, expect, it, spyOn, beforeEach, afterEach } from 'bun:test';
+import { describe, expect, it, spyOn } from 'bun:test';
 import type { Logger } from '@glaze/logger';
 import type { GlazeEnv } from '../../../validators/env';
 import {

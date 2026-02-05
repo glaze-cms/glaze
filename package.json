@@ -49,7 +49,7 @@
 			"pino-pretty": "latest"
 		},
 		"validation": {
-			"@sinclair/typebox": "latest"
+			"typebox": "latest"
 		}
 	},
 	"devDependencies": {
