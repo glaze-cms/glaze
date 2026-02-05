@@ -34,24 +34,8 @@ const createDefaultCorsConfig = () => ({
 });
 
 describe('corsPlugin', () => {
-	let originalNodeEnv: string | undefined;
-
-	beforeEach(() => {
-		originalNodeEnv = process.env.NODE_ENV;
-	});
-
-	afterEach(() => {
-		if (originalNodeEnv === undefined) {
-			delete process.env.NODE_ENV;
-		} else {
-			process.env.NODE_ENV = originalNodeEnv;
-		}
-	});
-
 	describe('production warning', () => {
 		it('should warn when no origins configured in production', () => {
-			process.env.NODE_ENV = 'production';
-
 			const mockLogger = createMockLogger();
 			const mockEnv = createMockEnv('production');
 			const warnSpy = spyOn(mockLogger, 'warn');
@@ -64,8 +48,6 @@ describe('corsPlugin', () => {
 		});
 
 		it('should not warn when origins are configured in production', () => {
-			process.env.NODE_ENV = 'production';
-
 			const mockLogger = createMockLogger();
 			const mockEnv = createMockEnv('production');
 			const warnSpy = spyOn(mockLogger, 'warn');
@@ -82,8 +64,6 @@ describe('corsPlugin', () => {
 		});
 
 		it('should not warn in development mode', () => {
-			process.env.NODE_ENV = 'development';
-
 			const mockLogger = createMockLogger();
 			const mockEnv = createMockEnv('development');
 			const warnSpy = spyOn(mockLogger, 'warn');
@@ -94,7 +74,6 @@ describe('corsPlugin', () => {
 		});
 
 		it('should not throw when logger is not provided', () => {
-			process.env.NODE_ENV = 'production';
 			const mockEnv = createMockEnv('production');
 
 			expect(() =>
@@ -105,7 +84,6 @@ describe('corsPlugin', () => {
 
 	describe('environment-based defaults', () => {
 		it('should create plugin in development mode', () => {
-			process.env.NODE_ENV = 'development';
 			const mockEnv = createMockEnv('development');
 
 			const plugin = corsPlugin(
@@ -118,7 +96,6 @@ describe('corsPlugin', () => {
 		});
 
 		it('should create plugin in production mode', () => {
-			process.env.NODE_ENV = 'production';
 			const mockEnv = createMockEnv('production');
 
 			const plugin = corsPlugin(
@@ -133,7 +110,6 @@ describe('corsPlugin', () => {
 
 	describe('configuration handling', () => {
 		it('should accept custom origin configuration', () => {
-			process.env.NODE_ENV = 'production';
 			const mockEnv = createMockEnv('production');
 
 			const plugin = corsPlugin(
@@ -148,7 +124,6 @@ describe('corsPlugin', () => {
 		});
 
 		it('should accept custom methods configuration', () => {
-			process.env.NODE_ENV = 'production';
 			const mockEnv = createMockEnv('production');
 
 			const plugin = corsPlugin(
@@ -166,7 +141,6 @@ describe('corsPlugin', () => {
 		});
 
 		it('should accept custom allowedHeaders configuration', () => {
-			process.env.NODE_ENV = 'production';
 			const mockEnv = createMockEnv('production');
 
 			const plugin = corsPlugin(
@@ -184,7 +158,6 @@ describe('corsPlugin', () => {
 		});
 
 		it('should handle multiple CORS options together', () => {
-			process.env.NODE_ENV = 'production';
 			const mockEnv = createMockEnv('production');
 
 			const plugin = corsPlugin(
