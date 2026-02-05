@@ -34,6 +34,30 @@ describe('adminPlugin', () => {
 			expect(response.headers.get('Location')).toBe('/dashboard/');
 		});
 
+		it('should normalize trailing slashes in config', async () => {
+			// Config with trailing slash should work the same as without
+			const app = new Elysia().use(
+				adminPlugin(createTestConfig('/dashboard/')),
+			);
+
+			// /dashboard (without slash) should redirect to /dashboard/
+			const response1 = await app.handle(
+				new Request('http://localhost/dashboard'),
+			);
+			expect(response1.status).toBe(301);
+			expect(response1.headers.get('Location')).toBe('/dashboard/');
+
+			// /dashboard/ should be handled
+			const response2 = await app.handle(
+				new Request('http://localhost/dashboard/'),
+			);
+			expect(
+				response2.status === 200 ||
+					response2.status === 404 ||
+					response2.status === 502,
+			).toBe(true);
+		});
+
 		it('should handle requests at trailing slash path', async () => {
 			const app = new Elysia().use(adminPlugin(createTestConfig('/dashboard')));
 
@@ -172,25 +196,20 @@ describe('adminPlugin', () => {
 			expect(response.headers.get('Location')).toBe('/admin/');
 		});
 
-		it('should register /admin fallback when using custom prefix in dev mode', async () => {
+		it('should register /admin fallback for assets only when using custom prefix in dev mode', async () => {
 			process.env.GLAZE_INTERNAL__ADMIN_PROXY = 'true';
 
 			const app = new Elysia().use(adminPlugin(createTestConfig('/cms')));
 
-			// Test /admin exact match - should redirect (proves handler ran)
+			// Test /admin exact match - should return 404 (not exposed when custom prefix is configured)
 			const response1 = await app.handle(new Request('http://localhost/admin'));
-			expect(response1.status).toBe(301);
-			expect(response1.headers.get('Location')).toBe('/admin/');
+			expect(response1.status).toBe(404);
 
-			// Test /admin/ wildcard - handler runs (200, 404, or 502)
+			// Test /admin/ wildcard - should also return 404 (root not exposed)
 			const response2 = await app.handle(
 				new Request('http://localhost/admin/'),
 			);
-			expect(
-				response2.status === 200 ||
-					response2.status === 404 ||
-					response2.status === 502,
-			).toBe(true);
+			expect(response2.status).toBe(404);
 
 			// Test /admin subpath (Vite assets) - handler runs (200, 404, or 502)
 			const response3 = await app.handle(

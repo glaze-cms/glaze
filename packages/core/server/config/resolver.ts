@@ -1,4 +1,4 @@
-import { deepMerge } from '../../../shared/utils/merge';
+import { deepMerge } from '@glaze/shared';
 import type { GlazeConfig, GlazeInternalConfig } from './types';
 import {
 	DEFAULT_API_PREFIX,
@@ -9,25 +9,27 @@ import {
 } from '../lib/consts';
 
 /**
- * Default configuration values.
- * These are merged with user-provided config to create the internal config.
+ * Creates a fresh default configuration object.
+ * Returns a new instance each call to prevent mutation across resolves.
  */
-const DEFAULT_CONFIG: GlazeInternalConfig = {
-	apiPrefix: DEFAULT_API_PREFIX,
-	adminPrefix: DEFAULT_ADMIN_PREFIX,
-	schema: {}, // Will be overridden by user
-	healthCheck: {
-		enabled: true,
-		path: DEFAULT_HEALTH_CHECK_PATH,
-	},
-	security: {
-		cors: {
-			// We spread these because these are read-only arrays and we need mutable ones
-			methods: [...DEFAULT_CORS_METHODS],
-			allowedHeaders: [...DEFAULT_CORS_ALLOWED_HEADERS],
+function createDefaultConfig(): GlazeInternalConfig {
+	return {
+		apiPrefix: DEFAULT_API_PREFIX,
+		adminPrefix: DEFAULT_ADMIN_PREFIX,
+		schema: {}, // Will be overridden by user
+		healthCheck: {
+			enabled: true,
+			path: DEFAULT_HEALTH_CHECK_PATH,
 		},
-	},
-};
+		security: {
+			cors: {
+				// We spread these because these are read-only arrays and we need mutable ones
+				methods: [...DEFAULT_CORS_METHODS],
+				allowedHeaders: [...DEFAULT_CORS_ALLOWED_HEADERS],
+			},
+		},
+	};
+}
 
 /**
  * Resolves user configuration with default values.
@@ -37,5 +39,8 @@ const DEFAULT_CONFIG: GlazeInternalConfig = {
  * @returns Resolved configuration with all defaults applied
  */
 export function resolveConfig(userConfig: GlazeConfig): GlazeInternalConfig {
-	return deepMerge(DEFAULT_CONFIG, userConfig as Partial<GlazeInternalConfig>);
+	return deepMerge(
+		createDefaultConfig(),
+		userConfig as Partial<GlazeInternalConfig>,
+	);
 }

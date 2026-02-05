@@ -13,5 +13,8 @@
 	},
 	"dependencies": {
 		"@glaze/core": "workspace:*"
+	},
+	"devDependencies": {
+		"drizzle-kit": "catalog:drizzle"
 	}
 }

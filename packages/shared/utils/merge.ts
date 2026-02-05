@@ -6,6 +6,16 @@
  * @param source - Override object (user config)
  * @returns Merged object
  */
+// Dangerous property names that can cause prototype pollution
+const DANGEROUS_KEYS = ['__proto__', 'constructor', 'prototype'] as const;
+
+/**
+ * Checks if a key is safe to use (not a prototype pollution vector)
+ */
+function isSafeKey(key: string): boolean {
+	return !DANGEROUS_KEYS.includes(key as (typeof DANGEROUS_KEYS)[number]);
+}
+
 export function deepMerge<T>(target: T, source?: Partial<T>): T {
 	if (!source) return target;
 	if (!target) return source as T;
@@ -13,7 +23,18 @@ export function deepMerge<T>(target: T, source?: Partial<T>): T {
 	const result = { ...target } as Record<string, unknown>;
 	const sourceObj = source as Record<string, unknown>;
 
-	for (const key in sourceObj) {
+	// Iterate only over own keys to avoid inherited properties
+	for (const key of Object.keys(sourceObj)) {
+		// Skip dangerous keys to prevent prototype pollution
+		if (!isSafeKey(key)) {
+			continue;
+		}
+
+		// Ensure we're reading own properties only
+		if (!Object.prototype.hasOwnProperty.call(sourceObj, key)) {
+			continue;
+		}
+
 		const sourceValue = sourceObj[key];
 		const targetValue = result[key];
 

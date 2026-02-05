@@ -66,6 +66,7 @@ describe('validateConfig', () => {
 			expect(result.apiPrefix).toBeUndefined();
 			expect(result.adminPrefix).toBeUndefined();
 			expect(result.healthCheck).toBeUndefined();
+			expect(mockProcessExit).not.toHaveBeenCalled();
 		});
 
 		it('should preserve all user-provided fields', () => {
