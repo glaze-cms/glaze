@@ -43,10 +43,10 @@ const GlazeConfigValidationSchema = Type.Object({
 						Type.Union([
 							Type.Boolean(),
 							Type.String(),
-							Type.String({ pattern: '.*' }),
-							Type.Array(
-								Type.Union([Type.String(), Type.String({ pattern: '.*' })]),
-							),
+							// Use Unknown to accept RegExp objects (common CORS use case)
+							// Validation is handled by @elysiajs/cors at runtime
+							Type.Unknown(),
+							Type.Array(Type.Union([Type.String(), Type.Unknown()])),
 						]),
 					),
 					methods: Type.Optional(Type.Array(Type.String())),
