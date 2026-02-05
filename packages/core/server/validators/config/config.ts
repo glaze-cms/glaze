@@ -1,5 +1,5 @@
-import { Type } from '@sinclair/typebox';
-import { Value } from '@sinclair/typebox/value';
+import Type from 'typebox';
+import Compile from 'typebox/compile';
 
 /* Types */
 import type { Logger } from '@glaze/logger';
@@ -43,8 +43,10 @@ const GlazeConfigValidationSchema = Type.Object({
 						Type.Union([
 							Type.Boolean(),
 							Type.String(),
-							Type.RegExp('.*'),
-							Type.Array(Type.Union([Type.String(), Type.RegExp('.*')])),
+							// Use Unknown to accept RegExp objects (common CORS use case)
+							// Validation is handled by @elysiajs/cors at runtime
+							Type.Unknown(),
+							Type.Array(Type.Union([Type.String(), Type.Unknown()])),
 						]),
 					),
 					methods: Type.Optional(Type.Array(Type.String())),
@@ -55,6 +57,9 @@ const GlazeConfigValidationSchema = Type.Object({
 	),
 	logger: Type.Optional(Type.Record(Type.String(), Type.Unknown())),
 });
+
+// Compile schema once for efficient validation
+const ConfigValidator = Compile(GlazeConfigValidationSchema);
 
 type ValidationResult =
 	| { success: true }
@@ -71,7 +76,7 @@ type ValidationResult =
  * @returns Validation result
  */
 function validateStructure(config: GlazeConfig): ValidationResult {
-	const errors = [...Value.Errors(GlazeConfigValidationSchema, config)];
+	const errors = [...ConfigValidator.Errors(config)];
 
 	if (errors.length > 0) {
 		const errorMap = new Map<
@@ -80,15 +85,31 @@ function validateStructure(config: GlazeConfig): ValidationResult {
 		>();
 
 		for (const err of errors) {
-			// TypeBox paths start with '/' for top-level properties
-			const field = err.path.slice(1);
-			if (!errorMap.has(field)) {
-				errorMap.set(field, {
-					field,
-					message: err.message,
-					hint: ` 👉 Ensure "${field}" is set correctly in your Glaze config`,
-				});
+			// TypeBox instancePath starts with '/' for top-level properties
+			// For missing required properties, instancePath is empty and the property name is in params
+			let field: string;
+			if (err.instancePath === '' && 'requiredProperties' in err.params) {
+				// Required property error - get the first missing property
+				field =
+					(err.params as { requiredProperties: string[] })
+						.requiredProperties[0] ?? '';
+			} else if (err.instancePath === '' && 'missingProperty' in err.params) {
+				// Single missing property error
+				field = (err.params as { missingProperty: string }).missingProperty;
+			} else {
+				// Regular property error - slice(1) removes the leading '/'
+				field = err.instancePath.slice(1);
 			}
+
+			if (!field || errorMap.has(field)) {
+				continue;
+			}
+
+			errorMap.set(field, {
+				field,
+				message: err.message,
+				hint: ` 👉 Ensure "${field}" is set correctly in your Glaze config`,
+			});
 		}
 
 		return {
