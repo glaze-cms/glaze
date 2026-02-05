@@ -1,55 +1,63 @@
-import { Type, type Static } from '@sinclair/typebox';
+import { Type } from '@sinclair/typebox';
 import { Value } from '@sinclair/typebox/value';
-
-/* Consts */
-import {
-	DEFAULT_ADMIN_PREFIX,
-	DEFAULT_API_PREFIX,
-	DEFAULT_HEALTH_CHECK_PATH,
-} from '../../lib/consts';
 
 /* Types */
 import type { Logger } from '@glaze/logger';
-import type { GlazeConfig } from '../../config';
+import type { GlazeConfig } from '../../config/types';
 
 /**
- * Internal schema for validating GlazeConfig runtime values.
- * Validates core server configuration fields with proper defaults.
+ * Schema for validating user-provided GlazeConfig values.
+ * Only validates structure and constraints - does NOT apply defaults.
+ * Defaults are applied separately in the resolver.
  */
-const GlazeConfigSchema = Type.Object({
-	apiPrefix: Type.String({
-		minLength: 1,
-		pattern: '^/',
-		default: DEFAULT_API_PREFIX,
-	}),
-	adminPrefix: Type.String({
-		minLength: 1,
-		pattern: '^/',
-		default: DEFAULT_ADMIN_PREFIX,
-	}),
-	healthCheck: Type.Object(
-		{
-			enabled: Type.Boolean({ default: true }),
-			path: Type.String({
-				minLength: 1,
-				pattern: '^/',
-				default: DEFAULT_HEALTH_CHECK_PATH,
-			}),
-		},
-		{ default: {} },
+const GlazeConfigValidationSchema = Type.Object({
+	apiPrefix: Type.Optional(
+		Type.String({
+			minLength: 1,
+			pattern: '^/',
+		}),
 	),
+	adminPrefix: Type.Optional(
+		Type.String({
+			minLength: 1,
+			pattern: '^/',
+		}),
+	),
+	schema: Type.Record(Type.String(), Type.Unknown()),
+	healthCheck: Type.Optional(
+		Type.Object({
+			enabled: Type.Optional(Type.Boolean()),
+			path: Type.Optional(
+				Type.String({
+					minLength: 1,
+					pattern: '^/',
+				}),
+			),
+		}),
+	),
+	security: Type.Optional(
+		Type.Object({
+			cors: Type.Optional(
+				Type.Object({
+					origin: Type.Optional(
+						Type.Union([
+							Type.Boolean(),
+							Type.String(),
+							Type.RegExp('.*'),
+							Type.Array(Type.Union([Type.String(), Type.RegExp('.*')])),
+						]),
+					),
+					methods: Type.Optional(Type.Array(Type.String())),
+					allowedHeaders: Type.Optional(Type.Array(Type.String())),
+				}),
+			),
+		}),
+	),
+	logger: Type.Optional(Type.Record(Type.String(), Type.Unknown())),
 });
 
-type ValidatedConfig = Static<typeof GlazeConfigSchema>;
-
-/**
- * Full internal configuration type including all user-provided fields
- * with validated fields having defaults applied.
- */
-export type GlazeInternalConfig = GlazeConfig & ValidatedConfig;
-
-type ValidateConfigResult =
-	| { success: true; config: ValidatedConfig }
+type ValidationResult =
+	| { success: true }
 	| {
 			success: false;
 			errors: Array<{ field: string; message: string; hint: string }>;
@@ -57,32 +65,13 @@ type ValidateConfigResult =
 
 /**
  * Validates the GlazeConfig object using TypeBox.
- * This performs runtime validation and applies defaults for optional fields.
+ * Only validates structure and constraints - does NOT apply defaults.
  *
  * @param config - The user-provided GlazeConfig
- * @returns Validation result with either validated config or errors
+ * @returns Validation result
  */
-function parseConfig(config: GlazeConfig): ValidateConfigResult {
-	// Extract fields that need validation with defaults
-	const configToValidate = {
-		apiPrefix: config.apiPrefix?.replace(/\/+$/, ''),
-		adminPrefix: config.adminPrefix?.replace(/\/+$/, ''),
-		healthCheck: config.healthCheck
-			? {
-					...config.healthCheck,
-					path: config.healthCheck.path?.replace(/\/+$/, ''),
-				}
-			: undefined,
-	};
-
-	// Apply defaults
-	const defaultedConfig = Value.Default(
-		GlazeConfigSchema,
-		Value.Clone(configToValidate),
-	) as ValidatedConfig;
-
-	// Validate
-	const errors = [...Value.Errors(GlazeConfigSchema, defaultedConfig)];
+function validateStructure(config: GlazeConfig): ValidationResult {
+	const errors = [...Value.Errors(GlazeConfigValidationSchema, config)];
 
 	if (errors.length > 0) {
 		const errorMap = new Map<
@@ -108,49 +97,42 @@ function parseConfig(config: GlazeConfig): ValidateConfigResult {
 		};
 	}
 
-	return {
-		success: true,
-		config: Value.Cast(GlazeConfigSchema, defaultedConfig),
-	};
+	return { success: true };
 }
 
 /**
- * Validates and normalizes the GlazeConfig with error logging.
- * Combines parsing with user-friendly error reporting via logger.
+ * Validates user configuration without applying defaults.
+ * Logs errors and exits if validation fails.
  *
  * @param logger - Logger instance for error output
  * @param config - The user-provided GlazeConfig
- * @returns The validated configuration object with defaults applied
+ * @returns The original config (validation passed)
  *
  * @remarks
- * This function calls `parseConfig()` internally and exits the process (code 1)
- * if validation fails, logging all errors via the provided logger.
+ * This function only validates - defaults are applied separately by resolveConfig().
+ * This function exits the process (code 1) if validation fails.
  */
 export function validateConfig(
 	logger: Logger,
 	config?: GlazeConfig,
-): GlazeInternalConfig {
+): GlazeConfig {
 	if (!config) {
-		logger.info('⚠️ No Glaze config provided, using defaults');
-		return Value.Default(GlazeConfigSchema, {}) as GlazeInternalConfig;
+		logger.info('⚠️ No Glaze config provided, will use defaults');
+		// Return minimal valid config (schema is required)
+		return { schema: {} };
 	}
 
-	const parsedConfig = parseConfig(config);
+	const validation = validateStructure(config);
 
-	if (!parsedConfig.success) {
+	if (!validation.success) {
 		logger.error('🛑 Configuration validation failed');
-		for (const error of parsedConfig.errors) {
+		for (const error of validation.errors) {
 			logger.error(`Config "${error.field}": ${error.message}`);
 			logger.info(error.hint);
 		}
 		process.exit(1);
 	}
 
-	// Return full config: original user values + validated values with defaults
-	return {
-		...config,
-		apiPrefix: parsedConfig.config.apiPrefix,
-		adminPrefix: parsedConfig.config.adminPrefix,
-		healthCheck: parsedConfig.config.healthCheck,
-	};
+	// Return original config - defaults applied separately by resolver
+	return config;
 }

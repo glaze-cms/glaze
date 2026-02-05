@@ -10,6 +10,7 @@
 		"dist",
 		"*.ts",
 		"types/**/*.ts",
+		"utils/**/*.ts",
 		"!**/*.test.ts"
 	],
 	"exports": {
@@ -20,6 +21,10 @@
 		"./types": {
 			"types": "./dist/types/index.d.ts",
 			"default": "./types/index.ts"
+		},
+		"./utils": {
+			"types": "./dist/utils/index.d.ts",
+			"default": "./utils/index.ts"
 		}
 	},
 	"scripts": {

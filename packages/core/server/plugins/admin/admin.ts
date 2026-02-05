@@ -2,7 +2,7 @@ import { Elysia } from 'elysia';
 import { dirname, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import type { GlazeInternalConfig } from '../../validators/config/config';
+import type { GlazeInternalConfig } from '../../config/types';
 
 type HandleAdminParams = {
 	request: Request;
@@ -11,10 +11,14 @@ type HandleAdminParams = {
 };
 
 /**
- * Normalizes a path prefix to always start with /
+ * Normalizes a path prefix to always start with / and removes trailing slashes
  */
 function normalizePrefix(prefix: string): string {
-	return prefix.startsWith('/') ? prefix : `/${prefix}`;
+	let normalized = prefix.startsWith('/') ? prefix : `/${prefix}`;
+	// Remove trailing slash to ensure consistent route matching
+	normalized = normalized.replace(/\/$/, '');
+	// Handle edge case: root path should remain "/"
+	return normalized || '/';
 }
 
 /**
@@ -127,15 +131,18 @@ export const adminPlugin = (config: GlazeInternalConfig) => {
 			handleAdmin({ request, path, adminPrefix }),
 		);
 
-	// Register fallback routes for Vite dev server when using custom prefix
+	// Register fallback routes for Vite dev server assets when using custom prefix
+	// These only handle asset requests (not the admin UI root) to avoid exposing
+	// /admin when a custom prefix is configured
 	if (needsViteFallback) {
-		app
-			.all('/admin/*', ({ request, path }) =>
-				handleAdmin({ request, path, adminPrefix: '/admin' }),
-			)
-			.all('/admin', ({ request, path }) =>
-				handleAdmin({ request, path, adminPrefix: '/admin' }),
-			);
+		app.all('/admin/*', ({ request, path }) => {
+			// Don't serve the admin UI at /admin when a custom prefix is configured
+			// Only proxy actual asset requests
+			if (path === '/admin' || path === '/admin/') {
+				return new Response('Not found', { status: 404 });
+			}
+			return handleAdmin({ request, path, adminPrefix: '/admin' });
+		});
 	}
 
 	return app;

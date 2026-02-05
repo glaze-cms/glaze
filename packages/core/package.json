@@ -40,6 +40,9 @@
 		"elysia": "latest",
 		"@elysiajs/cors": "latest",
 		"@sinclair/typebox": "latest",
+		"drizzle-kit": "catalog:drizzle",
+		"drizzle-orm": "catalog:drizzle",
+		"pg": "latest",
 		"pino": "catalog:system"
 	},
 	"devDependencies": {

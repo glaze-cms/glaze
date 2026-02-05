@@ -2,6 +2,16 @@ import { describe, expect, it } from 'bun:test';
 import { Elysia } from 'elysia';
 import { healthCheckPlugin } from './health';
 import { DEFAULT_HEALTH_CHECK_PATH } from '../../lib/consts/defaults';
+import type { ResolvedHealthCheckConfig } from '../../config/types';
+
+// Helper to create resolved health check config
+const createHealthConfig = (
+	overrides?: Partial<ResolvedHealthCheckConfig>,
+): ResolvedHealthCheckConfig => ({
+	enabled: true,
+	path: DEFAULT_HEALTH_CHECK_PATH,
+	...overrides,
+});
 
 describe('healthCheckPlugin', () => {
 	describe('path normalization', () => {
@@ -9,7 +19,7 @@ describe('healthCheckPlugin', () => {
 			const app = new Elysia();
 			const routesBefore = app.routes.length;
 
-			app.use(healthCheckPlugin());
+			app.use(healthCheckPlugin(createHealthConfig()));
 
 			expect(app.routes.length).toBeGreaterThan(routesBefore);
 		});
@@ -17,7 +27,7 @@ describe('healthCheckPlugin', () => {
 		it('should use custom path when provided', () => {
 			const app = new Elysia();
 
-			app.use(healthCheckPlugin({ path: '/custom' }));
+			app.use(healthCheckPlugin(createHealthConfig({ path: '/custom' })));
 
 			const hasCustomRoute = app.routes.some(
 				(route) => route.path === '/custom',
@@ -28,7 +38,7 @@ describe('healthCheckPlugin', () => {
 		it('should normalize path without leading slash', () => {
 			const app = new Elysia();
 
-			app.use(healthCheckPlugin({ path: 'healthz' }));
+			app.use(healthCheckPlugin(createHealthConfig({ path: 'healthz' })));
 
 			const hasNormalizedRoute = app.routes.some(
 				(route) => route.path === '/healthz',
@@ -39,7 +49,7 @@ describe('healthCheckPlugin', () => {
 		it('should fallback to default for empty string path', () => {
 			const app = new Elysia();
 
-			app.use(healthCheckPlugin({ path: '' }));
+			app.use(healthCheckPlugin(createHealthConfig({ path: '' })));
 
 			const hasDefaultRoute = app.routes.some(
 				(route) => route.path === DEFAULT_HEALTH_CHECK_PATH,
@@ -50,18 +60,7 @@ describe('healthCheckPlugin', () => {
 		it('should fallback to default for whitespace-only path', () => {
 			const app = new Elysia();
 
-			app.use(healthCheckPlugin({ path: '   ' }));
-
-			const hasDefaultRoute = app.routes.some(
-				(route) => route.path === DEFAULT_HEALTH_CHECK_PATH,
-			);
-			expect(hasDefaultRoute).toBe(true);
-		});
-
-		it('should fallback to default for undefined path', () => {
-			const app = new Elysia();
-
-			app.use(healthCheckPlugin({ path: undefined }));
+			app.use(healthCheckPlugin(createHealthConfig({ path: '   ' })));
 
 			const hasDefaultRoute = app.routes.some(
 				(route) => route.path === DEFAULT_HEALTH_CHECK_PATH,
@@ -75,7 +74,7 @@ describe('healthCheckPlugin', () => {
 			const app = new Elysia();
 			const routesBefore = app.routes.length;
 
-			app.use(healthCheckPlugin({ enabled: true }));
+			app.use(healthCheckPlugin(createHealthConfig({ enabled: true })));
 
 			expect(app.routes.length).toBeGreaterThan(routesBefore);
 		});
@@ -84,7 +83,7 @@ describe('healthCheckPlugin', () => {
 			const app = new Elysia();
 			const routesBefore = app.routes.length;
 
-			app.use(healthCheckPlugin({ enabled: false }));
+			app.use(healthCheckPlugin(createHealthConfig({ enabled: false })));
 
 			expect(app.routes.length).toBe(routesBefore);
 		});
@@ -93,7 +92,7 @@ describe('healthCheckPlugin', () => {
 			const app = new Elysia();
 			const routesBefore = app.routes.length;
 
-			app.use(healthCheckPlugin({}));
+			app.use(healthCheckPlugin(createHealthConfig()));
 
 			expect(app.routes.length).toBeGreaterThan(routesBefore);
 		});
@@ -101,7 +100,7 @@ describe('healthCheckPlugin', () => {
 
 	describe('response handler', () => {
 		it('should return health response with correct structure', () => {
-			const app = new Elysia().use(healthCheckPlugin());
+			const app = new Elysia().use(healthCheckPlugin(createHealthConfig()));
 
 			const healthRoute = app.routes.find(
 				(route) => route.path === DEFAULT_HEALTH_CHECK_PATH,
