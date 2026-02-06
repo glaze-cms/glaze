@@ -5,7 +5,7 @@ import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import type { AuthConfig, GlazeInternalConfig } from '../../config/types';
 import type { GlazeEnv } from '../../validators/env';
 
-import { authResolver } from './resolver';
+import { authResolver } from '../../config/resolver/auth';
 
 /**
  * Creates the Better Auth plugin for Elysia.

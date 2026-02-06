@@ -1,13 +1,13 @@
 import { deepMerge } from '@glaze/shared';
-import type { GlazeConfig, GlazeInternalConfig } from './types';
+import type { GlazeConfig, GlazeInternalConfig } from '../types';
 import {
 	DEFAULT_API_PREFIX,
 	DEFAULT_ADMIN_PREFIX,
 	DEFAULT_HEALTH_CHECK_PATH,
 	DEFAULT_CORS_METHODS,
 	DEFAULT_CORS_ALLOWED_HEADERS,
-} from '../lib/consts';
-import { authResolver } from '../plugins/auth/resolver';
+} from '../../lib/consts';
+import { authResolver } from './auth';
 
 /**
  * Creates a fresh default configuration object.
