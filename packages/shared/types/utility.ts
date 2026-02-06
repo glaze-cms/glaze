@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-function-type */
 /**
  * Disallows any keys not present in the base type Shape.
  * Perfect for configuration objects where typos should be fatal.
@@ -35,7 +36,7 @@ export type Strict<T, Shape> = T & Record<Exclude<keyof T, keyof Shape>, never>;
  * // Result: { items: { id: number }[] }
  * ```
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+
 export type DeepRequired<T> = T extends readonly any[]
 	? { [K in keyof T]: DeepRequired<T[K]> }
 	: T extends Function
