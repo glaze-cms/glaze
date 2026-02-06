@@ -1,3 +1,11 @@
 import { glaze } from '@glaze/core';
 
-glaze();
+glaze({
+	config: {
+		schema: {},
+		adminPrefix: '/dashboard',
+		healthCheck: {
+			path: '/health',
+		},
+	},
+});

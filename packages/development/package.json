@@ -4,14 +4,18 @@
 	"version": "0.0.1",
 	"scripts": {
 		"dev": "bun --hot index.ts",
-		"lint": "eslint /**/*.ts",
-		"lint:fix": "eslint /**/*.ts --fix",
-		"format": "prettier --check /**/*.ts",
-		"format:fix": "prettier --write /**/*.ts",
+		"lint": "eslint .",
+		"lint:fix": "eslint . --fix",
+		"format": "prettier --check .",
+		"format:fix": "prettier --write .",
 		"typecheck": "tsc --noEmit",
 		"test": "bun test"
 	},
 	"dependencies": {
 		"@glaze/core": "workspace:*"
+	},
+	"devDependencies": {
+		"drizzle-orm": "catalog:drizzle",
+		"drizzle-kit": "catalog:drizzle"
 	}
 }

@@ -1,6 +1,6 @@
 {
 	"name": "@glaze/core",
-	"version": "0.0.19",
+	"version": "0.0.21",
 	"description": "Core module of the Glaze framework, responsible for running the CMS server and providing essential functionality.",
 	"license": "MIT",
 	"type": "module",
@@ -25,10 +25,10 @@
 	},
 	"scripts": {
 		"start": "bun run index.ts",
-		"lint": "eslint /**/*.ts",
-		"lint:fix": "eslint /**/*.ts --fix",
-		"format": "prettier --check /**/*.ts",
-		"format:fix": "prettier --write /**/*.ts",
+		"lint": "eslint .",
+		"lint:fix": "eslint . --fix",
+		"format": "prettier --check .",
+		"format:fix": "prettier --write .",
 		"typecheck": "tsc --noEmit",
 		"test": "bun test",
 		"prepublishOnly": "bunx tsc -p tsconfig.build.json"
@@ -36,9 +36,17 @@
 	"dependencies": {
 		"@glaze/admin": "workspace:*",
 		"@glaze/logger": "workspace:*",
+		"@glaze/shared": "workspace:*",
 		"elysia": "latest",
-		"@sinclair/typebox": "latest",
+		"@elysiajs/cors": "latest",
+		"better-auth": "catalog:auth",
+		"typebox": "latest",
+		"drizzle-kit": "catalog:drizzle",
+		"pg": "latest",
 		"pino": "catalog:system"
+	},
+	"peerDependencies": {
+		"drizzle-orm": "catalog:drizzle"
 	},
 	"devDependencies": {
 		"@types/bun": "latest",

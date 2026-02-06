@@ -1,5 +1,6 @@
 import { expect, test, describe, beforeEach, afterEach, mock } from 'bun:test';
 import { parseEnv, validateEnv } from './env';
+import { DEFAULT_SERVER_PORT } from '../../lib/consts/defaults';
 
 describe('parseEnv', () => {
 	let originalEnv: NodeJS.ProcessEnv;
@@ -90,7 +91,7 @@ describe('parseEnv', () => {
 
 			expect(result.success).toBe(true);
 			if (result.success) {
-				expect(result.env.GLAZE_PORT).toBe(4000);
+				expect(result.env.GLAZE_PORT).toBe(DEFAULT_SERVER_PORT);
 			}
 		});
 
@@ -244,9 +245,9 @@ describe('parseEnv', () => {
 				const dbError = result.errors.find(
 					(e) => e.variable === 'GLAZE_DATABASE_URL',
 				);
-				// TypeBox generates this standard pattern error message
+				// TypeBox 1.0 generates this standard pattern error message
 				expect(dbError?.message).toContain(
-					"Expected string to match '^(postgres|postgresql)://'",
+					'must match pattern "^(postgres|postgresql)://"',
 				);
 			}
 		});

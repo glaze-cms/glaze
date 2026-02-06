@@ -5,7 +5,15 @@ import importPlugin from 'eslint-plugin-import';
 
 export default [
 	{
-		ignores: ['build/', 'dist/', 'node_modules/', '**/*.d.ts'],
+		ignores: [
+			'build/',
+			'dist/',
+			'node_modules/',
+			'**/*.d.ts',
+			'eslint.config.js',
+			'**/*.config.js',
+			'**/*.config.ts',
+		],
 	},
 
 	eslint.configs.recommended,
@@ -49,6 +57,7 @@ export default [
 				{ argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
 			],
 			'@typescript-eslint/no-explicit-any': 'off',
+			'@typescript-eslint/restrict-template-expressions': 'off',
 			'@typescript-eslint/prefer-nullish-coalescing': 'warn',
 
 			'consistent-return': 'warn',
@@ -75,9 +84,9 @@ export default [
 							group: ['@glaze/*/*'],
 							message:
 								'Use package-level imports only, except for explicitly exported subpaths.',
+							importNamePattern: '^(?!@glaze/core/server/types$).*',
 						},
 					],
-					allow: ['@glaze/core/server/types'],
 				},
 			],
 		},

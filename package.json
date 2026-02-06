@@ -19,6 +19,9 @@
 		"packages/*"
 	],
 	"catalogs": {
+		"auth": {
+			"better-auth": "latest"
+		},
 		"development": {
 			"@eslint/js": "latest",
 			"@types/bun": "latest",
@@ -30,8 +33,13 @@
 			"prettier": "latest",
 			"typescript": "latest"
 		},
+		"drizzle": {
+			"drizzle-kit": "beta",
+			"drizzle-orm": "beta"
+		},
 		"elysia": {
-			"elysia": "latest"
+			"elysia": "latest",
+			"@elysiajs/cors": "latest"
 		},
 		"react": {
 			"@types/react": "latest",
@@ -44,7 +52,7 @@
 			"pino-pretty": "latest"
 		},
 		"validation": {
-			"@sinclair/typebox": "latest"
+			"typebox": "latest"
 		}
 	},
 	"devDependencies": {

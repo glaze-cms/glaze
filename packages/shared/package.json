@@ -1,0 +1,43 @@
+{
+	"name": "@glaze/shared",
+	"version": "0.0.21",
+	"description": "Shared utilities and types for Glaze packages.",
+	"license": "MIT",
+	"type": "module",
+	"main": "index.ts",
+	"types": "./dist/index.d.ts",
+	"files": [
+		"dist",
+		"*.ts",
+		"types/**/*.ts",
+		"utils/**/*.ts",
+		"!**/*.test.ts"
+	],
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"default": "./index.ts"
+		},
+		"./types": {
+			"types": "./dist/types/index.d.ts",
+			"default": "./types/index.ts"
+		},
+		"./utils": {
+			"types": "./dist/utils/index.d.ts",
+			"default": "./utils/index.ts"
+		}
+	},
+	"scripts": {
+		"lint": "eslint .",
+		"lint:fix": "eslint . --fix",
+		"format": "prettier --check .",
+		"format:fix": "prettier --write .",
+		"typecheck": "tsc --noEmit",
+		"test": "bun test",
+		"prepublishOnly": "bunx tsc -p tsconfig.build.json"
+	},
+	"devDependencies": {
+		"@types/bun": "latest",
+		"typescript": "latest"
+	}
+}
