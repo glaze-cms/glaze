@@ -7,12 +7,13 @@ import {
 	DEFAULT_CORS_METHODS,
 	DEFAULT_CORS_ALLOWED_HEADERS,
 } from '../lib/consts';
+import { authResolver } from '../plugins/auth/resolver';
 
 /**
  * Creates a fresh default configuration object.
  * Returns a new instance each call to prevent mutation across resolves.
  */
-function createDefaultConfig(): GlazeInternalConfig {
+function createDefaultConfig(apiPrefix: string): GlazeInternalConfig {
 	return {
 		apiPrefix: DEFAULT_API_PREFIX,
 		adminPrefix: DEFAULT_ADMIN_PREFIX,
@@ -28,6 +29,7 @@ function createDefaultConfig(): GlazeInternalConfig {
 				allowedHeaders: [...DEFAULT_CORS_ALLOWED_HEADERS],
 			},
 		},
+		auth: authResolver(apiPrefix),
 	};
 }
 
@@ -39,8 +41,14 @@ function createDefaultConfig(): GlazeInternalConfig {
  * @returns Resolved configuration with all defaults applied
  */
 export function resolveConfig(userConfig: GlazeConfig): GlazeInternalConfig {
-	return deepMerge(
-		createDefaultConfig(),
+	const apiPrefix = userConfig.apiPrefix ?? DEFAULT_API_PREFIX;
+	const mergedConfig = deepMerge(
+		createDefaultConfig(apiPrefix),
 		userConfig as Partial<GlazeInternalConfig>,
 	);
+
+	// Resolve auth config with the final apiPrefix
+	mergedConfig.auth = authResolver(mergedConfig.apiPrefix, userConfig.auth);
+
+	return mergedConfig;
 }

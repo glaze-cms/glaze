@@ -39,11 +39,14 @@
 		"@glaze/shared": "workspace:*",
 		"elysia": "latest",
 		"@elysiajs/cors": "latest",
+		"better-auth": "catalog:auth",
 		"typebox": "latest",
 		"drizzle-kit": "catalog:drizzle",
-		"drizzle-orm": "catalog:drizzle",
 		"pg": "latest",
 		"pino": "catalog:system"
+	},
+	"peerDependencies": {
+		"drizzle-orm": "catalog:drizzle"
 	},
 	"devDependencies": {
 		"@types/bun": "latest",

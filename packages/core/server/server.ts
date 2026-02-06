@@ -2,6 +2,7 @@ import { Elysia } from 'elysia';
 import { drizzle } from 'drizzle-orm/node-postgres';
 
 /* Plugins */
+import { authPlugin } from './plugins/auth';
 import { healthCheckPlugin } from './plugins/health';
 import { adminPlugin } from './plugins/admin';
 import { corsPlugin } from './plugins/security';
@@ -30,14 +31,18 @@ export function createGlazeServer({
 	config: GlazeInternalConfig;
 	logger: Logger;
 }) {
+	// Create database instance first (needed for auth plugin)
+	const db = drizzle(env.GLAZE_DATABASE_URL, { schema: config.schema });
+
 	const glaze = new Elysia({ name: '@glaze/server' })
 		.decorate('env', env)
 		.decorate('logger', logger)
 		.decorate('config', config)
-		.decorate('db', drizzle(env.GLAZE_DATABASE_URL, { schema: config.schema }))
+		.decorate('db', db)
 		.use(healthCheckPlugin(config.healthCheck))
 		.use(adminPlugin(config))
 		.use(corsPlugin(config.security, env, logger))
+		.use(authPlugin(config, env, db))
 		.onStart(handleStart);
 
 	const fullyQualifiedAdminAddress = `http://${glaze.server?.hostname}:${env.GLAZE_PORT}${config.adminPrefix}`;

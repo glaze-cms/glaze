@@ -19,6 +19,9 @@
 		"packages/*"
 	],
 	"catalogs": {
+		"auth": {
+			"better-auth": "latest"
+		},
 		"development": {
 			"@eslint/js": "latest",
 			"@types/bun": "latest",
