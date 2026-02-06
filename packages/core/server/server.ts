@@ -6,6 +6,9 @@ import { healthCheckPlugin } from './plugins/health';
 import { adminPlugin } from './plugins/admin';
 import { corsPlugin } from './plugins/security';
 
+/* Hooks */
+import { handleStart } from './hooks';
+
 /*  Types */
 import type { GlazeEnv } from './validators/env';
 import type { Logger } from '@glaze/logger';
@@ -34,13 +37,13 @@ export function createGlazeServer({
 		.decorate('db', drizzle(env.GLAZE_DATABASE_URL, { schema: config.schema }))
 		.use(healthCheckPlugin(config.healthCheck))
 		.use(adminPlugin(config))
-		.use(corsPlugin(config.security, env, logger));
+		.use(corsPlugin(config.security, env, logger))
+		.onStart(handleStart);
 
-	glaze.listen({ port: env.GLAZE_PORT }, () => {
-		logger.info(
-			`🧁 Glaze admin dashboard available at http://localhost:${env.GLAZE_PORT}${config.adminPrefix}`,
-		);
-	});
+	const fullyQualifiedAdminAddress = `http://${glaze.server?.hostname}:${env.GLAZE_PORT}${config.adminPrefix}`;
+	logger.info(
+		`🚀 Glaze Admin Dashboard available at: ${fullyQualifiedAdminAddress}`,
+	);
 
 	return glaze;
 }

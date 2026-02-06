@@ -22,8 +22,6 @@ export function glaze<T extends GlazeConfig>({
 	const validatedConfig = validateConfig(logger, config);
 	const internalConfig = resolveConfig(validatedConfig);
 
-	logger.info('🚀 Starting Glaze server...');
-
 	return createGlazeServer({ env, logger, config: internalConfig });
 }
 
