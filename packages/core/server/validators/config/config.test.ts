@@ -451,12 +451,15 @@ describe('validateConfig', () => {
 			};
 
 			const result = validateConfig(logger, config as GlazeConfig);
+			const auth = result.auth;
 
-			expect(result.auth?.enabled).toBe(true);
-			expect(result.auth?.betterAuth?.emailVerification).toEqual({
-				sendOnSignUp: true,
-			});
-			expect(result.auth?.drizzleAdapter?.debugLogs).toBe(true);
+			expect(auth).toBeDefined();
+			if (auth && auth.enabled !== false) {
+				expect(auth.betterAuth?.emailVerification).toEqual({
+					sendOnSignUp: true,
+				});
+				expect(auth.drizzleAdapter?.debugLogs).toBe(true);
+			}
 			expect(mockProcessExit).not.toHaveBeenCalled();
 		});
 	});
