@@ -36,6 +36,14 @@ const GlazeEnvSchema = Type.Object({
 		minLength: 1,
 		pattern: '^(postgres|postgresql)://',
 	}),
+	GLAZE_SERVER_URL: Type.Optional(
+		Type.String({
+			minLength: 1,
+			pattern: '^https?://',
+			error:
+				'GLAZE_SERVER_URL must be a valid URL starting with http:// or https://',
+		}),
+	),
 });
 
 // Compile schema once for efficient validation

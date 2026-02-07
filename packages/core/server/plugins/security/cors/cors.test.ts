@@ -33,6 +33,17 @@ const createDefaultCorsConfig = () => ({
 	allowedHeaders: [...DEFAULT_CORS_ALLOWED_HEADERS],
 });
 
+const createDefaultSecurityConfig = (
+	corsOverrides?: {
+		origin?: string[];
+		methods?: string[];
+		allowedHeaders?: string[];
+	},
+) => ({
+	cors: { ...createDefaultCorsConfig(), ...corsOverrides },
+	rateLimit: { enabled: true, max: 60, duration: 60000 },
+});
+
 describe('corsPlugin', () => {
 	describe('production warning', () => {
 		it('should warn when no origins configured in production', () => {
@@ -40,7 +51,7 @@ describe('corsPlugin', () => {
 			const mockEnv = createMockEnv('production');
 			const warnSpy = spyOn(mockLogger, 'warn');
 
-			corsPlugin({ cors: createDefaultCorsConfig() }, mockEnv, mockLogger);
+			corsPlugin(createDefaultSecurityConfig(), mockEnv, mockLogger);
 
 			expect(warnSpy).toHaveBeenCalledWith(
 				'No CORS origins configured in production. All cross-origin requests will be blocked.',
@@ -53,9 +64,7 @@ describe('corsPlugin', () => {
 			const warnSpy = spyOn(mockLogger, 'warn');
 
 			corsPlugin(
-				{
-					cors: { ...createDefaultCorsConfig(), origin: ['https://myapp.com'] },
-				},
+				createDefaultSecurityConfig({ origin: ['https://myapp.com'] }),
 				mockEnv,
 				mockLogger,
 			);
@@ -68,7 +77,7 @@ describe('corsPlugin', () => {
 			const mockEnv = createMockEnv('development');
 			const warnSpy = spyOn(mockLogger, 'warn');
 
-			corsPlugin({ cors: createDefaultCorsConfig() }, mockEnv, mockLogger);
+			corsPlugin(createDefaultSecurityConfig(), mockEnv, mockLogger);
 
 			expect(warnSpy).not.toHaveBeenCalled();
 		});
@@ -77,7 +86,7 @@ describe('corsPlugin', () => {
 			const mockEnv = createMockEnv('production');
 
 			expect(() =>
-				corsPlugin({ cors: createDefaultCorsConfig() }, mockEnv),
+				corsPlugin(createDefaultSecurityConfig(), mockEnv),
 			).not.toThrow();
 		});
 	});
@@ -87,7 +96,7 @@ describe('corsPlugin', () => {
 			const mockEnv = createMockEnv('development');
 
 			const plugin = corsPlugin(
-				{ cors: createDefaultCorsConfig() },
+				createDefaultSecurityConfig(),
 				mockEnv,
 				createMockLogger(),
 			);
@@ -99,7 +108,7 @@ describe('corsPlugin', () => {
 			const mockEnv = createMockEnv('production');
 
 			const plugin = corsPlugin(
-				{ cors: createDefaultCorsConfig() },
+				createDefaultSecurityConfig(),
 				mockEnv,
 				createMockLogger(),
 			);
@@ -113,9 +122,7 @@ describe('corsPlugin', () => {
 			const mockEnv = createMockEnv('production');
 
 			const plugin = corsPlugin(
-				{
-					cors: { ...createDefaultCorsConfig(), origin: ['https://myapp.com'] },
-				},
+				createDefaultSecurityConfig({ origin: ['https://myapp.com'] }),
 				mockEnv,
 				createMockLogger(),
 			);
@@ -127,12 +134,7 @@ describe('corsPlugin', () => {
 			const mockEnv = createMockEnv('production');
 
 			const plugin = corsPlugin(
-				{
-					cors: {
-						...createDefaultCorsConfig(),
-						methods: ['GET', 'POST'],
-					},
-				},
+				createDefaultSecurityConfig({ methods: ['GET', 'POST'] }),
 				mockEnv,
 				createMockLogger(),
 			);
@@ -144,12 +146,7 @@ describe('corsPlugin', () => {
 			const mockEnv = createMockEnv('production');
 
 			const plugin = corsPlugin(
-				{
-					cors: {
-						...createDefaultCorsConfig(),
-						allowedHeaders: ['X-Custom-Header'],
-					},
-				},
+				createDefaultSecurityConfig({ allowedHeaders: ['X-Custom-Header'] }),
 				mockEnv,
 				createMockLogger(),
 			);
@@ -161,13 +158,11 @@ describe('corsPlugin', () => {
 			const mockEnv = createMockEnv('production');
 
 			const plugin = corsPlugin(
-				{
-					cors: {
-						origin: ['https://myapp.com'],
-						methods: ['GET', 'POST'],
-						allowedHeaders: ['X-Custom-Header', 'Authorization'],
-					},
-				},
+				createDefaultSecurityConfig({
+					origin: ['https://myapp.com'],
+					methods: ['GET', 'POST'],
+					allowedHeaders: ['X-Custom-Header', 'Authorization'],
+				}),
 				mockEnv,
 				createMockLogger(),
 			);

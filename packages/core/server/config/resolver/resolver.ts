@@ -1,5 +1,4 @@
 import { deepMerge } from '@glaze/shared';
-import type { GlazeConfig, GlazeInternalConfig } from '../types';
 import {
 	DEFAULT_API_PREFIX,
 	DEFAULT_ADMIN_PREFIX,
@@ -9,11 +8,13 @@ import {
 } from '../../lib/consts';
 import { authResolver } from './auth';
 
+import type { GlazeConfig, GlazeInternalConfig } from '../types';
+
 /**
  * Creates a fresh default configuration object.
- * Returns a new instance each call to prevent mutation across resolves.
+ * @returns A default configuration object with all default values set
  */
-function createDefaultConfig(apiPrefix: string): GlazeInternalConfig {
+function createDefaultConfig(): Omit<GlazeInternalConfig, 'auth'> {
 	return {
 		apiPrefix: DEFAULT_API_PREFIX,
 		adminPrefix: DEFAULT_ADMIN_PREFIX,
@@ -28,9 +29,30 @@ function createDefaultConfig(apiPrefix: string): GlazeInternalConfig {
 				methods: [...DEFAULT_CORS_METHODS],
 				allowedHeaders: [...DEFAULT_CORS_ALLOWED_HEADERS],
 			},
+			rateLimit: {
+				enabled: true,
+				max: 60, // 60 requests
+				duration: 60000, // 1 minute
+			},
 		},
-		auth: authResolver(apiPrefix),
 	};
+}
+
+/**
+ * Validates and normalizes path prefixes.
+ * Ensures prefix starts with "/" and removes trailing slashes.
+ *
+ * @param prefix - The path prefix to validate
+ * @param name - The name of the prefix for error messages
+ * @returns Normalized prefix
+ * @throws Error if prefix doesn't start with "/"
+ */
+function validatePathPrefix(prefix: string, name: string): string {
+	if (!prefix.startsWith('/')) {
+		throw new Error(`${name} must start with "/"`);
+	}
+	// Remove trailing slashes to prevent double slashes in paths
+	return prefix.replace(/\/+$/, '') || '/';
 }
 
 /**
@@ -41,14 +63,28 @@ function createDefaultConfig(apiPrefix: string): GlazeInternalConfig {
  * @returns Resolved configuration with all defaults applied
  */
 export function resolveConfig(userConfig: GlazeConfig): GlazeInternalConfig {
-	const apiPrefix = userConfig.apiPrefix ?? DEFAULT_API_PREFIX;
+	// Validate and normalize path prefixes before merging
+	const normalizedConfig: GlazeConfig = {
+		...userConfig,
+		apiPrefix:
+			userConfig.apiPrefix !== undefined
+				? validatePathPrefix(userConfig.apiPrefix, 'apiPrefix')
+				: undefined,
+		adminPrefix:
+			userConfig.adminPrefix !== undefined
+				? validatePathPrefix(userConfig.adminPrefix, 'adminPrefix')
+				: undefined,
+	};
+
 	const mergedConfig = deepMerge(
-		createDefaultConfig(apiPrefix),
-		userConfig as Partial<GlazeInternalConfig>,
+		createDefaultConfig(),
+		normalizedConfig as Partial<GlazeInternalConfig>,
 	);
 
-	// Resolve auth config with the final apiPrefix
-	mergedConfig.auth = authResolver(mergedConfig.apiPrefix, userConfig.auth);
+	const apiPrefix = mergedConfig.apiPrefix;
 
-	return mergedConfig;
+	return {
+		...mergedConfig,
+		auth: authResolver(apiPrefix, userConfig.auth),
+	};
 }

@@ -5,7 +5,7 @@ import { drizzle } from 'drizzle-orm/node-postgres';
 import { authPlugin } from './plugins/auth';
 import { healthCheckPlugin } from './plugins/health';
 import { adminPlugin } from './plugins/admin';
-import { corsPlugin } from './plugins/security';
+import { corsPlugin, rateLimitPlugin } from './plugins/security';
 
 /* Hooks */
 import { handleStart } from './hooks';
@@ -31,21 +31,24 @@ export function createGlazeServer({
 	config: GlazeInternalConfig;
 	logger: Logger;
 }) {
-	// Create database instance first (needed for auth plugin)
-	const db = drizzle(env.GLAZE_DATABASE_URL, { schema: config.schema });
-
 	const glaze = new Elysia({ name: '@glaze/server' })
 		.decorate('env', env)
 		.decorate('logger', logger)
 		.decorate('config', config)
-		.decorate('db', db)
+		.decorate('db', drizzle(env.GLAZE_DATABASE_URL, { schema: config.schema }))
+		.use(rateLimitPlugin(config.security, env, logger))
 		.use(healthCheckPlugin(config.healthCheck))
 		.use(adminPlugin(config))
 		.use(corsPlugin(config.security, env, logger))
-		.use(authPlugin(config, env, db))
-		.onStart(handleStart);
+		.use(authPlugin(config, env))
+		.get('/', () => ({
+			message: 'Glaze CMS Server',
+			admin: config.adminPrefix,
+			health: config.healthCheck.path,
+		}))
+		.onStart(({ decorator }) => handleStart({ decorator }));
 
-	const fullyQualifiedAdminAddress = `http://${glaze.server?.hostname}:${env.GLAZE_PORT}${config.adminPrefix}`;
+	const fullyQualifiedAdminAddress = `${env.GLAZE_SERVER_URL ?? `http://localhost:${env.GLAZE_PORT}`}${config.adminPrefix}`;
 	logger.info(
 		`🚀 Glaze Admin Dashboard available at: ${fullyQualifiedAdminAddress}`,
 	);
