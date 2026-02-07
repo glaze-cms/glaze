@@ -52,7 +52,7 @@ function validatePathPrefix(prefix: string, name: string): string {
 		throw new Error(`${name} must start with "/"`);
 	}
 	// Remove trailing slashes to prevent double slashes in paths
-	return prefix.replace(/\/+$/, '');
+	return prefix.replace(/\/+$/, '') || '/';
 }
 
 /**

@@ -43,8 +43,8 @@ export function createGlazeServer({
 		.use(authPlugin(config, env))
 		.get('/', () => ({
 			message: 'Glaze CMS Server',
-			admin: '/admin',
-			health: '/_health',
+			admin: config.adminPrefix,
+			health: config.healthCheck.path,
 		}))
 		.onStart(({ decorator }) => handleStart({ decorator }));
 

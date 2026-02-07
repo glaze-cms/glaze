@@ -257,6 +257,17 @@ describe('resolveConfig', () => {
 			expect(result.apiPrefix).toBe('/api');
 		});
 
+		it('should preserve root-only apiPrefix as "/"', () => {
+			const config: GlazeConfig = {
+				schema: mockSchema,
+				apiPrefix: '/',
+			};
+
+			const result = resolveConfig(config);
+
+			expect(result.apiPrefix).toBe('/');
+		});
+
 		it('should remove multiple trailing slashes from apiPrefix', () => {
 			const config: GlazeConfig = {
 				schema: mockSchema,

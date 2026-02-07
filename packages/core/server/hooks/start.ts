@@ -5,7 +5,7 @@ import type { Glaze } from '@glaze/core';
 export async function handleStart({
 	decorator,
 }: {
-	decorator: Awaited<Glaze>['decorator'];
+	decorator: Glaze['decorator'];
 }) {
 	const { logger, db } = decorator;
 

@@ -36,6 +36,10 @@ export const rateLimitPlugin = (
 		);
 	}
 
+	if (!rateLimitConfig.enabled) {
+		return app;
+	}
+
 	return app.use(
 		rateLimit({
 			...rateLimitConfig,

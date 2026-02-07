@@ -13,7 +13,7 @@ import { createGlazeServer } from './server/server';
 /* Types */
 import type { GlazeConfig } from './server/config/types';
 
-export async function glaze({ config }: { config?: GlazeConfig } = {}) {
+export function glaze({ config }: { config?: GlazeConfig } = {}) {
 	const logger = createLogger({ name: 'GLAZE' });
 	const env = validateEnv(logger);
 	const validatedConfig = validateConfig(logger, config);
@@ -21,7 +21,7 @@ export async function glaze({ config }: { config?: GlazeConfig } = {}) {
 
 	const server = createGlazeServer({ env, logger, config: internalConfig });
 
-	await server.listen({ port: env.GLAZE_PORT });
+	server.listen({ port: env.GLAZE_PORT });
 
 	return server;
 }

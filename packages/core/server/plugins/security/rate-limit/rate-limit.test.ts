@@ -1,3 +1,4 @@
+import { Elysia } from 'elysia';
 import { describe, expect, it, spyOn } from 'bun:test';
 import type { Logger } from '@glaze/logger';
 import type { GlazeEnv } from '../../../validators/env';
@@ -195,19 +196,48 @@ describe('rateLimitPlugin', () => {
 			expect(plugin).toBeDefined();
 		});
 
-		it('should accept disabled rate limiting', () => {
-			const mockEnv = createMockEnv('production');
+		it('should not register middleware when disabled', async () => {
+			const mockEnv = createMockEnv('development');
 
-			const plugin = rateLimitPlugin(
-				{
-					rateLimit: { enabled: false, max: 60, duration: 60000 },
-					cors: { methods: [], allowedHeaders: [] },
-				},
-				mockEnv,
-				createMockLogger(),
+			const app = new Elysia()
+				.use(
+					rateLimitPlugin(
+						{
+							rateLimit: { enabled: false, max: 60, duration: 60000 },
+							cors: { methods: [], allowedHeaders: [] },
+						},
+						mockEnv,
+					),
+				)
+				.get('/test', () => 'ok');
+
+			const response = await app.handle(
+				new Request('http://localhost/test'),
 			);
 
-			expect(plugin).toBeDefined();
+			expect(response.headers.has('RateLimit-Limit')).toBe(false);
+		});
+
+		it('should register middleware when enabled', async () => {
+			const mockEnv = createMockEnv('development');
+
+			const app = new Elysia()
+				.use(
+					rateLimitPlugin(
+						{
+							rateLimit: { enabled: true, max: 60, duration: 60000 },
+							cors: { methods: [], allowedHeaders: [] },
+						},
+						mockEnv,
+					),
+				)
+				.get('/test', () => 'ok');
+
+			const response = await app.handle(
+				new Request('http://localhost/test'),
+			);
+
+			expect(response.headers.has('RateLimit-Limit')).toBe(true);
 		});
 
 		it('should handle custom generator function', () => {
