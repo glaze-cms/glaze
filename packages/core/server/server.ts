@@ -5,7 +5,7 @@ import { drizzle } from 'drizzle-orm/node-postgres';
 import { authPlugin } from './plugins/auth';
 import { healthCheckPlugin } from './plugins/health';
 import { adminPlugin } from './plugins/admin';
-import { corsPlugin } from './plugins/security';
+import { corsPlugin, rateLimitPlugin } from './plugins/security';
 
 /* Hooks */
 import { handleStart } from './hooks';
@@ -39,13 +39,28 @@ export function createGlazeServer({
 		.decorate('logger', logger)
 		.decorate('config', config)
 		.decorate('db', db)
+		.use(rateLimitPlugin(config.security, env, logger))
+		.get('/', () => ({
+			message: 'Glaze CMS Server',
+			admin: '/admin',
+			health: '/_health',
+		}))
 		.use(healthCheckPlugin(config.healthCheck))
 		.use(adminPlugin(config))
-		.use(corsPlugin(config.security, env, logger))
-		.use(authPlugin(config, env, db))
-		.onStart(handleStart);
+		.use(corsPlugin(config.security, env, logger));
 
-	const fullyQualifiedAdminAddress = `http://${glaze.server?.hostname}:${env.GLAZE_PORT}${config.adminPrefix}`;
+	// Construct server base URL for auth plugin
+	// Use GLAZE_SERVER_URL if provided, otherwise build from hostname:port
+	const serverBaseURL =
+		env.GLAZE_SERVER_URL ??
+		`http://${glaze.server?.hostname ?? 'localhost'}:${env.GLAZE_PORT}`;
+
+	// Add auth plugin with server URL
+	glaze.use(authPlugin(config, env, db, serverBaseURL));
+
+	glaze.onStart(({ decorator }) => handleStart({ decorator }));
+
+	const fullyQualifiedAdminAddress = `${serverBaseURL}${config.adminPrefix}`;
 	logger.info(
 		`🚀 Glaze Admin Dashboard available at: ${fullyQualifiedAdminAddress}`,
 	);

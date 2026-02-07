@@ -11,18 +11,19 @@ import { resolveConfig } from './server/config/resolver';
 import { createGlazeServer } from './server/server';
 
 /* Types */
-import type { Strict } from '@glaze/shared';
 import type { GlazeConfig } from './server/config/types';
 
-export function glaze<T extends GlazeConfig>({
-	config,
-}: { config?: Strict<T, GlazeConfig> } = {}) {
+export async function glaze({ config }: { config?: GlazeConfig } = {}) {
 	const logger = createLogger({ name: 'GLAZE' });
 	const env = validateEnv(logger);
 	const validatedConfig = validateConfig(logger, config);
 	const internalConfig = resolveConfig(validatedConfig);
 
-	return createGlazeServer({ env, logger, config: internalConfig });
+	const server = createGlazeServer({ env, logger, config: internalConfig });
+
+	await server.listen({ port: env.GLAZE_PORT });
+
+	return server;
 }
 
 export type Glaze = ReturnType<typeof glaze>;

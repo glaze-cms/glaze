@@ -34,16 +34,17 @@
 		"prepublishOnly": "bunx tsc -p tsconfig.build.json"
 	},
 	"dependencies": {
+		"@elysiajs/cors": "catalog:elysia",
 		"@glaze/admin": "workspace:*",
 		"@glaze/logger": "workspace:*",
 		"@glaze/shared": "workspace:*",
-		"elysia": "latest",
-		"@elysiajs/cors": "latest",
 		"better-auth": "catalog:auth",
-		"typebox": "latest",
 		"drizzle-kit": "catalog:drizzle",
+		"elysia": "catalog:elysia",
+		"elysia-rate-limit": "latest",
 		"pg": "latest",
-		"pino": "catalog:system"
+		"pino": "catalog:system",
+		"typebox": "catalog:validation"
 	},
 	"peerDependencies": {
 		"drizzle-orm": "catalog:drizzle"

@@ -1,6 +1,26 @@
 import type { BetterAuthOptions } from 'better-auth';
 
 /**
+ * Configuration for the BetterAuth Drizzle adapter.
+ */
+export type DrizzleAdapterConfig = {
+	/** Enable debug logging for the Drizzle adapter */
+	debugLogs?: boolean;
+};
+
+/**
+ * Allowed BetterAuth options that users can configure.
+ * Restricted options (database, appName, baseUrl, basePath, secret, etc.)
+ * are managed internally by Glaze and cannot be overridden.
+ */
+export type Auth = {
+	/** Email verification configuration */
+	emailVerification?: BetterAuthOptions['emailVerification'];
+	/** Email and password authentication configuration - enabled is always true */
+	emailAndPassword?: Omit<BetterAuthOptions['emailAndPassword'], 'enabled'>;
+};
+
+/**
  * Authentication configuration.
  *
  * By default, public authentication is enabled with email/password.
@@ -13,6 +33,10 @@ export type AuthConfig =
 	| { enabled: false }
 	| {
 			enabled?: true;
+			/** User-configurable BetterAuth options (restricted fields managed by Glaze) */
+			betterAuth?: Auth;
+			/** Drizzle adapter configuration */
+			drizzleAdapter?: DrizzleAdapterConfig;
 			emailVerification?: BetterAuthOptions['emailVerification'];
 			emailAndPassword?: Omit<
 				BetterAuthOptions['emailAndPassword'],

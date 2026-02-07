@@ -5,7 +5,7 @@ import type { Glaze } from '@glaze/core';
 export async function handleStart({
 	decorator,
 }: {
-	decorator: Glaze['decorator'];
+	decorator: Awaited<Glaze>['decorator'];
 }) {
 	const { logger, db } = decorator;
 
@@ -18,6 +18,4 @@ export async function handleStart({
 		}
 		process.exit(1);
 	});
-
-	logger.info('🧁 Glaze server started successfully.');
 }

@@ -1,6 +1,6 @@
 import { glaze } from '@glaze/core';
 
-glaze({
+await glaze({
 	config: {
 		schema: {},
 		adminPrefix: '/dashboard',

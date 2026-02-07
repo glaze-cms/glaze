@@ -10,53 +10,129 @@ import type { GlazeConfig } from '../../config/types';
  * Only validates structure and constraints - does NOT apply defaults.
  * Defaults are applied separately in the resolver.
  */
-const GlazeConfigValidationSchema = Type.Object({
-	apiPrefix: Type.Optional(
-		Type.String({
-			minLength: 1,
-			pattern: '^/',
-		}),
+/**
+ * Schema for validating user-configurable BetterAuth options.
+ * Restricted fields are managed by Glaze and cannot be overridden.
+ */
+const BetterAuthUserConfigSchema = Type.Object(
+	{
+		emailVerification: Type.Optional(
+			Type.Record(Type.String(), Type.Unknown()),
+		),
+		emailAndPassword: Type.Optional(Type.Record(Type.String(), Type.Unknown())),
+	},
+	{ additionalProperties: false },
+);
+
+/**
+ * Schema for validating the Drizzle adapter configuration.
+ */
+const DrizzleAdapterConfigSchema = Type.Object(
+	{
+		debugLogs: Type.Optional(Type.Boolean()),
+	},
+	{ additionalProperties: false },
+);
+
+/**
+ * Schema for validating authentication configuration.
+ */
+const AuthConfigSchema = Type.Union([
+	Type.Object(
+		{
+			enabled: Type.Literal(false),
+		},
+		{ additionalProperties: false },
 	),
-	adminPrefix: Type.Optional(
-		Type.String({
-			minLength: 1,
-			pattern: '^/',
-		}),
-	),
-	schema: Type.Record(Type.String(), Type.Unknown()),
-	healthCheck: Type.Optional(
-		Type.Object({
-			enabled: Type.Optional(Type.Boolean()),
-			path: Type.Optional(
-				Type.String({
-					minLength: 1,
-					pattern: '^/',
-				}),
+	Type.Object(
+		{
+			enabled: Type.Optional(Type.Literal(true)),
+			betterAuth: Type.Optional(BetterAuthUserConfigSchema),
+			drizzleAdapter: Type.Optional(DrizzleAdapterConfigSchema),
+			emailVerification: Type.Optional(
+				Type.Record(Type.String(), Type.Unknown()),
 			),
-		}),
+			emailAndPassword: Type.Optional(
+				Type.Record(Type.String(), Type.Unknown()),
+			),
+		},
+		{ additionalProperties: false },
 	),
-	security: Type.Optional(
-		Type.Object({
-			cors: Type.Optional(
-				Type.Object({
-					origin: Type.Optional(
-						Type.Union([
-							Type.Boolean(),
-							Type.String(),
-							// Use Unknown to accept RegExp objects (common CORS use case)
-							// Validation is handled by @elysiajs/cors at runtime
-							Type.Unknown(),
-							Type.Array(Type.Union([Type.String(), Type.Unknown()])),
-						]),
+]);
+
+const GlazeConfigValidationSchema = Type.Object(
+	{
+		apiPrefix: Type.Optional(
+			Type.String({
+				minLength: 1,
+				pattern: '^/',
+			}),
+		),
+		adminPrefix: Type.Optional(
+			Type.String({
+				minLength: 1,
+				pattern: '^/',
+			}),
+		),
+		auth: Type.Optional(AuthConfigSchema),
+		schema: Type.Record(Type.String(), Type.Unknown()),
+		healthCheck: Type.Optional(
+			Type.Object(
+				{
+					enabled: Type.Optional(Type.Boolean()),
+					path: Type.Optional(
+						Type.String({
+							minLength: 1,
+							pattern: '^/',
+						}),
 					),
-					methods: Type.Optional(Type.Array(Type.String())),
-					allowedHeaders: Type.Optional(Type.Array(Type.String())),
-				}),
+				},
+				{ additionalProperties: false },
 			),
-		}),
-	),
-	logger: Type.Optional(Type.Record(Type.String(), Type.Unknown())),
-});
+		),
+		security: Type.Optional(
+			Type.Object(
+				{
+					cors: Type.Optional(
+						Type.Object(
+							{
+								origin: Type.Optional(
+									Type.Union([
+										Type.Boolean(),
+										Type.String(),
+										// Use Unknown to accept RegExp objects (common CORS use case)
+										// Validation is handled by @elysiajs/cors at runtime
+										Type.Unknown(),
+										Type.Array(Type.Union([Type.String(), Type.Unknown()])),
+									]),
+								),
+								methods: Type.Optional(Type.Array(Type.String())),
+								allowedHeaders: Type.Optional(Type.Array(Type.String())),
+							},
+							{ additionalProperties: false },
+						),
+					),
+					rateLimit: Type.Optional(
+						Type.Object(
+							{
+								enabled: Type.Optional(Type.Boolean()),
+								max: Type.Optional(Type.Number({ minimum: 1 })),
+								duration: Type.Optional(Type.Number({ minimum: 1 })),
+								// Generator is a function - TypeBox can't validate function signatures easily
+								// Use Unknown and rely on runtime validation
+								generator: Type.Optional(Type.Unknown()),
+							},
+							{ additionalProperties: false },
+						),
+					),
+				},
+				{ additionalProperties: false },
+			),
+		),
+		logger: Type.Optional(Type.Record(Type.String(), Type.Unknown())),
+	},
+	{ additionalProperties: false },
+);
 
 // Compile schema once for efficient validation
 const ConfigValidator = Compile(GlazeConfigValidationSchema);

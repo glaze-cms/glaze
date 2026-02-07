@@ -1,2 +1,1 @@
-export { corsPlugin } from './cors';
 export { rateLimitPlugin } from './rate-limit';

@@ -333,6 +333,120 @@ describe('parseEnv', () => {
 			}
 		});
 
+		describe('GLAZE_SERVER_URL validation', () => {
+			test('should accept valid http:// URL', () => {
+				process.env = {
+					GLAZE_DATABASE_URL: 'postgresql://localhost:5432/test',
+					GLAZE_AUTH_SECRET: 'a'.repeat(32),
+					GLAZE_SERVER_URL: 'http://localhost:4000',
+				};
+
+				const result = parseEnv();
+
+				expect(result.success).toBe(true);
+				if (result.success) {
+					expect(result.env.GLAZE_SERVER_URL).toBe('http://localhost:4000');
+				}
+			});
+
+			test('should accept valid https:// URL', () => {
+				process.env = {
+					GLAZE_DATABASE_URL: 'postgresql://localhost:5432/test',
+					GLAZE_AUTH_SECRET: 'a'.repeat(32),
+					GLAZE_SERVER_URL: 'https://api.example.com',
+				};
+
+				const result = parseEnv();
+
+				expect(result.success).toBe(true);
+				if (result.success) {
+					expect(result.env.GLAZE_SERVER_URL).toBe('https://api.example.com');
+				}
+			});
+
+			test('should accept URL with port', () => {
+				process.env = {
+					GLAZE_DATABASE_URL: 'postgresql://localhost:5432/test',
+					GLAZE_AUTH_SECRET: 'a'.repeat(32),
+					GLAZE_SERVER_URL: 'https://api.example.com:8080',
+				};
+
+				const result = parseEnv();
+
+				expect(result.success).toBe(true);
+				if (result.success) {
+					expect(result.env.GLAZE_SERVER_URL).toBe(
+						'https://api.example.com:8080',
+					);
+				}
+			});
+
+			test('should reject URL without protocol', () => {
+				process.env = {
+					GLAZE_DATABASE_URL: 'postgresql://localhost:5432/test',
+					GLAZE_AUTH_SECRET: 'a'.repeat(32),
+					GLAZE_SERVER_URL: 'localhost:4000',
+				};
+
+				const result = parseEnv();
+
+				expect(result.success).toBe(false);
+				if (!result.success) {
+					expect(
+						result.errors.some((e) => e.variable === 'GLAZE_SERVER_URL'),
+					).toBe(true);
+				}
+			});
+
+			test('should reject URL with ftp:// protocol', () => {
+				process.env = {
+					GLAZE_DATABASE_URL: 'postgresql://localhost:5432/test',
+					GLAZE_AUTH_SECRET: 'a'.repeat(32),
+					GLAZE_SERVER_URL: 'ftp://files.example.com',
+				};
+
+				const result = parseEnv();
+
+				expect(result.success).toBe(false);
+				if (!result.success) {
+					expect(
+						result.errors.some((e) => e.variable === 'GLAZE_SERVER_URL'),
+					).toBe(true);
+				}
+			});
+
+			test('should reject empty string', () => {
+				process.env = {
+					GLAZE_DATABASE_URL: 'postgresql://localhost:5432/test',
+					GLAZE_AUTH_SECRET: 'a'.repeat(32),
+					GLAZE_SERVER_URL: '',
+				};
+
+				const result = parseEnv();
+
+				expect(result.success).toBe(false);
+				if (!result.success) {
+					expect(
+						result.errors.some((e) => e.variable === 'GLAZE_SERVER_URL'),
+					).toBe(true);
+				}
+			});
+
+			test('should allow missing GLAZE_SERVER_URL (optional)', () => {
+				process.env = {
+					GLAZE_DATABASE_URL: 'postgresql://localhost:5432/test',
+					GLAZE_AUTH_SECRET: 'a'.repeat(32),
+				};
+
+				const result = parseEnv();
+
+				expect(result.success).toBe(true);
+				if (result.success) {
+					expect(result.env.GLAZE_SERVER_URL).toBeUndefined();
+				}
+			});
+		});
+
 		test('should return multiple errors when multiple variables are invalid', () => {
 			process.env = {
 				// Missing GLAZE_DATABASE_URL and GLAZE_AUTH_SECRET
