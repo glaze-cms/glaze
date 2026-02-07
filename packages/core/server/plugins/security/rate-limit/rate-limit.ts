@@ -32,7 +32,7 @@ export const rateLimitPlugin = (
 	// Warn if production is running without explicit rate limiting
 	if (!shouldBePermissive && !rateLimitConfig.enabled && logger) {
 		logger.warn(
-			'Rate limiting is not enabled in production. This may expose your application to DDOS attacks.',
+			'Rate limiting is not enabled in production. This may expose your application to DDoS attacks.',
 		);
 	}
 

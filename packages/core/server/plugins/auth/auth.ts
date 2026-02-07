@@ -36,6 +36,7 @@ export const authPlugin = (config: GlazeInternalConfig, env: GlazeEnv) =>
 			database: drizzleAdapter(db, {
 				provider: 'pg',
 				usePlural: true,
+				...resolvedAuth.drizzleAdapter,
 			}),
 			secret: env.GLAZE_AUTH_SECRET,
 			emailAndPassword: resolvedAuth.emailAndPassword,

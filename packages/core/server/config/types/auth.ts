@@ -58,6 +58,8 @@ export type ResolvedAuthConfig = {
 	basePath: string;
 	emailAndPassword: BetterAuthOptions['emailAndPassword'];
 	emailVerification?: BetterAuthOptions['emailVerification'];
+	/** Drizzle adapter configuration */
+	drizzleAdapter?: DrizzleAdapterConfig;
 	/** Whether end-user auth routes are exposed */
 	publicAuthEnabled: boolean;
 };

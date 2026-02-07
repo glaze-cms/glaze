@@ -44,5 +44,8 @@ export function authResolver(
 		emailVerification:
 			betterAuthConfig?.emailVerification ??
 			(hasUserAuthConfig ? authConfig.emailVerification : undefined),
+		drizzleAdapter: hasUserAuthConfig
+			? authConfig.drizzleAdapter
+			: undefined,
 	};
 }
