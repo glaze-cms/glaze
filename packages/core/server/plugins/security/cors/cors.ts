@@ -38,7 +38,7 @@ export const corsPlugin = (
 	logger?: Logger,
 ) => {
 	const app = new Elysia({ name: '@glaze/cors' });
-	const corsConfig = config.cors;
+	const { cors: corsConfig } = config;
 
 	// Environment-aware default: permissive in dev, restrictive in prod
 	const shouldBePermissive =
