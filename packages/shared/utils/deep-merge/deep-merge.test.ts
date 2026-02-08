@@ -2,7 +2,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 
 import { expect, test, describe } from 'bun:test';
-import { deepMerge } from './merge';
+import { deepMerge } from './deep-merge';
 
 interface TestConfig {
 	a: number;

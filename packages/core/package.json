@@ -21,6 +21,10 @@
 		"./types": {
 			"types": "./dist/types.d.ts",
 			"default": "./types.ts"
+		},
+		"./schema": {
+			"types": "./dist/schema.d.ts",
+			"default": "./schema.ts"
 		}
 	},
 	"scripts": {
