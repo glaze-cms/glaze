@@ -75,4 +75,79 @@ describe('deepMerge', () => {
 		// a should stay 1 because source.a was undefined
 		expect(result).toEqual({ a: 1, b: 3 });
 	});
+
+	describe('prototype pollution prevention', () => {
+		test('should skip __proto__ keys', () => {
+			const target = { a: 1 };
+			const source = JSON.parse('{"__proto__": {"polluted": true}, "b": 2}');
+
+			const result = deepMerge(target, source);
+
+			expect((result as any).b).toBe(2);
+			expect((result as any).polluted).toBeUndefined();
+			// Ensure Object prototype is not polluted
+			expect(({} as any).polluted).toBeUndefined();
+		});
+
+		test('should skip constructor keys', () => {
+			const target = { a: 1 };
+			const source = { constructor: { polluted: true } } as any;
+
+			const result = deepMerge(target, source);
+
+			// constructor should not be overwritten
+			expect(result.constructor).toBe(Object);
+		});
+
+		test('should skip prototype keys', () => {
+			const target = { a: 1 };
+			const source = { prototype: { polluted: true } } as any;
+
+			const result = deepMerge(target, source);
+
+			expect((result as any).prototype).toBeUndefined();
+		});
+	});
+
+	describe('edge cases', () => {
+		test('should not merge non-plain objects (Date)', () => {
+			const date = new Date('2024-01-01');
+			const target = { date: new Date('2023-01-01') };
+			const source = { date };
+
+			const result = deepMerge(target, source);
+
+			// Date should be replaced, not recursively merged
+			expect(result.date).toBe(date);
+		});
+
+		test('should not merge non-plain objects (RegExp)', () => {
+			const regex = /test/i;
+			const target = { pattern: /old/ };
+			const source = { pattern: regex };
+
+			const result = deepMerge(target, source);
+
+			expect(result.pattern).toBe(regex);
+		});
+
+		test('should handle empty source object', () => {
+			const target = { a: 1, b: 2 };
+			const result = deepMerge(target, {});
+			expect(result).toEqual({ a: 1, b: 2 });
+		});
+
+		test('should handle empty target object', () => {
+			const target = {} as { a?: number };
+			const source = { a: 1 };
+			const result = deepMerge(target, source);
+			expect(result).toEqual({ a: 1 });
+		});
+
+		test('should return source when target is falsy', () => {
+			const source = { a: 1 };
+			// @ts-expect-error - testing runtime resilience
+			expect(deepMerge(null, source)).toEqual({ a: 1 });
+		});
+	});
 });

@@ -1,6 +1,24 @@
 import { expect, test, describe, spyOn } from 'bun:test';
 import { createLogger } from './index';
 
+const captureStdout = (fn: () => void): string => {
+	const writes: string[] = [];
+	const writeSpy = spyOn(process.stdout, 'write').mockImplementation(
+		(chunk: unknown) => {
+			writes.push(String(chunk));
+			return true;
+		},
+	);
+
+	try {
+		fn();
+	} finally {
+		writeSpy.mockRestore();
+	}
+
+	return writes.join('');
+};
+
 describe('Logger', () => {
 	test('should handle uppercase log levels (e.g., DEBUG)', () => {
 		const logger = createLogger({}, { LOG_LEVEL: 'DEBUG' });
@@ -24,22 +42,12 @@ describe('Logger', () => {
 
 	describe('Environment-based behavior', () => {
 		test('should use JSON output in production with NODE_ENV', () => {
-			// Spy on stdout to capture the actual output
-			const writes: string[] = [];
-			const writeSpy = spyOn(process.stdout, 'write').mockImplementation(
-				(chunk: unknown) => {
-					writes.push(String(chunk));
-					return true;
-				},
-			);
-
-			const logger = createLogger({}, { NODE_ENV: 'production' });
-			logger.info('test message');
-
-			writeSpy.mockRestore();
+			const output = captureStdout(() => {
+				const logger = createLogger({}, { NODE_ENV: 'production' });
+				logger.info('test message');
+			});
 
 			// In production, the output should be valid JSON
-			const output = writes.join('');
 			const parsed = JSON.parse(output) as {
 				level: string;
 				msg: string;
@@ -52,21 +60,12 @@ describe('Logger', () => {
 		});
 
 		test('should use JSON output in production with BUN_ENV', () => {
-			const writes: string[] = [];
-			const writeSpy = spyOn(process.stdout, 'write').mockImplementation(
-				(chunk: unknown) => {
-					writes.push(String(chunk));
-					return true;
-				},
-			);
-
-			const logger = createLogger({}, { BUN_ENV: 'production' });
-			logger.info('test message');
-
-			writeSpy.mockRestore();
+			const output = captureStdout(() => {
+				const logger = createLogger({}, { BUN_ENV: 'production' });
+				logger.info('test message');
+			});
 
 			// BUN_ENV should work the same as NODE_ENV
-			const output = writes.join('');
 			const parsed = JSON.parse(output) as {
 				level: string;
 				msg: string;
@@ -80,23 +79,14 @@ describe('Logger', () => {
 		test('should prefer BUN_ENV over NODE_ENV when both are set', () => {
 			// When BUN_ENV is production and NODE_ENV is development,
 			// should use production mode (JSON output)
-			const writes: string[] = [];
-			const writeSpy = spyOn(process.stdout, 'write').mockImplementation(
-				(chunk: unknown) => {
-					writes.push(String(chunk));
-					return true;
-				},
-			);
+			const output = captureStdout(() => {
+				const logger = createLogger(
+					{},
+					{ BUN_ENV: 'production', NODE_ENV: 'development' },
+				);
+				logger.info('test');
+			});
 
-			const logger = createLogger(
-				{},
-				{ BUN_ENV: 'production', NODE_ENV: 'development' },
-			);
-			logger.info('test');
-
-			writeSpy.mockRestore();
-
-			const output = writes.join('');
 			const parsed = JSON.parse(output) as {
 				level: string;
 				name: string;
@@ -142,6 +132,85 @@ describe('Logger', () => {
 			// We can't directly inspect the redact config, but we can verify
 			// the logger was created successfully with the custom redact paths
 			expect(logger.bindings().name).toBe('GLAZE');
+		});
+
+		test('should redact password fields in production output', () => {
+			const output = captureStdout(() => {
+				const logger = createLogger({}, { NODE_ENV: 'production' });
+				logger.info({ user: { password: 'super-secret-123' } }, 'user login');
+			});
+
+			expect(output).toContain('[REDACTED]');
+			expect(output).not.toContain('super-secret-123');
+		});
+
+		test('should redact token fields in production output', () => {
+			const output = captureStdout(() => {
+				const logger = createLogger({}, { NODE_ENV: 'production' });
+				logger.info({ auth: { token: 'jwt-token-value' } }, 'auth event');
+			});
+
+			expect(output).toContain('[REDACTED]');
+			expect(output).not.toContain('jwt-token-value');
+		});
+
+		test('should redact apiKey fields in production output', () => {
+			const output = captureStdout(() => {
+				const logger = createLogger({}, { NODE_ENV: 'production' });
+				logger.info({ service: { apiKey: 'sk-12345' } }, 'api call');
+			});
+
+			expect(output).toContain('[REDACTED]');
+			expect(output).not.toContain('sk-12345');
+		});
+
+		test('should redact secret fields in production output', () => {
+			const output = captureStdout(() => {
+				const logger = createLogger({}, { NODE_ENV: 'production' });
+				logger.info({ config: { secret: 'my-secret-value' } }, 'config loaded');
+			});
+
+			expect(output).toContain('[REDACTED]');
+			expect(output).not.toContain('my-secret-value');
+		});
+
+		test('should redact DATABASE_URL in production output', () => {
+			const output = captureStdout(() => {
+				const logger = createLogger({}, { NODE_ENV: 'production' });
+				logger.info(
+					{ DATABASE_URL: 'postgres://user:pass@host:5432/db' },
+					'env loaded',
+				);
+			});
+
+			expect(output).toContain('[REDACTED]');
+			expect(output).not.toContain('postgres://user:pass@host:5432/db');
+		});
+
+		test('should redact custom paths when provided', () => {
+			const output = captureStdout(() => {
+				const logger = createLogger(
+					{ redact: ['customSecret'] },
+					{ NODE_ENV: 'production' },
+				);
+				logger.info({ customSecret: 'should-be-hidden' }, 'custom data');
+			});
+
+			expect(output).toContain('[REDACTED]');
+			expect(output).not.toContain('should-be-hidden');
+		});
+
+		test('should not redact non-sensitive fields', () => {
+			const output = captureStdout(() => {
+				const logger = createLogger({}, { NODE_ENV: 'production' });
+				logger.info(
+					{ username: 'john', email: 'john@example.com' },
+					'user data',
+				);
+			});
+
+			expect(output).toContain('john');
+			expect(output).toContain('john@example.com');
 		});
 	});
 });
