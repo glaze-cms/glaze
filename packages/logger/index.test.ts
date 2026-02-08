@@ -143,5 +143,144 @@ describe('Logger', () => {
 			// the logger was created successfully with the custom redact paths
 			expect(logger.bindings().name).toBe('GLAZE');
 		});
+
+		test('should redact password fields in production output', () => {
+			const writes: string[] = [];
+			const writeSpy = spyOn(process.stdout, 'write').mockImplementation(
+				(chunk: unknown) => {
+					writes.push(String(chunk));
+					return true;
+				},
+			);
+
+			const logger = createLogger({}, { NODE_ENV: 'production' });
+			logger.info({ user: { password: 'super-secret-123' } }, 'user login');
+
+			writeSpy.mockRestore();
+
+			const output = writes.join('');
+			expect(output).toContain('[REDACTED]');
+			expect(output).not.toContain('super-secret-123');
+		});
+
+		test('should redact token fields in production output', () => {
+			const writes: string[] = [];
+			const writeSpy = spyOn(process.stdout, 'write').mockImplementation(
+				(chunk: unknown) => {
+					writes.push(String(chunk));
+					return true;
+				},
+			);
+
+			const logger = createLogger({}, { NODE_ENV: 'production' });
+			logger.info({ auth: { token: 'jwt-token-value' } }, 'auth event');
+
+			writeSpy.mockRestore();
+
+			const output = writes.join('');
+			expect(output).toContain('[REDACTED]');
+			expect(output).not.toContain('jwt-token-value');
+		});
+
+		test('should redact apiKey fields in production output', () => {
+			const writes: string[] = [];
+			const writeSpy = spyOn(process.stdout, 'write').mockImplementation(
+				(chunk: unknown) => {
+					writes.push(String(chunk));
+					return true;
+				},
+			);
+
+			const logger = createLogger({}, { NODE_ENV: 'production' });
+			logger.info({ service: { apiKey: 'sk-12345' } }, 'api call');
+
+			writeSpy.mockRestore();
+
+			const output = writes.join('');
+			expect(output).toContain('[REDACTED]');
+			expect(output).not.toContain('sk-12345');
+		});
+
+		test('should redact secret fields in production output', () => {
+			const writes: string[] = [];
+			const writeSpy = spyOn(process.stdout, 'write').mockImplementation(
+				(chunk: unknown) => {
+					writes.push(String(chunk));
+					return true;
+				},
+			);
+
+			const logger = createLogger({}, { NODE_ENV: 'production' });
+			logger.info({ config: { secret: 'my-secret-value' } }, 'config loaded');
+
+			writeSpy.mockRestore();
+
+			const output = writes.join('');
+			expect(output).toContain('[REDACTED]');
+			expect(output).not.toContain('my-secret-value');
+		});
+
+		test('should redact DATABASE_URL in production output', () => {
+			const writes: string[] = [];
+			const writeSpy = spyOn(process.stdout, 'write').mockImplementation(
+				(chunk: unknown) => {
+					writes.push(String(chunk));
+					return true;
+				},
+			);
+
+			const logger = createLogger({}, { NODE_ENV: 'production' });
+			logger.info(
+				{ DATABASE_URL: 'postgres://user:pass@host:5432/db' },
+				'env loaded',
+			);
+
+			writeSpy.mockRestore();
+
+			const output = writes.join('');
+			expect(output).toContain('[REDACTED]');
+			expect(output).not.toContain('postgres://user:pass@host:5432/db');
+		});
+
+		test('should redact custom paths when provided', () => {
+			const writes: string[] = [];
+			const writeSpy = spyOn(process.stdout, 'write').mockImplementation(
+				(chunk: unknown) => {
+					writes.push(String(chunk));
+					return true;
+				},
+			);
+
+			const logger = createLogger(
+				{ redact: ['customSecret'] },
+				{ NODE_ENV: 'production' },
+			);
+			logger.info({ customSecret: 'should-be-hidden' }, 'custom data');
+
+			writeSpy.mockRestore();
+
+			const output = writes.join('');
+			expect(output).toContain('[REDACTED]');
+			expect(output).not.toContain('should-be-hidden');
+		});
+
+		test('should not redact non-sensitive fields', () => {
+			const writes: string[] = [];
+			const writeSpy = spyOn(process.stdout, 'write').mockImplementation(
+				(chunk: unknown) => {
+					writes.push(String(chunk));
+					return true;
+				},
+			);
+
+			const logger = createLogger({}, { NODE_ENV: 'production' });
+			logger.info({ username: 'john', email: 'john@example.com' }, 'user data');
+
+			writeSpy.mockRestore();
+
+			const output = writes.join('');
+			expect(output).toContain('john');
+			expect(output).toContain('john@example.com');
+		});
 	});
 });
