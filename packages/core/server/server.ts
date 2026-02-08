@@ -36,6 +36,7 @@ export function createGlazeServer({
 		.decorate('logger', logger)
 		.decorate('config', config)
 		.decorate('db', drizzle(env.GLAZE_DATABASE_URL, { schema: config.schema }))
+		.decorate('schema', config.schema)
 		.use(rateLimitPlugin(config.security, env, logger))
 		.use(healthCheckPlugin(config.healthCheck))
 		.use(adminPlugin(config))
