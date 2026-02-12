@@ -14,11 +14,14 @@ import { authResolver } from '../../config/resolver/auth';
  * @param env - The validated environment variables
  * @returns A plugin function that receives the Elysia instance with `db` in decorators
  */
-export const authPlugin = (config: GlazeInternalConfig, env: GlazeEnv) =>
-	(app: Elysia<
-		string,
-		{ decorator: { db: DB }; store: {}; derive: {}; resolve: {} }
-	>) => {
+export const authPlugin =
+	(config: GlazeInternalConfig, env: GlazeEnv) =>
+	(
+		app: Elysia<
+			string,
+			{ decorator: { db: DB }; store: {}; derive: {}; resolve: {} }
+		>,
+	) => {
 		const { db } = app.decorator;
 
 		const resolvedAuth = authResolver(
@@ -29,6 +32,7 @@ export const authPlugin = (config: GlazeInternalConfig, env: GlazeEnv) =>
 		const baseURL =
 			env.GLAZE_SERVER_URL ?? `http://localhost:${env.GLAZE_PORT}`;
 
+		// Initialize Better Auth with the resolved configuration and the Drizzle adapter
 		const auth = betterAuth({
 			appName: resolvedAuth.appName,
 			baseURL,
@@ -46,6 +50,7 @@ export const authPlugin = (config: GlazeInternalConfig, env: GlazeEnv) =>
 			},
 		});
 
+		// Mount the Better Auth plugin and derive user and session information for each request
 		return app
 			.decorate('auth', auth)
 			.mount(auth.handler)

@@ -10,6 +10,9 @@ import { corsPlugin, rateLimitPlugin } from './plugins/security';
 /* Hooks */
 import { handleStart } from './hooks';
 
+/* Schema */
+import * as authSchema from '../schema';
+
 /*  Types */
 import type { GlazeEnv } from './validators/env';
 import type { Logger } from '@glaze/logger';
@@ -31,12 +34,14 @@ export function createGlazeServer({
 	config: GlazeInternalConfig;
 	logger: Logger;
 }) {
+	const schema = { ...config.schema, ...authSchema };
+
 	const glaze = new Elysia({ name: '@glaze/server' })
 		.decorate('env', env)
 		.decorate('logger', logger)
 		.decorate('config', config)
-		.decorate('db', drizzle(env.GLAZE_DATABASE_URL, { schema: config.schema }))
-		.decorate('schema', config.schema)
+		.decorate('schema', schema)
+		.decorate('db', drizzle(env.GLAZE_DATABASE_URL, { schema }))
 		.use(rateLimitPlugin(config.security, env, logger))
 		.use(healthCheckPlugin(config.healthCheck))
 		.use(adminPlugin(config))
