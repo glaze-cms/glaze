@@ -1,5 +1,5 @@
 import { resolve, dirname, relative } from 'node:path';
-import { exists } from 'fs/promises';
+import { access } from 'node:fs/promises';
 
 export interface MergeConfigOptions {
 	/** Relative or absolute path to the user's drizzle config file. */
@@ -23,9 +23,24 @@ export async function mergeConfig({
 	const cwd = process.cwd();
 	const absoluteUserConfigPath = resolve(cwd, userConfigPath);
 
-	// Validate user config exists
-	if (!(await exists(absoluteUserConfigPath))) {
-		throw new Error(`Drizzle config not found: ${userConfigPath}`);
+	try {
+		await access(absoluteUserConfigPath);
+	} catch (err) {
+		const code = (err as NodeJS.ErrnoException).code;
+		if (code === 'ENOENT') {
+			throw new Error(`Drizzle config not found: ${userConfigPath}`);
+		}
+		throw err;
+	}
+
+	try {
+		await access(glazeSchemaPath);
+	} catch (err) {
+		const code = (err as NodeJS.ErrnoException).code;
+		if (code === 'ENOENT') {
+			throw new Error(`Glaze schema not found at: ${glazeSchemaPath}`);
+		}
+		throw err;
 	}
 
 	const userConfigDir = dirname(absoluteUserConfigPath);

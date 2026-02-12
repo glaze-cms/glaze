@@ -1,4 +1,4 @@
-import { expect, test, describe, beforeEach, afterEach } from 'bun:test';
+import { expect, test, describe, beforeEach, afterEach, mock } from 'bun:test';
 import { resolve, dirname } from 'node:path';
 import { mkdirSync, writeFileSync, rmSync, readFileSync } from 'node:fs';
 import { mergeConfig } from './merge-schema';
@@ -127,15 +127,22 @@ describe('mergeConfig', () => {
 		}
 	});
 
-	test('should handle absolute userConfigPath', async () => {
-		const result = await mergeConfig({
-			userConfigPath: USER_CONFIG_PATH,
-			glazeSchemaPath: GLAZE_SCHEMA_PATH,
-		});
+	test('should handle relative userConfigPath', async () => {
+		const originalCwd = process.cwd();
+		process.chdir(TMP_DIR);
 
-		expect(result).toContain('.glaze/drizzle.merged.config.ts');
-		const content = readFileSync(result, 'utf-8');
-		expect(content).toContain("import userConfig from '../drizzle.config'");
+		try {
+			const result = await mergeConfig({
+				userConfigPath: './drizzle.config.ts',
+				glazeSchemaPath: GLAZE_SCHEMA_PATH,
+			});
+
+			expect(result).toContain('.glaze/drizzle.merged.config.ts');
+			const content = readFileSync(result, 'utf-8');
+			expect(content).toContain("import userConfig from '../drizzle.config'");
+		} finally {
+			process.chdir(originalCwd);
+		}
 	});
 
 	test('should include DATABASE_URL in dbCredentials', async () => {
@@ -146,5 +153,70 @@ describe('mergeConfig', () => {
 
 		const content = readFileSync(result, 'utf-8');
 		expect(content).toContain('process.env.DATABASE_URL');
+	});
+
+	test('should throw if glaze schema path does not exist', async () => {
+		const fakePath = resolve(TMP_DIR, 'nonexistent/schema.ts');
+
+		expect(
+			mergeConfig({
+				userConfigPath: USER_CONFIG_PATH,
+				glazeSchemaPath: fakePath,
+			}),
+		).rejects.toThrow('Glaze schema not found');
+	});
+
+	test('should throw and not write merged config when Bun.write fails', async () => {
+		const originalWrite = Bun.write;
+		const writeMock = mock(() => {
+			throw new Error('Permission denied');
+		});
+		Bun.write = writeMock as typeof Bun.write;
+
+		try {
+			await expect(
+				mergeConfig({
+					userConfigPath: USER_CONFIG_PATH,
+					glazeSchemaPath: GLAZE_SCHEMA_PATH,
+				}),
+			).rejects.toThrow('Permission denied');
+
+			const mergedPath = resolve(
+				dirname(USER_CONFIG_PATH),
+				'.glaze',
+				'drizzle.merged.config.ts',
+			);
+			try {
+				readFileSync(mergedPath);
+				throw new Error('Expected file not to exist');
+			} catch (err) {
+				expect((err as NodeJS.ErrnoException).code).toBe('ENOENT');
+			}
+		} finally {
+			Bun.write = originalWrite;
+		}
+	});
+
+	test('should not strip non-.ts extensions from import paths', async () => {
+		const jsConfigPath = resolve(TMP_DIR, 'drizzle.config.js');
+		const jsSchemaPath = resolve(
+			TMP_DIR,
+			'node_modules/@glaze/core/schema.js',
+		);
+
+		writeFileSync(jsConfigPath, 'export default {}');
+		mkdirSync(dirname(jsSchemaPath), { recursive: true });
+		writeFileSync(jsSchemaPath, 'export const authSchema = {}');
+
+		const result = await mergeConfig({
+			userConfigPath: jsConfigPath,
+			glazeSchemaPath: jsSchemaPath,
+		});
+
+		const content = readFileSync(result, 'utf-8');
+
+		// .js extensions should be preserved since only .ts is stripped
+		expect(content).toContain("import userConfig from '../drizzle.config.js'");
+		expect(content).toContain('node_modules/@glaze/core/schema.js');
 	});
 });
