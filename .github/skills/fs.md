@@ -85,7 +85,7 @@ try {
 
 **Mental Model**
 
-```
+```text
 Attempt operation → Handle failure
 NOT
 Check → Attempt → Hope nothing changed
@@ -142,7 +142,7 @@ Avoid:
 
 Agents MUST avoid:
 
-```
+```text
 readFile().slice()
 readFileSync().slice()
 readFile() when file size is unknown and potentially large
@@ -182,7 +182,7 @@ try {
 
 If you see patterns like:
 
-```
+```text
 exists → stat
 exists → read
 exists → delete
@@ -190,7 +190,7 @@ exists → delete
 
 Replace with:
 
-```
+```text
 attempt → catch error
 ```
 
@@ -222,20 +222,20 @@ try {
 
 ### Memory
 
-```
+```text
 readFile().slice()
 readFileSync().slice()
 ```
 
 ### Race Conditions
 
-```
+```text
 existsSync() before any other fs operation
 ```
 
 ### Reinventing OS Features
 
-```
+```text
 manual recursive delete
 manual recursive copy
 manual mkdir chains
