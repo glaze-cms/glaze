@@ -1,0 +1,19 @@
+{
+	"name": "create-glaze-app",
+	"version": "0.0.24",
+	"type": "module",
+	"description": "The rapid-scaffolding CLI for Glaze CMS",
+	"bin": {
+		"create-glaze-app": "./index.ts"
+	},
+	"scripts": {
+		"dev": "bun --watch index.ts",
+		"test": "bun test"
+	},
+	"dependencies": {
+		"@clack/prompts": "^1.0.0-alpha.9"
+	},
+	"devDependencies": {
+		"typescript": "^5.0.0"
+	}
+}
