@@ -18,6 +18,4 @@ export async function handleStart({
 		}
 		process.exit(1);
 	});
-
-	logger.info('🧁 Glaze server started successfully.');
 }

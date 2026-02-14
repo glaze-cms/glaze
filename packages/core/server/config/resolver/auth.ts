@@ -3,8 +3,8 @@ import type { AuthConfig, ResolvedAuthConfig } from '../../config/types';
 /**
  * Resolves auth configuration with sensible defaults.
  *
- * @param authConfig - User-provided auth configuration (optional)
  * @param apiPrefix - The API prefix from config (e.g., "/api")
+ * @param authConfig - User-provided auth configuration (optional)
  * @returns Resolved auth configuration with defaults applied
  *
  * @remarks
@@ -24,16 +24,28 @@ export function authResolver(
 	const hasUserAuthConfig =
 		authConfig !== undefined && authConfig.enabled !== false;
 
+	// Normalize apiPrefix to remove trailing slashes
+	const normalizedPrefix = apiPrefix.replace(/\/+$/, '');
+
+	// Get user-provided BetterAuth config (either from betterAuth or top-level legacy fields)
+	const betterAuthConfig = hasUserAuthConfig
+		? authConfig.betterAuth
+		: undefined;
+
 	return {
 		appName: 'Glaze CMS',
-		basePath: `${apiPrefix}/auth`,
+		basePath: `${normalizedPrefix}/auth`,
 		publicAuthEnabled,
 		emailAndPassword: {
-			...(hasUserAuthConfig ? authConfig.emailAndPassword : undefined),
+			...(betterAuthConfig?.emailAndPassword ??
+				(hasUserAuthConfig ? authConfig.emailAndPassword : undefined)),
 			enabled: true,
 		},
-		emailVerification: hasUserAuthConfig
-			? authConfig.emailVerification
+		emailVerification:
+			betterAuthConfig?.emailVerification ??
+			(hasUserAuthConfig ? authConfig.emailVerification : undefined),
+		drizzleAdapter: hasUserAuthConfig
+			? authConfig.drizzleAdapter
 			: undefined,
 	};
 }

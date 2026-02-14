@@ -1,6 +1,6 @@
 {
 	"name": "@glaze/core",
-	"version": "0.0.21",
+	"version": "0.0.22",
 	"description": "Core module of the Glaze framework, responsible for running the CMS server and providing essential functionality.",
 	"license": "MIT",
 	"type": "module",
@@ -21,6 +21,10 @@
 		"./types": {
 			"types": "./dist/types.d.ts",
 			"default": "./types.ts"
+		},
+		"./schema": {
+			"types": "./dist/schema.d.ts",
+			"default": "./schema.ts"
 		}
 	},
 	"scripts": {
@@ -34,16 +38,17 @@
 		"prepublishOnly": "bunx tsc -p tsconfig.build.json"
 	},
 	"dependencies": {
+		"@elysiajs/cors": "catalog:elysia",
 		"@glaze/admin": "workspace:*",
 		"@glaze/logger": "workspace:*",
 		"@glaze/shared": "workspace:*",
-		"elysia": "latest",
-		"@elysiajs/cors": "latest",
 		"better-auth": "catalog:auth",
-		"typebox": "latest",
 		"drizzle-kit": "catalog:drizzle",
+		"elysia": "catalog:elysia",
+		"elysia-rate-limit": "latest",
 		"pg": "latest",
-		"pino": "catalog:system"
+		"pino": "catalog:system",
+		"typebox": "catalog:validation"
 	},
 	"peerDependencies": {
 		"drizzle-orm": "catalog:drizzle"
