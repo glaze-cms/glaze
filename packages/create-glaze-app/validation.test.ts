@@ -28,6 +28,30 @@ describe('validateProjectName', () => {
 		);
 	});
 
+	test('rejects ".." traversal', () => {
+		expect(validateProjectName('../my-app')).toBe(
+			'Please use a folder name like "my-glaze-app" without ".." segments.',
+		);
+	});
+
+	test('rejects nested ".." traversal', () => {
+		expect(validateProjectName('a/../../my-app')).toBe(
+			'Please use a folder name like "my-glaze-app" without ".." segments.',
+		);
+	});
+
+	test('rejects bare ".."', () => {
+		expect(validateProjectName('..')).toBe(
+			'Please use a folder name like "my-glaze-app" without ".." segments.',
+		);
+	});
+
+	test('rejects bare "."', () => {
+		expect(validateProjectName('.')).toBe(
+			'Please use a folder name like "my-glaze-app" without ".." segments.',
+		);
+	});
+
 	test('accepts simple folder name', () => {
 		expect(validateProjectName('my-app')).toBeUndefined();
 	});

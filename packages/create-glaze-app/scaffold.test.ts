@@ -1,5 +1,5 @@
 import { describe, expect, test, afterEach } from 'bun:test';
-import { rm } from 'node:fs/promises';
+import { chmod, mkdir, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { scaffold } from './scaffold';
@@ -96,15 +96,39 @@ describe('scaffold', () => {
 		expect(posts).toContain('pgTable');
 	});
 
-	test('returns error for permission-denied paths', async () => {
-		const result = await scaffold('/proc/fake-glaze-app', {
-			projectName: 'fake',
+	test('returns EEXIST error when directory already exists', async () => {
+		const projectDir = join(testDir, 'already-exists');
+		await mkdir(projectDir, { recursive: true });
+
+		const result = await scaffold(projectDir, {
+			projectName: 'already-exists',
 			includeExampleSchema: false,
 		});
 
 		expect(result.success).toBe(false);
 		if (result.success) return;
 
-		expect(['EACCES', 'EPERM', 'EROFS']).toContain(result.code);
+		expect(result.code).toBe('EEXIST');
+		expect(result.message).toBe('Directory already exists.');
+	});
+
+	test('returns error for permission-denied paths', async () => {
+		const readOnlyDir = join(testDir, 'readonly');
+		await mkdir(readOnlyDir, { recursive: true });
+		await chmod(readOnlyDir, 0o444);
+
+		try {
+			const result = await scaffold(join(readOnlyDir, 'child'), {
+				projectName: 'child',
+				includeExampleSchema: false,
+			});
+
+			expect(result.success).toBe(false);
+			if (result.success) return;
+
+			expect(['EACCES', 'EPERM']).toContain(result.code);
+		} finally {
+			await chmod(readOnlyDir, 0o755);
+		}
 	});
 });

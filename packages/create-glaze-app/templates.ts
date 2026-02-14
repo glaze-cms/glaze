@@ -22,6 +22,9 @@ export function getTemplateFiles(
 				dependencies: {
 					'@glaze/cms': 'latest',
 				},
+				devDependencies: {
+					'@types/bun': 'latest',
+				},
 			},
 			null,
 			'\t',
@@ -54,7 +57,7 @@ await glaze({
 					module: 'Preserve',
 					strict: true,
 					outDir: 'dist',
-					types: ['bun-types'],
+					types: ['bun'],
 				},
 				include: ['*.ts', '**/*.ts'],
 			},
@@ -76,7 +79,7 @@ export default defineConfig({
 \tdialect: 'postgresql',
 \tout: './drizzle',
 \tdbCredentials: {
-\t\turl: process.env.DATABASE_URL as string,
+\t\turl: (process.env.GLAZE_DATABASE_URL ?? process.env.DATABASE_URL) as string,
 \t},
 });
 `;
