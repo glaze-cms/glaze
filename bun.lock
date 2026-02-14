@@ -72,12 +72,14 @@
     },
     "packages/create-glaze-app": {
       "name": "create-glaze-app",
-      "version": "0.0.1",
+      "version": "0.0.24",
       "bin": {
         "create-glaze-app": "./index.ts",
       },
+      "dependencies": {
+        "@clack/prompts": "latest",
+      },
       "devDependencies": {
-        "@clack/prompts": "^1.0.0-alpha.9",
         "typescript": "^5.0.0",
       },
     },
