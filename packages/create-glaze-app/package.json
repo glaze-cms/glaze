@@ -2,7 +2,12 @@
 	"name": "create-glaze-app",
 	"version": "0.0.23",
 	"type": "module",
+	"license": "MIT",
 	"description": "The rapid-scaffolding CLI for Glaze CMS",
+	"files": [
+		"*.ts",
+		"!*.test.ts"
+	],
 	"bin": {
 		"create-glaze-app": "./index.ts"
 	},

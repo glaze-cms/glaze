@@ -1,4 +1,4 @@
-import { mkdir } from 'node:fs/promises';
+import { mkdir, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { getTemplateFiles, type TemplateOptions } from './templates';
 
@@ -69,8 +69,18 @@ export async function scaffold(
 
 	const files = getTemplateFiles(options);
 
-	for (const [filePath, content] of Object.entries(files)) {
-		await Bun.write(join(projectDir, filePath), content);
+	try {
+		for (const [filePath, content] of Object.entries(files)) {
+			await Bun.write(join(projectDir, filePath), content);
+		}
+	} catch (err: unknown) {
+		await rm(projectDir, { recursive: true, force: true });
+		const fsErr = err as NodeJS.ErrnoException;
+		return {
+			success: false,
+			code: fsErr.code ?? 'WRITE_FAILED',
+			message: `Failed to write files: ${fsErr.message}`,
+		};
 	}
 
 	return { success: true, files: Object.keys(files) };
