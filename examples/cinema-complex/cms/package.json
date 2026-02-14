@@ -3,7 +3,7 @@
 	"private": true,
 	"type": "module",
 	"dependencies": {
-		"@glaze/cms": "^0.0.22"
+		"@glaze/cms": "^0.0.23"
 	},
 	"engines": {
 		"bun": "1"
