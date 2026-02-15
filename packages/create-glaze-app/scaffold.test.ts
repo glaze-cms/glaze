@@ -3,8 +3,14 @@ import { chmod, mkdir, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { scaffold } from './scaffold';
+import type { TemplateOptions } from './templates';
 
 const testDir = join(tmpdir(), 'glaze-cli-test');
+
+const defaults: Pick<TemplateOptions, 'databaseUrl' | 'authSecret'> = {
+	databaseUrl: 'postgresql://localhost:5432/test_db',
+	authSecret: 'a'.repeat(64),
+};
 
 afterEach(async () => {
 	try {
@@ -20,6 +26,7 @@ describe('scaffold', () => {
 		const result = await scaffold(projectDir, {
 			projectName: 'no-schema',
 			includeExampleSchema: false,
+			...defaults,
 		});
 
 		expect(result.success).toBe(true);
@@ -29,7 +36,8 @@ describe('scaffold', () => {
 			'package.json',
 			'index.ts',
 			'tsconfig.json',
-			'.env.example',
+			'.gitignore',
+			'.env',
 		]);
 
 		const pkg = await Bun.file(join(projectDir, 'package.json')).json();
@@ -44,6 +52,7 @@ describe('scaffold', () => {
 		const result = await scaffold(projectDir, {
 			projectName: 'with-schema',
 			includeExampleSchema: true,
+			...defaults,
 		});
 
 		expect(result.success).toBe(true);
@@ -64,11 +73,32 @@ describe('scaffold', () => {
 		expect(schemaIndex).toContain("from './authors'");
 	});
 
+	test('writes .env with database URL and auth secret', async () => {
+		const projectDir = join(testDir, 'env-test');
+		const result = await scaffold(projectDir, {
+			projectName: 'env-test',
+			includeExampleSchema: false,
+			databaseUrl: 'postgresql://user:pass@host:5432/mydb',
+			authSecret: 'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4',
+		});
+
+		expect(result.success).toBe(true);
+		if (!result.success) return;
+
+		const env = await Bun.file(join(projectDir, '.env')).text();
+		expect(env).toContain(
+			'GLAZE_DATABASE_URL=postgresql://user:pass@host:5432/mydb',
+		);
+		expect(env).toContain('GLAZE_AUTH_SECRET=a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4');
+		expect(env).toContain('GLAZE_PORT=4000');
+	});
+
 	test('creates nested directories like a/b/my-app', async () => {
 		const projectDir = join(testDir, 'a', 'b', 'my-app');
 		const result = await scaffold(projectDir, {
 			projectName: 'my-app',
 			includeExampleSchema: false,
+			...defaults,
 		});
 
 		expect(result.success).toBe(true);
@@ -83,6 +113,7 @@ describe('scaffold', () => {
 		const result = await scaffold(projectDir, {
 			projectName: 'z',
 			includeExampleSchema: true,
+			...defaults,
 		});
 
 		expect(result.success).toBe(true);
@@ -103,6 +134,7 @@ describe('scaffold', () => {
 		const result = await scaffold(projectDir, {
 			projectName: 'already-exists',
 			includeExampleSchema: false,
+			...defaults,
 		});
 
 		expect(result.success).toBe(false);
@@ -121,6 +153,7 @@ describe('scaffold', () => {
 			const result = await scaffold(join(readOnlyDir, 'child'), {
 				projectName: 'child',
 				includeExampleSchema: false,
+				...defaults,
 			});
 
 			expect(result.success).toBe(false);
