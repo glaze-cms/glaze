@@ -68,6 +68,26 @@ await glaze({
 			'\t',
 		),
 
+		'.gitignore': `# Dependencies
+node_modules/
+
+# Build
+dist/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.idea/
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+`,
+
 		'.env': `# Server Config
 GLAZE_PORT=4000
 

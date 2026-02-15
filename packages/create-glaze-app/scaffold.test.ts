@@ -36,6 +36,7 @@ describe('scaffold', () => {
 			'package.json',
 			'index.ts',
 			'tsconfig.json',
+			'.gitignore',
 			'.env',
 		]);
 

@@ -10,6 +10,8 @@
 	"files": [
 		"dist",
 		"*.ts",
+		"lib",
+		"schema",
 		"server",
 		"!**/*.test.ts"
 	],
@@ -23,8 +25,8 @@
 			"default": "./types.ts"
 		},
 		"./schema": {
-			"types": "./dist/schema.d.ts",
-			"default": "./schema.ts"
+			"types": "./dist/schema/index.d.ts",
+			"default": "./schema/index.ts"
 		}
 	},
 	"scripts": {
