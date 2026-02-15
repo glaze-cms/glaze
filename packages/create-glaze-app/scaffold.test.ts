@@ -79,7 +79,7 @@ describe('scaffold', () => {
 			projectName: 'env-test',
 			includeExampleSchema: false,
 			databaseUrl: 'postgresql://user:pass@host:5432/mydb',
-			authSecret: 'test-secret-1234',
+			authSecret: 'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4',
 		});
 
 		expect(result.success).toBe(true);
@@ -89,7 +89,7 @@ describe('scaffold', () => {
 		expect(env).toContain(
 			'GLAZE_DATABASE_URL=postgresql://user:pass@host:5432/mydb',
 		);
-		expect(env).toContain('GLAZE_AUTH_SECRET=test-secret-1234');
+		expect(env).toContain('GLAZE_AUTH_SECRET=a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4');
 		expect(env).toContain('GLAZE_PORT=4000');
 	});
 

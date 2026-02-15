@@ -11,9 +11,17 @@ export function validateProjectName(value = ''): string | undefined {
 }
 
 export function validateDatabaseUrl(value = ''): string | undefined {
-	if (!value.trim()) return 'Please enter a database URL.';
-	if (!value.startsWith('postgres://') && !value.startsWith('postgresql://'))
+	const trimmed = value.trim();
+	if (!trimmed) return 'Please enter a database URL.';
+	if (!trimmed.startsWith('postgres://') && !trimmed.startsWith('postgresql://'))
 		return 'Must be a valid PostgreSQL connection string (starts with postgres:// or postgresql://).';
+
+	if (/[\r\n]/.test(trimmed))
+		return 'Connection string must not contain newlines.';
+
+	const afterProtocol = trimmed.replace(/^postgres(ql)?:\/\//, '');
+	if (!afterProtocol || afterProtocol === '/')
+		return 'Connection string is missing a host. Example: postgresql://localhost:5432/mydb';
 }
 
 export function generateAuthSecret(): string {

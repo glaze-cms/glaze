@@ -90,6 +90,30 @@ describe('validateDatabaseUrl', () => {
 		);
 	});
 
+	test('rejects protocol-only postgresql://', () => {
+		expect(validateDatabaseUrl('postgresql://')).toContain(
+			'missing a host',
+		);
+	});
+
+	test('rejects protocol-only postgres://', () => {
+		expect(validateDatabaseUrl('postgres://')).toContain('missing a host');
+	});
+
+	test('rejects URL with newline injection', () => {
+		expect(
+			validateDatabaseUrl(
+				'postgresql://localhost:5432/mydb\nEVIL_VAR=injected',
+			),
+		).toContain('must not contain newlines');
+	});
+
+	test('accepts URL with leading/trailing whitespace', () => {
+		expect(
+			validateDatabaseUrl('  postgres://localhost:5432/mydb  '),
+		).toBeUndefined();
+	});
+
 	test('accepts postgres:// URL', () => {
 		expect(
 			validateDatabaseUrl('postgres://localhost:5432/mydb'),
