@@ -1,12 +1,15 @@
 export interface TemplateOptions {
 	projectName: string;
 	includeExampleSchema: boolean;
+	databaseUrl: string;
+	authSecret: string;
 }
 
 export function getTemplateFiles(
 	options: TemplateOptions,
 ): Record<string, string> {
-	const { projectName, includeExampleSchema } = options;
+	const { projectName, includeExampleSchema, databaseUrl, authSecret } =
+		options;
 
 	const files: Record<string, string> = {
 		'package.json': JSON.stringify(
@@ -65,9 +68,14 @@ await glaze({
 			'\t',
 		),
 
-		'.env.example': `GLAZE_DATABASE_URL=postgresql://glaze:glaze@localhost:5432/glaze
-GLAZE_AUTH_SECRET=change-me-to-a-random-string-at-least-32-chars
+		'.env': `# Server Config
 GLAZE_PORT=4000
+
+# Database
+GLAZE_DATABASE_URL=${databaseUrl}
+
+# Auth (auto-generated)
+GLAZE_AUTH_SECRET=${authSecret}
 `,
 	};
 

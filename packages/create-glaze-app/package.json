@@ -12,7 +12,7 @@
 		"create-glaze-app": "./index.ts"
 	},
 	"scripts": {
-		"dev": "bun --watch index.ts",
+		"dev:test": "bun --watch index.ts",
 		"test": "bun test"
 	},
 	"dependencies": {

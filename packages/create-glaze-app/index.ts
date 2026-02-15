@@ -5,7 +5,11 @@ import { resolve } from 'node:path';
 import { styleText } from 'node:util';
 
 // Utils
-import { validateProjectName } from './validation';
+import {
+	validateProjectName,
+	validateDatabaseUrl,
+	generateAuthSecret,
+} from './validation';
 import { scaffold } from './scaffold';
 
 p.intro('Create Glaze App');
@@ -32,6 +36,24 @@ if (p.isCancel(includeExampleSchema)) {
 	process.exit(0);
 }
 
+p.note(
+	'If you are using Supabase or Neon, you can find your\n' +
+		'connection string in your project dashboard and paste it here.',
+	'Pro Tip',
+);
+
+const databaseUrl = await p.text({
+	message: 'Postgres connection URL',
+	placeholder: 'postgresql://localhost:5432/glaze_db',
+	defaultValue: 'postgresql://localhost:5432/glaze_db',
+	validate: validateDatabaseUrl,
+});
+
+if (p.isCancel(databaseUrl)) {
+	p.cancel('Cancelled.');
+	process.exit(0);
+}
+
 const projectDir = resolve(projectName);
 const s = p.spinner();
 
@@ -39,6 +61,8 @@ s.start('Scaffolding project files...');
 const result = await scaffold(projectDir, {
 	projectName: projectName as string,
 	includeExampleSchema: includeExampleSchema as boolean,
+	databaseUrl: databaseUrl as string,
+	authSecret: generateAuthSecret(),
 });
 
 if (!result.success) {
@@ -66,7 +90,7 @@ try {
 	p.note(cmd, 'Manual installation required');
 }
 
-const nextSteps = `cd ${String(projectName)}\ncp .env.example .env\nbun dev`;
+const nextSteps = `cd ${String(projectName)}\nbun dev`;
 p.note(styleText('cyan', nextSteps), 'Next steps');
 
 p.outro(`${styleText('bold', String(projectName))} is ready — happy glazing!`);

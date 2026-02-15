@@ -5,7 +5,7 @@ import {
 	DEFAULT_HEALTH_CHECK_PATH,
 	DEFAULT_CORS_METHODS,
 	DEFAULT_CORS_ALLOWED_HEADERS,
-} from '../../lib/consts';
+} from '../../../lib/consts';
 import { authResolver } from './auth';
 
 import type { GlazeConfig, GlazeInternalConfig } from '../types';

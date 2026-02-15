@@ -4,7 +4,7 @@ import type { GlazeEnv } from '../../../validators/env';
 import {
 	DEFAULT_CORS_METHODS,
 	DEFAULT_CORS_ALLOWED_HEADERS,
-} from '../../../lib/consts';
+} from '../../../../lib/consts';
 import { corsPlugin } from './cors';
 
 const createMockLogger = (): Logger =>
@@ -33,13 +33,11 @@ const createDefaultCorsConfig = () => ({
 	allowedHeaders: [...DEFAULT_CORS_ALLOWED_HEADERS],
 });
 
-const createDefaultSecurityConfig = (
-	corsOverrides?: {
-		origin?: string[];
-		methods?: string[];
-		allowedHeaders?: string[];
-	},
-) => ({
+const createDefaultSecurityConfig = (corsOverrides?: {
+	origin?: string[];
+	methods?: string[];
+	allowedHeaders?: string[];
+}) => ({
 	cors: { ...createDefaultCorsConfig(), ...corsOverrides },
 	rateLimit: { enabled: true, max: 60, duration: 60000 },
 });
