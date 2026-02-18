@@ -18,7 +18,7 @@
     },
     "packages/admin": {
       "name": "@glaze/admin",
-      "version": "0.0.23",
+      "version": "0.0.25",
       "dependencies": {
         "react": "catalog:react",
         "react-dom": "catalog:react",
@@ -41,17 +41,33 @@
     },
     "packages/cms": {
       "name": "@glaze/cms",
-      "version": "0.0.23",
+      "version": "0.0.25",
       "dependencies": {
         "@glaze/core": "workspace:*",
       },
     },
+    "packages/convergence": {
+      "name": "@glaze/convergence",
+      "version": "0.0.25",
+      "dependencies": {
+        "@clack/prompts": "catalog:system",
+        "@glaze/logger": "workspace:*",
+        "@glaze/shared": "workspace:*",
+        "drizzle-kit": "catalog:drizzle",
+        "drizzle-orm": "catalog:drizzle",
+      },
+      "devDependencies": {
+        "@types/bun": "catalog:development",
+        "typescript": "catalog:development",
+      },
+    },
     "packages/core": {
       "name": "@glaze/core",
-      "version": "0.0.23",
+      "version": "0.0.25",
       "dependencies": {
         "@elysiajs/cors": "catalog:elysia",
         "@glaze/admin": "workspace:*",
+        "@glaze/convergence": "workspace:*",
         "@glaze/logger": "workspace:*",
         "@glaze/shared": "workspace:*",
         "better-auth": "catalog:auth",
@@ -72,7 +88,7 @@
     },
     "packages/create-glaze-app": {
       "name": "create-glaze-app",
-      "version": "0.0.24",
+      "version": "0.0.25",
       "bin": {
         "create-glaze-app": "./index.ts",
       },
@@ -96,7 +112,7 @@
     },
     "packages/logger": {
       "name": "@glaze/logger",
-      "version": "0.0.23",
+      "version": "0.0.25",
       "dependencies": {
         "pino": "latest",
         "pino-pretty": "latest",
@@ -108,7 +124,7 @@
     },
     "packages/shared": {
       "name": "@glaze/shared",
-      "version": "0.0.23",
+      "version": "0.0.25",
       "devDependencies": {
         "@types/bun": "latest",
         "typescript": "latest",
@@ -145,6 +161,7 @@
       "react-dom": "latest",
     },
     "system": {
+      "@clack/prompts": "latest",
       "pino": "latest",
       "pino-pretty": "latest",
     },
@@ -322,6 +339,8 @@
     "@glaze/admin": ["@glaze/admin@workspace:packages/admin"],
 
     "@glaze/cms": ["@glaze/cms@workspace:packages/cms"],
+
+    "@glaze/convergence": ["@glaze/convergence@workspace:packages/convergence"],
 
     "@glaze/core": ["@glaze/core@workspace:packages/core"],
 

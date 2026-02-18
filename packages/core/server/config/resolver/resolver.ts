@@ -1,4 +1,5 @@
 import { deepMerge } from '@glaze/shared';
+import { syncResolver } from '@glaze/convergence';
 import {
 	DEFAULT_API_PREFIX,
 	DEFAULT_ADMIN_PREFIX,
@@ -14,7 +15,7 @@ import type { GlazeConfig, GlazeInternalConfig } from '../types';
  * Creates a fresh default configuration object.
  * @returns A default configuration object with all default values set
  */
-function createDefaultConfig(): Omit<GlazeInternalConfig, 'auth'> {
+function createDefaultConfig(): Omit<GlazeInternalConfig, 'auth' | 'sync'> {
 	return {
 		apiPrefix: DEFAULT_API_PREFIX,
 		adminPrefix: DEFAULT_ADMIN_PREFIX,
@@ -83,8 +84,12 @@ export function resolveConfig(userConfig: GlazeConfig): GlazeInternalConfig {
 
 	const apiPrefix = mergedConfig.apiPrefix;
 
+	const nodeEnv =
+		(process.env.NODE_ENV as 'development') ?? 'development';
+
 	return {
 		...mergedConfig,
 		auth: authResolver(apiPrefix, userConfig.auth),
+		sync: syncResolver(nodeEnv, userConfig.sync),
 	};
 }

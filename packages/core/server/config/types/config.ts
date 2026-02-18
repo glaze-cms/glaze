@@ -1,4 +1,5 @@
 import type { LoggerOptions } from '@glaze/logger';
+import type { SyncConfig } from '@glaze/convergence/types';
 import type { ResolvedSecurityConfig, SecurityConfig } from './security';
 import type { HealthCheckConfig, ResolvedHealthCheckConfig } from './health';
 import type { AuthConfig, ResolvedAuthConfig } from './auth';
@@ -46,6 +47,14 @@ export interface GlazeConfig {
 	 * To disable, pass `{ enabled: false }`. Not recommended for production environments.
 	 */
 	healthCheck?: HealthCheckConfig;
+
+	/**
+	 * Database synchronization configuration.
+	 * Controls how schema changes are detected and applied.
+	 *
+	 * @default { enabled: true, workflow: 'solo' }
+	 */
+	sync?: SyncConfig;
 }
 
 /**
@@ -76,4 +85,7 @@ export interface GlazeInternalConfig {
 
 	/** Authentication configuration - resolved with defaults */
 	auth: ResolvedAuthConfig;
+
+	/** Database synchronization configuration - resolved with defaults */
+	sync: SyncConfig;
 }

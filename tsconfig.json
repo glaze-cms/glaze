@@ -23,8 +23,11 @@
 		"paths": {
 			"@glaze/core": ["./packages/core/index.ts"],
 			"@glaze/core/types": ["./packages/core/server/types.ts"],
+			"@glaze/convergence": ["./packages/convergence/index.ts"],
+			"@glaze/convergence/types": ["./packages/convergence/types/index.ts"],
 			"@glaze/development": ["./packages/development/index.ts"],
-			"@glaze/logger": ["./packages/logger/index.ts"]
+			"@glaze/logger": ["./packages/logger/index.ts"],
+			"@glaze/shared": ["./packages/shared/index.ts"]
 		}
 	}
 }
