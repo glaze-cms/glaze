@@ -42,6 +42,7 @@
 	"dependencies": {
 		"@elysiajs/cors": "catalog:elysia",
 		"@glaze/admin": "workspace:*",
+		"@glaze/config": "workspace:*",
 		"@glaze/convergence": "workspace:*",
 		"@glaze/logger": "workspace:*",
 		"@glaze/shared": "workspace:*",

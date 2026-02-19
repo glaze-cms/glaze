@@ -14,9 +14,8 @@ import { handleStart } from './hooks';
 import * as authSchema from '../schema';
 
 /*  Types */
-import type { GlazeEnv } from './validators/env';
+import type { GlazeEnv, GlazeInternalConfig } from '@glaze/config';
 import type { Logger } from '@glaze/logger';
-import type { GlazeInternalConfig } from './validators/config';
 
 /**
  * Creates a Glaze server instance.

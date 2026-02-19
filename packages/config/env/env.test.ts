@@ -1,6 +1,6 @@
 import { expect, test, describe, beforeEach, afterEach, mock } from 'bun:test';
 import { parseEnv, validateEnv } from './env';
-import { DEFAULT_SERVER_PORT } from '../../../lib/consts/defaults';
+import { DEFAULT_SERVER_PORT } from '../consts/defaults';
 
 describe('parseEnv', () => {
 	let originalEnv: NodeJS.ProcessEnv;

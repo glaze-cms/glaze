@@ -1,4 +1,4 @@
-import type { SyncConfig, SoloWorkflowConfig } from '../../types/index';
+import type { SyncConfig, SoloWorkflowConfig } from '../../types';
 
 type NodeEnv = 'local' | 'development' | 'production' | 'staging' | 'test';
 

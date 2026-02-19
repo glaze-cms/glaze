@@ -1,5 +1,5 @@
 import type { LoggerOptions } from '@glaze/logger';
-import type { SyncConfig } from '@glaze/convergence/types';
+import type { SyncConfig } from './sync';
 import type { ResolvedSecurityConfig, SecurityConfig } from './security';
 import type { HealthCheckConfig, ResolvedHealthCheckConfig } from './health';
 import type { AuthConfig, ResolvedAuthConfig } from './auth';

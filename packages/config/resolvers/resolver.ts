@@ -1,13 +1,13 @@
 import { deepMerge } from '@glaze/shared';
-import { syncResolver } from '@glaze/convergence';
+import { syncResolver } from './sync/sync';
 import {
 	DEFAULT_API_PREFIX,
 	DEFAULT_ADMIN_PREFIX,
 	DEFAULT_HEALTH_CHECK_PATH,
 	DEFAULT_CORS_METHODS,
 	DEFAULT_CORS_ALLOWED_HEADERS,
-} from '../../../lib/consts';
-import { authResolver } from './auth';
+} from '../consts/defaults';
+import { authResolver } from './auth/auth';
 
 import type { GlazeConfig, GlazeInternalConfig } from '../types';
 

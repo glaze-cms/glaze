@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'bun:test';
 import { resolveConfig } from './resolver';
-import { authResolver } from './auth';
+import { authResolver } from './auth/auth';
 import type { GlazeConfig } from '../types';
 import type { AuthConfig } from '../types/auth';
 import {
@@ -9,7 +9,7 @@ import {
 	DEFAULT_HEALTH_CHECK_PATH,
 	DEFAULT_CORS_METHODS,
 	DEFAULT_CORS_ALLOWED_HEADERS,
-} from '../../../lib/consts';
+} from '../consts/defaults';
 
 const mockSchema = {};
 

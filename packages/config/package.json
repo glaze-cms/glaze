@@ -1,7 +1,7 @@
 {
-	"name": "@glaze/convergence",
+	"name": "@glaze/config",
 	"version": "0.0.25",
-	"description": "Sync engine for Glaze CMS built on top of Drizzle-Kit.",
+	"description": "Configuration types, resolvers, and validators for Glaze CMS.",
 	"license": "MIT",
 	"type": "module",
 	"main": "index.ts",
@@ -9,11 +9,11 @@
 	"files": [
 		"dist",
 		"*.ts",
+		"consts/**/*.ts",
+		"env/**/*.ts",
+		"validators/**/*.ts",
 		"types/**/*.ts",
-		"config/**/*.ts",
-		"engine/**/*.ts",
-		"workflows/**/*.ts",
-		"lib/**/*.ts",
+		"resolvers/**/*.ts",
 		"!**/*.test.ts"
 	],
 	"exports": {
@@ -36,12 +36,11 @@
 		"prepublishOnly": "bunx tsc -p tsconfig.build.json"
 	},
 	"dependencies": {
-		"@clack/prompts": "catalog:system",
-		"@glaze/config": "workspace:*",
 		"@glaze/logger": "workspace:*",
 		"@glaze/shared": "workspace:*",
-		"drizzle-kit": "catalog:drizzle",
-		"drizzle-orm": "catalog:drizzle"
+		"better-auth": "catalog:auth",
+		"@elysiajs/cors": "catalog:elysia",
+		"typebox": "catalog:validation"
 	},
 	"devDependencies": {
 		"@types/bun": "catalog:development",

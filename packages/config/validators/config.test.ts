@@ -3,7 +3,7 @@ import { describe, it, expect, mock, beforeEach, afterEach } from 'bun:test';
 import { createLogger } from '@glaze/logger';
 
 import { validateConfig } from './config';
-import type { GlazeConfig } from '../../config/types';
+import type { GlazeConfig } from '../types';
 
 const logger = createLogger({ name: 'TEST' });
 const mockSchema = {};

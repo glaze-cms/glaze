@@ -3,7 +3,7 @@ import { Elysia } from 'elysia';
 
 import { adminPlugin } from './index';
 
-import type { GlazeInternalConfig } from '../../config/types';
+import type { GlazeInternalConfig } from '@glaze/config';
 
 // Helper to create minimal config for testing
 const createTestConfig = (adminPrefix: string): GlazeInternalConfig =>

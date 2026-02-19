@@ -6,7 +6,7 @@ import { Value } from 'typebox/value';
 import type { Logger } from '@glaze/logger';
 
 /* Consts */
-import { DEFAULT_SERVER_PORT } from '../../../lib/consts/defaults';
+import { DEFAULT_SERVER_PORT } from '../consts/defaults';
 
 /**
  * Internal schema defining the required environment variables for Glaze.

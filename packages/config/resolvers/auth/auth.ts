@@ -1,4 +1,4 @@
-import type { AuthConfig, ResolvedAuthConfig } from '../../config/types';
+import type { AuthConfig, ResolvedAuthConfig } from '../../types';
 
 /**
  * Resolves auth configuration with sensible defaults.

@@ -3,7 +3,7 @@ import Compile from 'typebox/compile';
 
 /* Types */
 import type { Logger } from '@glaze/logger';
-import type { GlazeConfig } from '../../config/types';
+import type { GlazeConfig } from '../types';
 
 /**
  * Schema for validating user-provided GlazeConfig values.
@@ -129,6 +129,7 @@ const GlazeConfigValidationSchema = Type.Object(
 				{ additionalProperties: false },
 			),
 		),
+		sync: Type.Optional(Type.Record(Type.String(), Type.Unknown())),
 		logger: Type.Optional(Type.Record(Type.String(), Type.Unknown())),
 	},
 	{ additionalProperties: false },
