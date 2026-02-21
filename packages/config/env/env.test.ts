@@ -1,5 +1,5 @@
 import { expect, test, describe, beforeEach, afterEach, mock } from 'bun:test';
-import { parseEnv, validateEnv } from './env';
+import { parseEnv, validateEnv } from '.';
 import { DEFAULT_SERVER_PORT } from '../consts/defaults';
 
 describe('parseEnv', () => {

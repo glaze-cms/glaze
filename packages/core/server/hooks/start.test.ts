@@ -8,6 +8,11 @@ import {
 	afterEach,
 } from 'bun:test';
 import type { Logger } from '@glaze/logger';
+
+mock.module('@glaze/convergence', () => ({
+	runConvergence: mock(() => Promise.resolve()),
+}));
+
 import { handleStart } from './start';
 
 const createMockLogger = (): Logger =>
@@ -24,6 +29,13 @@ const createMockLogger = (): Logger =>
 		child: () => createMockLogger(),
 	}) as unknown as Logger;
 
+const createMockDecorator = (db: { execute: ReturnType<typeof mock> }) => ({
+	logger: createMockLogger(),
+	db,
+	env: { GLAZE_DATABASE_URL: 'postgres://localhost:5432/test' },
+	config: { sync: { workflow: 'solo' as const, enabled: false } },
+});
+
 describe('handleStart', () => {
 	let originalExit: typeof process.exit;
 
@@ -38,15 +50,10 @@ describe('handleStart', () => {
 
 	it('should successfully verify database connection', async () => {
 		const mockExecute = mock(() => Promise.resolve([{ '?column?': 1 }]));
-		const mockLogger = createMockLogger();
-		const errorSpy = spyOn(mockLogger, 'error');
+		const decorator = createMockDecorator({ execute: mockExecute });
+		const errorSpy = spyOn(decorator.logger, 'error');
 
-		await handleStart({
-			decorator: {
-				logger: mockLogger,
-				db: { execute: mockExecute },
-			} as any,
-		});
+		await handleStart({ decorator: decorator as any });
 
 		expect(mockExecute).toHaveBeenCalled();
 		expect(errorSpy).not.toHaveBeenCalled();
@@ -57,16 +64,11 @@ describe('handleStart', () => {
 		const mockExecute = mock(() =>
 			Promise.reject(new Error('Connection refused')),
 		);
-		const mockLogger = createMockLogger();
-		const errorSpy = spyOn(mockLogger, 'error');
-		const infoSpy = spyOn(mockLogger, 'info');
+		const decorator = createMockDecorator({ execute: mockExecute });
+		const errorSpy = spyOn(decorator.logger, 'error');
+		const infoSpy = spyOn(decorator.logger, 'info');
 
-		await handleStart({
-			decorator: {
-				logger: mockLogger,
-				db: { execute: mockExecute },
-			} as any,
-		});
+		await handleStart({ decorator: decorator as any });
 
 		expect(errorSpy).toHaveBeenCalledWith('Could not connect to database.');
 		expect(infoSpy).toHaveBeenCalledWith(
@@ -96,15 +98,10 @@ describe('handleStart', () => {
 		}
 
 		const mockExecute = mock(() => Promise.reject(drizzleError));
-		const mockLogger = createMockLogger();
-		const debugSpy = spyOn(mockLogger, 'debug');
+		const decorator = createMockDecorator({ execute: mockExecute });
+		const debugSpy = spyOn(decorator.logger, 'debug');
 
-		await handleStart({
-			decorator: {
-				logger: mockLogger,
-				db: { execute: mockExecute },
-			} as any,
-		});
+		await handleStart({ decorator: decorator as any });
 
 		// If it's a proper DrizzleQueryError with Error cause, debug should be called
 		if (
@@ -119,15 +116,10 @@ describe('handleStart', () => {
 		const mockExecute = mock(() =>
 			Promise.reject(new TypeError('Something else')),
 		);
-		const mockLogger = createMockLogger();
-		const debugSpy = spyOn(mockLogger, 'debug');
+		const decorator = createMockDecorator({ execute: mockExecute });
+		const debugSpy = spyOn(decorator.logger, 'debug');
 
-		await handleStart({
-			decorator: {
-				logger: mockLogger,
-				db: { execute: mockExecute },
-			} as any,
-		});
+		await handleStart({ decorator: decorator as any });
 
 		expect(debugSpy).not.toHaveBeenCalled();
 		expect(process.exit).toHaveBeenCalledWith(1);
@@ -137,15 +129,10 @@ describe('handleStart', () => {
 		const mockExecute = mock(() =>
 			Promise.reject(new RangeError('unexpected')),
 		);
-		const mockLogger = createMockLogger();
-		const errorSpy = spyOn(mockLogger, 'error');
+		const decorator = createMockDecorator({ execute: mockExecute });
+		const errorSpy = spyOn(decorator.logger, 'error');
 
-		await handleStart({
-			decorator: {
-				logger: mockLogger,
-				db: { execute: mockExecute },
-			} as any,
-		});
+		await handleStart({ decorator: decorator as any });
 
 		expect(errorSpy).toHaveBeenCalledWith('Could not connect to database.');
 	});

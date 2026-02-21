@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'bun:test';
-import { resolveConfig } from './resolver';
-import { authResolver } from './auth/auth';
+import { resolveConfig } from '.';
+import { authResolver } from './auth';
 import type { GlazeConfig } from '../types';
 import type { AuthConfig } from '../types/auth';
 import {
