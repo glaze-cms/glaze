@@ -78,6 +78,14 @@ export async function runSoloWorkflow(
 
 	// Determine if we should apply
 	if (destructionPolicy === 'ask') {
+		if (!process.stdout.isTTY) {
+			logger.warn(
+				'destructive="ask" in a non-interactive environment — schema sync cancelled. ' +
+					'Set destructive="apply" to apply changes automatically, or destructive="fail" to block on destructive changes.',
+			);
+			return;
+		}
+
 		const response = await confirm({
 			message: `Apply ${String(drift.statements.length)} change(s)?`,
 		});

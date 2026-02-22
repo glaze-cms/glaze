@@ -189,6 +189,44 @@ describe('runSoloWorkflow', () => {
 		confirmSpy.mockRestore();
 	});
 
+	it('should cancel without prompting when destructive=ask in non-TTY environment', async () => {
+		detectSpy = spyOn(
+			detectorModule,
+			'detectDriftFromSchema',
+		).mockResolvedValue({
+			hasDrift: true,
+			statements: ['DROP TABLE test'],
+			summary: ['• Drop table test'],
+			currentSnapshot: {},
+			warnings: ['Dropping table "test" will cause data loss'],
+		});
+
+		const confirmSpy = spyOn(promptsModule, 'confirm').mockResolvedValue(true);
+		executeSpy = spyOn(executorModule, 'applyStatements').mockResolvedValue({
+			success: true,
+			appliedCount: 1,
+		});
+
+		const originalIsTTY = process.stdout.isTTY;
+		Object.defineProperty(process.stdout, 'isTTY', { value: false, configurable: true });
+
+		try {
+			await runSoloWorkflow({
+				db: mockDb,
+				logger,
+				config: { destructive: 'ask', validation: 'permissive' },
+				connectionString: 'postgresql://localhost/test',
+				configPath: '/tmp/merged-config.ts',
+			});
+		} finally {
+			Object.defineProperty(process.stdout, 'isTTY', { value: originalIsTTY, configurable: true });
+		}
+
+		expect(confirmSpy).not.toHaveBeenCalled();
+		expect(executeSpy).not.toHaveBeenCalled();
+		confirmSpy.mockRestore();
+	});
+
 	it('should apply changes when user confirms and destructive=ask', async () => {
 		detectSpy = spyOn(
 			detectorModule,
@@ -208,13 +246,18 @@ describe('runSoloWorkflow', () => {
 			appliedCount: 1,
 		});
 
-		await runSoloWorkflow({
-			db: mockDb,
-			logger,
-			config: { destructive: 'ask', validation: 'permissive' },
-			connectionString: 'postgresql://localhost/test',
-			configPath: '/tmp/merged-config.ts',
-		});
+		Object.defineProperty(process.stdout, 'isTTY', { value: true, configurable: true });
+		try {
+			await runSoloWorkflow({
+				db: mockDb,
+				logger,
+				config: { destructive: 'ask', validation: 'permissive' },
+				connectionString: 'postgresql://localhost/test',
+				configPath: '/tmp/merged-config.ts',
+			});
+		} finally {
+			Object.defineProperty(process.stdout, 'isTTY', { value: undefined, configurable: true });
+		}
 
 		expect(confirmSpy).toHaveBeenCalled();
 		expect(executeSpy).toHaveBeenCalled();
@@ -242,13 +285,18 @@ describe('runSoloWorkflow', () => {
 			appliedCount: 1,
 		});
 
-		await runSoloWorkflow({
-			db: mockDb,
-			logger,
-			config: { destructive: 'ask', validation: 'permissive' },
-			connectionString: 'postgresql://localhost/test',
-			configPath: '/tmp/merged-config.ts',
-		});
+		Object.defineProperty(process.stdout, 'isTTY', { value: true, configurable: true });
+		try {
+			await runSoloWorkflow({
+				db: mockDb,
+				logger,
+				config: { destructive: 'ask', validation: 'permissive' },
+				connectionString: 'postgresql://localhost/test',
+				configPath: '/tmp/merged-config.ts',
+			});
+		} finally {
+			Object.defineProperty(process.stdout, 'isTTY', { value: undefined, configurable: true });
+		}
 
 		expect(confirmSpy).toHaveBeenCalled();
 		expect(executeSpy).not.toHaveBeenCalled();

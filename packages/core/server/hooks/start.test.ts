@@ -14,6 +14,7 @@ mock.module('@glaze/convergence', () => ({
 }));
 
 import { handleStart } from './start';
+import * as convergenceModule from '@glaze/convergence';
 
 const createMockLogger = (): Logger =>
 	({
@@ -123,6 +124,25 @@ describe('handleStart', () => {
 
 		expect(debugSpy).not.toHaveBeenCalled();
 		expect(process.exit).toHaveBeenCalledWith(1);
+	});
+
+	it('should call runConvergence with config, db, logger, connectionString, and glazeSchemaPath', async () => {
+		const mockExecute = mock(() => Promise.resolve([{ '?column?': 1 }]));
+		const decorator = createMockDecorator({ execute: mockExecute });
+
+		const runConvergenceMock = convergenceModule.runConvergence as ReturnType<typeof mock>;
+		runConvergenceMock.mockClear();
+
+		await handleStart({ decorator: decorator as any });
+
+		expect(runConvergenceMock).toHaveBeenCalledTimes(1);
+		expect(runConvergenceMock).toHaveBeenCalledWith({
+			config: decorator.config.sync,
+			db: decorator.db,
+			logger: decorator.logger,
+			connectionString: decorator.env.GLAZE_DATABASE_URL,
+			glazeSchemaPath: expect.stringContaining('schema'),
+		});
 	});
 
 	it('should always log the generic error message regardless of error type', async () => {
