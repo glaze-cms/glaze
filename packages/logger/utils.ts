@@ -6,9 +6,9 @@ import { styleText } from 'node:util';
 const BG_COLORS = [
 	'bgBlue',
 	'bgGreen',
+	'bgYellow',
 	'bgMagenta',
 	'bgCyan',
-	'bgYellow',
 	'bgRed',
 ] as const;
 

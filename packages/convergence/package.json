@@ -1,0 +1,50 @@
+{
+	"name": "@glaze/convergence",
+	"version": "0.0.25",
+	"description": "Sync engine for Glaze CMS built on top of Drizzle-Kit.",
+	"license": "MIT",
+	"type": "module",
+	"main": "index.ts",
+	"types": "./dist/index.d.ts",
+	"files": [
+		"dist",
+		"*.ts",
+		"types/**/*.ts",
+		"config/**/*.ts",
+		"engine/**/*.ts",
+		"workflows/**/*.ts",
+		"lib/**/*.ts",
+		"!**/*.test.ts"
+	],
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"default": "./index.ts"
+		},
+		"./types": {
+			"types": "./dist/types/index.d.ts",
+			"default": "./types/index.ts"
+		}
+	},
+	"scripts": {
+		"lint": "eslint .",
+		"lint:fix": "eslint . --fix",
+		"format": "prettier --check .",
+		"format:fix": "prettier --write .",
+		"typecheck": "tsc --noEmit",
+		"test": "bun test",
+		"prepublishOnly": "bunx tsc -p tsconfig.build.json"
+	},
+	"dependencies": {
+		"@clack/prompts": "catalog:system",
+		"@glaze/config": "workspace:*",
+		"@glaze/logger": "workspace:*",
+		"@glaze/shared": "workspace:*",
+		"drizzle-kit": "catalog:drizzle",
+		"drizzle-orm": "catalog:drizzle"
+	},
+	"devDependencies": {
+		"@types/bun": "catalog:development",
+		"typescript": "catalog:development"
+	}
+}

@@ -76,7 +76,7 @@ describe('mergeConfig', () => {
 		expect(content).not.toContain(TMP_DIR);
 	});
 
-	test('should strip .ts extension from both paths', async () => {
+	test('should strip .ts extension from import path but keep it in schema array', async () => {
 		const result = await mergeConfig({
 			userConfigPath: USER_CONFIG_PATH,
 			glazeSchemaPath: GLAZE_SCHEMA_PATH,
@@ -84,7 +84,7 @@ describe('mergeConfig', () => {
 
 		const content = readFileSync(result, 'utf-8');
 
-		// Neither import path should end with .ts
+		// Import path must NOT have .ts (TypeScript import convention)
 		const importLines = content
 			.split('\n')
 			.filter((line) => line.includes('import '));
@@ -92,11 +92,12 @@ describe('mergeConfig', () => {
 			expect(line).not.toMatch(/\.ts['"]/);
 		}
 
-		// Schema in the schema array should also not end with .ts
+		// Schema file path in the schema array MUST keep .ts extension
+		// (drizzle-kit requires the extension to locate the file)
 		const schemaLine = content
 			.split('\n')
 			.find((line) => line.includes('schema: ['));
-		expect(schemaLine).not.toMatch(/\.ts'/);
+		expect(schemaLine).toMatch(/\.ts'/);
 	});
 
 	test('should include schema filter with auth and drizzle', async () => {

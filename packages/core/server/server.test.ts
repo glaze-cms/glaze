@@ -1,7 +1,6 @@
 import { describe, it, expect, mock, spyOn } from 'bun:test';
 import type { Logger } from '@glaze/logger';
-import type { GlazeInternalConfig } from './config/types';
-import type { GlazeEnv } from './validators/env';
+import type { GlazeInternalConfig, GlazeEnv } from '@glaze/config';
 
 const mockDb = { execute: async () => [{ '?column?': 1 }] };
 

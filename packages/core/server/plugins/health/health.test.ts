@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'bun:test';
 import { Elysia } from 'elysia';
 import { healthCheckPlugin } from './health';
-import { DEFAULT_HEALTH_CHECK_PATH } from '../../../lib/consts/defaults';
-import type { ResolvedHealthCheckConfig } from '../../config/types';
+import { DEFAULT_HEALTH_CHECK_PATH } from '@glaze/config';
+import type { ResolvedHealthCheckConfig } from '@glaze/config';
 
 // Helper to create resolved health check config
 const createHealthConfig = (

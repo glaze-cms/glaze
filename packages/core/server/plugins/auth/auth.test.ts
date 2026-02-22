@@ -1,7 +1,6 @@
 import { describe, it, expect, mock, beforeEach } from 'bun:test';
 import { Elysia } from 'elysia';
-import type { GlazeInternalConfig } from '../../config/types';
-import type { GlazeEnv } from '../../validators/env';
+import type { GlazeInternalConfig, GlazeEnv } from '@glaze/config';
 
 const mockBetterAuth = mock(() => ({
 	handler: (_req: Request) => new Response('auth ok'),

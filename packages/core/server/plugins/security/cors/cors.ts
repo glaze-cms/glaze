@@ -1,9 +1,8 @@
 import { Elysia } from 'elysia';
 import cors from '@elysiajs/cors';
 
-import type { GlazeEnv } from '../../../validators/env';
+import type { GlazeEnv, GlazeInternalConfig } from '@glaze/config';
 import type { Logger } from '@glaze/logger';
-import type { GlazeInternalConfig } from '../../../validators/config';
 
 /**
  * Creates Elysia CORS middleware with environment-aware defaults.
