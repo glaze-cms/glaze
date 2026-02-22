@@ -21,10 +21,14 @@ export async function handleStart({
 		process.exit(1);
 	});
 
+	const glazeSchemaPath = new URL(import.meta.resolve('@glaze/core/schema'))
+		.pathname;
+
 	await runConvergence({
 		config: convergenceConfig,
 		db,
 		logger,
 		connectionString: env.GLAZE_DATABASE_URL,
+		glazeSchemaPath,
 	});
 }

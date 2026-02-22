@@ -117,4 +117,6 @@ export interface ConvergenceOptions {
 	logger: Logger;
 	/** Database connection string (from env.GLAZE_DATABASE_URL) */
 	connectionString: string;
+	/** Absolute path to the Glaze auth schema file — resolved by core via import.meta.resolve */
+	glazeSchemaPath: string;
 }

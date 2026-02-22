@@ -18,7 +18,7 @@ function isProductionLike(nodeEnv: NodeEnv): boolean {
 function resolveSoloDefaults(
 	nodeEnv: NodeEnv,
 	userConfig?: SoloWorkflowConfig,
-): Required<SoloWorkflowConfig> {
+): Required<Omit<SoloWorkflowConfig, 'configPath'>> {
 	const isProd = isProductionLike(nodeEnv);
 
 	return {
@@ -42,13 +42,15 @@ export function syncResolver(
 	const workflow = userConfig?.workflow ?? 'solo';
 
 	if (workflow === 'solo') {
+		const userSoloConfig =
+			userConfig?.workflow === 'solo' ? userConfig.solo : undefined;
 		return {
 			enabled,
 			workflow: 'solo',
-			solo: resolveSoloDefaults(
-				nodeEnv,
-				userConfig?.workflow === 'solo' ? userConfig.solo : undefined,
-			),
+			solo: {
+				...resolveSoloDefaults(nodeEnv, userSoloConfig),
+				configPath: userSoloConfig?.configPath,
+			},
 		};
 	}
 

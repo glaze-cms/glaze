@@ -24,6 +24,12 @@ export interface SoloWorkflowConfig {
 	 * @default 'permissive' in development, 'strict' in production
 	 */
 	validation?: 'strict' | 'permissive';
+
+	/**
+	 * Path to the user's drizzle config file.
+	 * @default 'drizzle.config.ts'
+	 */
+	configPath?: string;
 }
 
 /**
