@@ -33,6 +33,15 @@ export async function runSoloWorkflow(
 	});
 
 	if (!drift.hasDrift) {
+		if (drift.warnings && drift.warnings.length > 0) {
+			for (const warning of drift.warnings) {
+				logger.warn(warning);
+			}
+			logger.error(
+				'Schema sync requires manual intervention. Server startup blocked.',
+			);
+			process.exit(1);
+		}
 		logger.info('✓ Schema is in sync with database');
 		return;
 	}

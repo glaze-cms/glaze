@@ -180,12 +180,12 @@ export async function checkAddColumnNotNull(
 	const tableRef = sqlIdentifier(table);
 
 	try {
-		const query = sql`SELECT COUNT(*) as count FROM ${tableRef} LIMIT 1`;
+		const query = sql`SELECT 1 FROM ${tableRef} LIMIT 1`;
 		const result = await db.execute(query);
 		const rows = 'rows' in result ? result.rows : result;
-		const count = Number(rows[0]?.count ?? 0);
+		const hasRows = Array.isArray(rows) && rows.length > 0;
 
-		if (count > 0) {
+		if (hasRows) {
 			return `⚠️  POTENTIAL DATA LOSS: Adding NOT NULL column ${table}."${column}" without a DEFAULT value will fail because the table is not empty.`;
 		}
 	} catch (e) {

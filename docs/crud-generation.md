@@ -13,7 +13,7 @@ Glaze automatically generates RESTful CRUD routes by introspecting your Drizzle 
 ### Implementation
 
 ```typescript
-// packages/core/src/lib/crud-generator.ts
+// example implementation
 import { Elysia, t } from 'elysia';
 import type { PgTable } from 'drizzle-orm/pg-core';
 import { eq } from 'drizzle-orm';

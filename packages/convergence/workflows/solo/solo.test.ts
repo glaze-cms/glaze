@@ -29,6 +29,48 @@ describe('runSoloWorkflow', () => {
 		if (exitSpy) exitSpy.mockRestore();
 	});
 
+	it('should surface warnings and exit when hasDrift=false but warnings exist (ambiguous rename)', async () => {
+		detectSpy = spyOn(
+			detectorModule,
+			'detectDriftFromSchema',
+		).mockResolvedValue({
+			hasDrift: false,
+			statements: [],
+			summary: [],
+			currentSnapshot: {},
+			warnings: [
+				'Ambiguous schema change (rename vs drop/create) detected. Manual intervention required.',
+			],
+		});
+
+		exitSpy = spyOn(process, 'exit').mockImplementation(() => {
+			throw new Error('process.exit called');
+		});
+
+		const warnSpy = spyOn(logger, 'warn');
+		const errorSpy = spyOn(logger, 'error');
+
+		try {
+			await runSoloWorkflow({
+				db: mockDb,
+				logger,
+				config: { destructive: 'fail', validation: 'permissive' },
+				connectionString: 'postgresql://localhost/test',
+				configPath: '/tmp/merged-config.ts',
+			});
+		} catch (error) {
+			expect((error as Error).message).toBe('process.exit called');
+		}
+
+		expect(warnSpy).toHaveBeenCalledWith(
+			'Ambiguous schema change (rename vs drop/create) detected. Manual intervention required.',
+		);
+		expect(errorSpy).toHaveBeenCalledWith(
+			'Schema sync requires manual intervention. Server startup blocked.',
+		);
+		expect(exitSpy).toHaveBeenCalledWith(1);
+	});
+
 	it('should log success when no drift detected', async () => {
 		detectSpy = spyOn(
 			detectorModule,

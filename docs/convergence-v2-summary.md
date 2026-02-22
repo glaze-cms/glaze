@@ -274,7 +274,7 @@ class SchemaExecutor {
 
 ## Pending Changes Tracking
 
-Admins need to know on audit mode wich changes are pending to be approved.
+Admins need to know on audit mode which changes are pending to be approved.
 We track those on the DB. Drizzle has `formatToMillis` from drizzle-orm/migrator - we use that
 to compare hashes.
 

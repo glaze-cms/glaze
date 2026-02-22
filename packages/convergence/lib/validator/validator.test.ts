@@ -127,7 +127,7 @@ describe('validator', () => {
 
 	describe('checkAddColumnNotNull', () => {
 		it('should warn if adding NOT NULL column to table with rows', async () => {
-			mockExecute.mockResolvedValueOnce({ rows: [{ count: 1 }] });
+			mockExecute.mockResolvedValueOnce({ rows: [{ '?column?': 1 }] });
 
 			const warnings = await validateDataConstraints(mockDb, [
 				'ALTER TABLE "posts" ADD COLUMN "excerpt" text NOT NULL',
@@ -140,7 +140,7 @@ describe('validator', () => {
 		});
 
 		it('should pass if table is empty', async () => {
-			mockExecute.mockResolvedValueOnce({ rows: [{ count: 0 }] });
+			mockExecute.mockResolvedValueOnce({ rows: [] });
 
 			const warnings = await validateDataConstraints(mockDb, [
 				'ALTER TABLE "posts" ADD COLUMN "excerpt" text NOT NULL',
@@ -159,7 +159,7 @@ describe('validator', () => {
 		});
 
 		it('should not treat identifier containing DEFAULT as a DEFAULT clause', async () => {
-			mockExecute.mockResolvedValueOnce({ rows: [{ count: 1 }] });
+			mockExecute.mockResolvedValueOnce({ rows: [{ '?column?': 1 }] });
 
 			const warnings = await validateDataConstraints(mockDb, [
 				'ALTER TABLE "DEFAULT" ADD COLUMN "excerpt" text NOT NULL',

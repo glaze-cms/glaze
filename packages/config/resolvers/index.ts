@@ -10,6 +10,7 @@ import {
 import { authResolver } from './auth';
 
 import type { GlazeConfig, GlazeInternalConfig } from '../types';
+import type { GlazeEnv } from '../env';
 
 /**
  * Creates a fresh default configuration object.
@@ -85,7 +86,7 @@ export function resolveConfig(userConfig: GlazeConfig): GlazeInternalConfig {
 	const apiPrefix = mergedConfig.apiPrefix;
 
 	const nodeEnv =
-		(process.env.NODE_ENV as 'development') ?? 'development';
+		(process.env.NODE_ENV as GlazeEnv['NODE_ENV'] | undefined) ?? 'development';
 
 	return {
 		...mergedConfig,

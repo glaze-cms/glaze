@@ -1,96 +1,96 @@
 ---
-title: Glaze Convergence v2 - Flujos de Sincronización
+title: Glaze Convergence v2 - Sync Workflows
 ---
 flowchart TB
     subgraph DEV_SOLO["🧑‍💻 DEV (Solo Mode)"]
-        DS1[Edita schema en código]
-        DS2[Hot reload detecta cambios]
-        DS3[Convergence detecta drift]
-        DS4[Actualiza DB directo]
-        DS5[✅ Sync completo]
-        
+        DS1[Edit schema in code]
+        DS2[Hot reload detects changes]
+        DS3[Convergence detects drift]
+        DS4[Update DB directly]
+        DS5[✅ Sync complete]
+
         DS1 --> DS2 --> DS3 --> DS4 --> DS5
     end
 
     subgraph DEV_TEAM["🧑‍💻 DEV (Team Mode)"]
-        DT1[Edita schema en código]
-        DT2[Hot reload detecta cambios]
-        DT3[Genera archivo de migración]
-        DT4{Modo?}
-        
+        DT1[Edit schema in code]
+        DT2[Hot reload detects changes]
+        DT3[Generate migration file]
+        DT4{Mode?}
+
         DT1 --> DT2 --> DT3 --> DT4
-        
+
         subgraph AUTO_DEV["⚡ Auto"]
-            DTA1[Aplica migración]
-            DTA2[WebSocket notifica Admin UI]
-            DTA3[React Query invalida cache]
-            DTA4[✅ Sync completo]
-            
+            DTA1[Apply migration]
+            DTA2[WebSocket notifies Admin UI]
+            DTA3[React Query invalidates cache]
+            DTA4[✅ Sync complete]
+
             DTA1 --> DTA2 --> DTA3 --> DTA4
         end
-        
+
         subgraph AUDIT_DEV["🔍 Audit"]
-            DTB1[Migración queda pending]
-            DTB2[Dev corre CLI: migrate:apply]
-            DTB3[CLI aplica migración]
-            DTB4[CLI compara hashes con __drizzle_migrations]
-            DTB5[CLI actualiza status en glaze_pending_migrations]
-            DTB6[WebSocket notifica Admin UI]
-            DTB7[React Query invalida cache]
-            DTB8[✅ Sync completo]
-            
+            DTB1[Migration stays pending]
+            DTB2[Dev runs CLI: migrate:apply]
+            DTB3[CLI applies migration]
+            DTB4[CLI compares hashes with __drizzle_migrations]
+            DTB5[CLI updates status in glaze_pending_migrations]
+            DTB6[WebSocket notifies Admin UI]
+            DTB7[React Query invalidates cache]
+            DTB8[✅ Sync complete]
+
             DTB1 --> DTB2 --> DTB3 --> DTB4 --> DTB5 --> DTB6 --> DTB7 --> DTB8
         end
-        
+
         DT4 -->|auto| AUTO_DEV
         DT4 -->|audit| AUDIT_DEV
     end
 
     subgraph ADMIN_SOLO["👤 ADMIN (Solo Mode)"]
-        AS1[HTTP Request granular]
-        AS2[Genera SQL seguro]
-        AS3[Aplica a DB]
-        AS4{Resultado?}
-        AS5[Introspección DB]
-        AS6[Regenera schema en código]
-        AS7[✅ Respuesta exitosa a UI]
-        AS8[❌ Error amigable a UI]
-        
+        AS1[Granular HTTP request]
+        AS2[Generate safe SQL]
+        AS3[Apply to DB]
+        AS4{Result?}
+        AS5[DB introspection]
+        AS6[Regenerate schema in code]
+        AS7[✅ Successful response to UI]
+        AS8[❌ Friendly error to UI]
+
         AS1 --> AS2 --> AS3 --> AS4
         AS4 -->|success| AS5 --> AS6 --> AS7
         AS4 -->|error| AS8
     end
 
     subgraph ADMIN_TEAM["👤 ADMIN (Team Mode)"]
-        AT1[HTTP Request granular]
-        AT2[Genera migración]
-        AT3{Modo?}
-        
+        AT1[Granular HTTP request]
+        AT2[Generate migration]
+        AT3{Mode?}
+
         AT1 --> AT2 --> AT3
-        
+
         subgraph AUTO_ADMIN["⚡ Auto"]
-            ATA1[Aplica migración]
-            ATA2[Introspección DB]
-            ATA3[Regenera schema en código]
-            ATA4[✅ Respuesta exitosa a UI]
-            
+            ATA1[Apply migration]
+            ATA2[DB introspection]
+            ATA3[Regenerate schema in code]
+            ATA4[✅ Successful response to UI]
+
             ATA1 --> ATA2 --> ATA3 --> ATA4
         end
-        
+
         subgraph AUDIT_ADMIN["🔍 Audit"]
-            ATB1[Guarda metadata + expectedHash]
-            ATB2[⏳ Respuesta: pending approval]
-            ATB3[Dev corre CLI: migrate:apply]
-            ATB4[CLI aplica migración]
-            ATB5[CLI compara hashes con __drizzle_migrations]
-            ATB6[CLI actualiza status en glaze_pending_migrations]
-            ATB7[WebSocket notifica Admin UI]
-            ATB8[✅ Campo habilitado]
-            
+            ATB1[Save metadata + expectedHash]
+            ATB2[⏳ Response: pending approval]
+            ATB3[Dev runs CLI: migrate:apply]
+            ATB4[CLI applies migration]
+            ATB5[CLI compares hashes with __drizzle_migrations]
+            ATB6[CLI updates status in glaze_pending_migrations]
+            ATB7[WebSocket notifies Admin UI]
+            ATB8[✅ Field enabled]
+
             ATB1 --> ATB2
             ATB3 --> ATB4 --> ATB5 --> ATB6 --> ATB7 --> ATB8
         end
-        
+
         AT3 -->|auto| AUTO_ADMIN
         AT3 -->|audit| AUDIT_ADMIN
     end
@@ -102,7 +102,7 @@ flowchart TB
     classDef audit fill:#fce4ec,stroke:#e91e63,color:#880e4f
     classDef success fill:#c8e6c9,stroke:#388e3c,color:#1b5e20
     classDef error fill:#ffcdd2,stroke:#d32f2f,color:#b71c1c
-    
+
     class DS1,DS2,DS3,DS4,DS5 solo
     class AS1,AS2,AS3,AS4,AS5,AS6,AS7 solo
     class DT1,DT2,DT3,DT4 team
