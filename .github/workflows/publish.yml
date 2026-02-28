@@ -39,7 +39,7 @@ jobs:
 
       - name: Publish @glaze packages
         run: |
-          # Publish in dependency order: create-glaze-app → shared → logger → admin → core → cms
+          # Publish in dependency order: create-glaze-app → shared → logger → config → convergence → admin → core → cms
           echo "Publishing create-glaze-app..."
           cd packages/create-glaze-app
           bun publish --non-interactive || echo "Skipping create-glaze-app (likely already published)"
@@ -58,6 +58,11 @@ jobs:
           echo "Publishing @glaze/config..."
           cd packages/config
           bun publish --non-interactive || echo "Skipping config (likely already published)"
+          cd ../..
+
+          echo "Publishing @glaze/convergence..."
+          cd packages/convergence
+          bun publish --non-interactive || echo "Skipping convergence (likely already published)"
           cd ../..
 
           echo "Publishing @glaze/admin..."
