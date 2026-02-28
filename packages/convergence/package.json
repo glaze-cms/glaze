@@ -1,6 +1,6 @@
 {
 	"name": "@glaze/convergence",
-	"version": "0.0.28",
+	"version": "0.0.1",
 	"description": "Sync engine for Glaze CMS built on top of Drizzle-Kit.",
 	"license": "MIT",
 	"type": "module",
