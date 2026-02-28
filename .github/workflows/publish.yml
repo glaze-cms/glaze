@@ -18,9 +18,6 @@ jobs:
         with:
           bun-version: latest
 
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
-
       - name: Wake up Registry
         run: |
           echo "Waking up registry..."
@@ -36,6 +33,9 @@ jobs:
             sleep 5
           done
           echo "WARNING: Registry might still be sleeping or unreachable."
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
 
       - name: Publish @glaze packages
         run: |
