@@ -1,6 +1,6 @@
 {
 	"name": "@glaze/core",
-	"version": "0.0.25",
+	"version": "0.0.26",
 	"description": "Core module of the Glaze framework, responsible for running the CMS server and providing essential functionality.",
 	"license": "MIT",
 	"type": "module",
@@ -42,6 +42,8 @@
 	"dependencies": {
 		"@elysiajs/cors": "catalog:elysia",
 		"@glaze/admin": "workspace:*",
+		"@glaze/config": "workspace:*",
+		"@glaze/convergence": "workspace:*",
 		"@glaze/logger": "workspace:*",
 		"@glaze/shared": "workspace:*",
 		"better-auth": "catalog:auth",

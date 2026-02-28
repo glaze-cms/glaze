@@ -2,10 +2,12 @@ import { Elysia } from 'elysia';
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter, type DB } from 'better-auth/adapters/drizzle';
 
-import type { AuthConfig, GlazeInternalConfig } from '../../config/types';
-import type { GlazeEnv } from '../../validators/env';
-
-import { authResolver } from '../../config/resolver/auth';
+import {
+	authResolver,
+	type AuthConfig,
+	type GlazeInternalConfig,
+	type GlazeEnv,
+} from '@glaze/config';
 
 /**
  * Creates the Better Auth plugin for Elysia.
@@ -17,6 +19,7 @@ import { authResolver } from '../../config/resolver/auth';
 export const authPlugin =
 	(config: GlazeInternalConfig, env: GlazeEnv) =>
 	(
+		// eslint-disable-next-line @typescript-eslint/no-empty-object-type
 		app: Elysia<
 			string,
 			{ decorator: { db: DB }; store: {}; derive: {}; resolve: {} }

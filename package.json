@@ -48,6 +48,7 @@
 			"react-dom": "latest"
 		},
 		"system": {
+			"@clack/prompts": "latest",
 			"pino": "latest",
 			"pino-pretty": "latest"
 		},

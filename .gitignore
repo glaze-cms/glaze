@@ -22,5 +22,8 @@ build/
 .output
 *.log
 
+# Glaze generated files
+.glaze/
+
 # LLMs
 CLAUDE.md

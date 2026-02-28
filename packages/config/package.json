@@ -1,0 +1,49 @@
+{
+	"name": "@glaze/config",
+	"version": "0.0.26",
+	"description": "Configuration types, resolvers, and validators for Glaze CMS.",
+	"license": "MIT",
+	"type": "module",
+	"main": "index.ts",
+	"types": "./dist/index.d.ts",
+	"files": [
+		"dist",
+		"*.ts",
+		"consts/**/*.ts",
+		"env/**/*.ts",
+		"validators/**/*.ts",
+		"types/**/*.ts",
+		"resolvers/**/*.ts",
+		"!**/*.test.ts"
+	],
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"default": "./index.ts"
+		},
+		"./types": {
+			"types": "./dist/types/index.d.ts",
+			"default": "./types/index.ts"
+		}
+	},
+	"scripts": {
+		"lint": "eslint .",
+		"lint:fix": "eslint . --fix",
+		"format": "prettier --check .",
+		"format:fix": "prettier --write .",
+		"typecheck": "tsc --noEmit",
+		"test": "bun test",
+		"prepublishOnly": "bunx tsc -p tsconfig.build.json"
+	},
+	"dependencies": {
+		"@glaze/logger": "workspace:*",
+		"@glaze/shared": "workspace:*",
+		"better-auth": "catalog:auth",
+		"@elysiajs/cors": "catalog:elysia",
+		"typebox": "catalog:validation"
+	},
+	"devDependencies": {
+		"@types/bun": "catalog:development",
+		"typescript": "catalog:development"
+	}
+}

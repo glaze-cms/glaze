@@ -1,10 +1,10 @@
 import { describe, expect, it, spyOn } from 'bun:test';
 import type { Logger } from '@glaze/logger';
-import type { GlazeEnv } from '../../../validators/env';
 import {
 	DEFAULT_CORS_METHODS,
 	DEFAULT_CORS_ALLOWED_HEADERS,
-} from '../../../../lib/consts';
+	type GlazeEnv,
+} from '@glaze/config';
 import { corsPlugin } from './cors';
 
 const createMockLogger = (): Logger =>

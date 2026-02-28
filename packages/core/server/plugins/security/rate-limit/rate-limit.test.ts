@@ -1,7 +1,7 @@
 import { Elysia } from 'elysia';
 import { describe, expect, it, spyOn } from 'bun:test';
 import type { Logger } from '@glaze/logger';
-import type { GlazeEnv } from '../../../validators/env';
+import type { GlazeEnv } from '@glaze/config';
 import { rateLimitPlugin } from './rate-limit';
 
 const createMockLogger = (): Logger =>
@@ -211,9 +211,7 @@ describe('rateLimitPlugin', () => {
 				)
 				.get('/test', () => 'ok');
 
-			const response = await app.handle(
-				new Request('http://localhost/test'),
-			);
+			const response = await app.handle(new Request('http://localhost/test'));
 
 			expect(response.headers.has('RateLimit-Limit')).toBe(false);
 		});
@@ -233,9 +231,7 @@ describe('rateLimitPlugin', () => {
 				)
 				.get('/test', () => 'ok');
 
-			const response = await app.handle(
-				new Request('http://localhost/test'),
-			);
+			const response = await app.handle(new Request('http://localhost/test'));
 
 			expect(response.headers.has('RateLimit-Limit')).toBe(true);
 		});

@@ -1,3 +1,3 @@
 export { authPlugin } from './auth';
-export { authResolver } from '../../config/resolver/auth';
-export type { ResolvedAuthConfig } from './types';
+export { authResolver } from '@glaze/config';
+export type { ResolvedAuthConfig } from '@glaze/config';

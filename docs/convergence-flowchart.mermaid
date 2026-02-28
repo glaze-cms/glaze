@@ -1,0 +1,113 @@
+---
+title: Glaze Convergence v2 - Sync Workflows
+---
+flowchart TB
+    subgraph DEV_SOLO["🧑‍💻 DEV (Solo Mode)"]
+        DS1[Edit schema in code]
+        DS2[Hot reload detects changes]
+        DS3[Convergence detects drift]
+        DS4[Update DB directly]
+        DS5[✅ Sync complete]
+
+        DS1 --> DS2 --> DS3 --> DS4 --> DS5
+    end
+
+    subgraph DEV_TEAM["🧑‍💻 DEV (Team Mode)"]
+        DT1[Edit schema in code]
+        DT2[Hot reload detects changes]
+        DT3[Generate migration file]
+        DT4{Mode?}
+
+        DT1 --> DT2 --> DT3 --> DT4
+
+        subgraph AUTO_DEV["⚡ Auto"]
+            DTA1[Apply migration]
+            DTA2[WebSocket notifies Admin UI]
+            DTA3[React Query invalidates cache]
+            DTA4[✅ Sync complete]
+
+            DTA1 --> DTA2 --> DTA3 --> DTA4
+        end
+
+        subgraph AUDIT_DEV["🔍 Audit"]
+            DTB1[Migration stays pending]
+            DTB2[Dev runs CLI: migrate:apply]
+            DTB3[CLI applies migration]
+            DTB4[CLI compares hashes with __drizzle_migrations]
+            DTB5[CLI updates status in glaze_pending_migrations]
+            DTB6[WebSocket notifies Admin UI]
+            DTB7[React Query invalidates cache]
+            DTB8[✅ Sync complete]
+
+            DTB1 --> DTB2 --> DTB3 --> DTB4 --> DTB5 --> DTB6 --> DTB7 --> DTB8
+        end
+
+        DT4 -->|auto| AUTO_DEV
+        DT4 -->|audit| AUDIT_DEV
+    end
+
+    subgraph ADMIN_SOLO["👤 ADMIN (Solo Mode)"]
+        AS1[Granular HTTP request]
+        AS2[Generate safe SQL]
+        AS3[Apply to DB]
+        AS4{Result?}
+        AS5[DB introspection]
+        AS6[Regenerate schema in code]
+        AS7[✅ Successful response to UI]
+        AS8[❌ Friendly error to UI]
+
+        AS1 --> AS2 --> AS3 --> AS4
+        AS4 -->|success| AS5 --> AS6 --> AS7
+        AS4 -->|error| AS8
+    end
+
+    subgraph ADMIN_TEAM["👤 ADMIN (Team Mode)"]
+        AT1[Granular HTTP request]
+        AT2[Generate migration]
+        AT3{Mode?}
+
+        AT1 --> AT2 --> AT3
+
+        subgraph AUTO_ADMIN["⚡ Auto"]
+            ATA1[Apply migration]
+            ATA2[DB introspection]
+            ATA3[Regenerate schema in code]
+            ATA4[✅ Successful response to UI]
+
+            ATA1 --> ATA2 --> ATA3 --> ATA4
+        end
+
+        subgraph AUDIT_ADMIN["🔍 Audit"]
+            ATB1[Save metadata + expectedHash]
+            ATB2[⏳ Response: pending approval]
+            ATB3[Dev runs CLI: migrate:apply]
+            ATB4[CLI applies migration]
+            ATB5[CLI compares hashes with __drizzle_migrations]
+            ATB6[CLI updates status in glaze_pending_migrations]
+            ATB7[WebSocket notifies Admin UI]
+            ATB8[✅ Field enabled]
+
+            ATB1 --> ATB2
+            ATB3 --> ATB4 --> ATB5 --> ATB6 --> ATB7 --> ATB8
+        end
+
+        AT3 -->|auto| AUTO_ADMIN
+        AT3 -->|audit| AUDIT_ADMIN
+    end
+
+    %% Styling with dark text
+    classDef solo fill:#e8f5e9,stroke:#4caf50,color:#1b5e20
+    classDef team fill:#e3f2fd,stroke:#2196f3,color:#0d47a1
+    classDef auto fill:#fff3e0,stroke:#ff9800,color:#e65100
+    classDef audit fill:#fce4ec,stroke:#e91e63,color:#880e4f
+    classDef success fill:#c8e6c9,stroke:#388e3c,color:#1b5e20
+    classDef error fill:#ffcdd2,stroke:#d32f2f,color:#b71c1c
+
+    class DS1,DS2,DS3,DS4,DS5 solo
+    class AS1,AS2,AS3,AS4,AS5,AS6,AS7 solo
+    class DT1,DT2,DT3,DT4 team
+    class AT1,AT2,AT3 team
+    class DTA1,DTA2,DTA3,DTA4,ATA1,ATA2,ATA3,ATA4 auto
+    class DTB1,DTB2,DTB3,DTB4,DTB5,DTB6,DTB7,DTB8,ATB1,ATB2,ATB3,ATB4,ATB5,ATB6,ATB7,ATB8 audit
+    class DS5,AS7,DTA4,DTB8,ATA4,ATB8 success
+    class AS8 error

@@ -28,7 +28,9 @@ export async function mergeConfig({
 	} catch (err) {
 		const code = (err as NodeJS.ErrnoException).code;
 		if (code === 'ENOENT') {
-			throw new Error(`Drizzle config not found: ${userConfigPath}`);
+			throw new Error(`Drizzle config not found: ${userConfigPath}`, {
+				cause: err,
+			});
 		}
 		throw err;
 	}
@@ -38,7 +40,9 @@ export async function mergeConfig({
 	} catch (err) {
 		const code = (err as NodeJS.ErrnoException).code;
 		if (code === 'ENOENT') {
-			throw new Error(`Glaze schema not found at: ${glazeSchemaPath}`);
+			throw new Error(`Glaze schema not found at: ${glazeSchemaPath}`, {
+				cause: err,
+			});
 		}
 		throw err;
 	}
@@ -59,9 +63,14 @@ export async function mergeConfig({
 		.replace(/\\/g, '/') // Windows compat
 		.replace(/\.ts$/, ''); // Remove extension
 
-	const relativeGlazeSchemaPath = relative(wrappedConfigDir, glazeSchemaPath)
-		.replace(/\\/g, '/') // Windows compat
-		.replace(/\.ts$/, ''); // Remove extension
+	// Glaze schema path must be relative to CWD because drizzle-kit resolves
+	// schema file paths relative to the process working directory, not the config file.
+	// The .ts extension must be kept — drizzle-kit requires it for schema file paths
+	// (unlike TypeScript imports where the extension must be omitted).
+	const relativeGlazeSchemaPath = relative(cwd, glazeSchemaPath).replace(
+		/\\/g,
+		'/',
+	); // Windows compat only
 
 	const content = `
 import { defineConfig } from 'drizzle-kit';

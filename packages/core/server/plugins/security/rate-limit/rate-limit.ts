@@ -1,9 +1,8 @@
 import { Elysia } from 'elysia';
 import { rateLimit } from 'elysia-rate-limit';
 
-import type { GlazeEnv } from '../../../validators/env';
+import type { GlazeEnv, GlazeInternalConfig } from '@glaze/config';
 import type { Logger } from '@glaze/logger';
-import type { GlazeInternalConfig } from '../../../validators/config';
 
 export const rateLimitPlugin = (
 	config: GlazeInternalConfig['security'],

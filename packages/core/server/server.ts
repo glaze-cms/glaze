@@ -5,6 +5,7 @@ import { drizzle } from 'drizzle-orm/node-postgres';
 import { authPlugin } from './plugins/auth';
 import { healthCheckPlugin } from './plugins/health';
 import { adminPlugin } from './plugins/admin';
+import { schemaPlugin } from './plugins/schema';
 import { corsPlugin, rateLimitPlugin } from './plugins/security';
 
 /* Hooks */
@@ -14,9 +15,8 @@ import { handleStart } from './hooks';
 import * as authSchema from '../schema';
 
 /*  Types */
-import type { GlazeEnv } from './validators/env';
+import type { GlazeEnv, GlazeInternalConfig } from '@glaze/config';
 import type { Logger } from '@glaze/logger';
-import type { GlazeInternalConfig } from './validators/config';
 
 /**
  * Creates a Glaze server instance.
@@ -45,6 +45,7 @@ export function createGlazeServer({
 		.use(rateLimitPlugin(config.security, env, logger))
 		.use(healthCheckPlugin(config.healthCheck))
 		.use(adminPlugin(config))
+		.use(schemaPlugin(config, env))
 		.use(corsPlugin(config.security, env, logger))
 		.use(authPlugin(config, env))
 		.get('/', () => ({

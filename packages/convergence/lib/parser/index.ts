@@ -1,0 +1,1 @@
+export { scanTopLevelExports } from './parser';

@@ -55,6 +55,11 @@ jobs:
           bun publish --non-interactive || echo "Skipping logger (likely already published)"
           cd ../..
 
+          echo "Publishing @glaze/config..."
+          cd packages/config
+          bun publish --non-interactive || echo "Skipping config (likely already published)"
+          cd ../..
+
           echo "Publishing @glaze/admin..."
           cd packages/admin
           bun publish --non-interactive || echo "Skipping admin (likely already published)"

@@ -1,9 +1,10 @@
 import { Elysia } from 'elysia';
 import { uptime } from 'node:process';
 
-import { DEFAULT_HEALTH_CHECK_PATH } from '../../../lib/consts';
-
-import type { ResolvedHealthCheckConfig } from '../../config/types';
+import {
+	DEFAULT_HEALTH_CHECK_PATH,
+	type ResolvedHealthCheckConfig,
+} from '@glaze/config';
 
 /**
  * Injects a health check endpoint into the Elysia instance.

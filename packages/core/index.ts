@@ -1,17 +1,15 @@
 import { createLogger } from '@glaze/logger';
 
-/* Validators */
-import { validateEnv } from './server/validators/env';
-import { validateConfig } from './server/validators/config';
-
-/* Resolver */
-import { resolveConfig } from './server/config/resolver';
+/* Config */
+import {
+	validateEnv,
+	validateConfig,
+	resolveConfig,
+	type GlazeConfig,
+} from '@glaze/config';
 
 /* Server */
 import { createGlazeServer } from './server/server';
-
-/* Types */
-import type { GlazeConfig } from './server/config/types';
 
 export function glaze({ config }: { config?: GlazeConfig } = {}) {
 	const logger = createLogger({ name: 'GLAZE' });
