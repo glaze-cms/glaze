@@ -1,6 +1,6 @@
 {
 	"name": "@glaze/config",
-	"version": "0.0.25",
+	"version": "0.0.26",
 	"description": "Configuration types, resolvers, and validators for Glaze CMS.",
 	"license": "MIT",
 	"type": "module",
