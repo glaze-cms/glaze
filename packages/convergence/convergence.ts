@@ -1,3 +1,6 @@
+import { rm } from 'node:fs/promises';
+import { dirname } from 'node:path';
+
 import { mergeConfig } from '@glaze/shared';
 import { runSoloWorkflow } from './workflows/solo';
 
@@ -19,12 +22,16 @@ export async function runConvergence({
 			glazeSchemaPath,
 		});
 
-		await runSoloWorkflow({
-			db,
-			logger,
-			config: config.solo ?? {},
-			connectionString,
-			configPath: mergedConfigPath,
-		});
+		try {
+			await runSoloWorkflow({
+				db,
+				logger,
+				config: config.solo ?? {},
+				connectionString,
+				configPath: mergedConfigPath,
+			});
+		} finally {
+			await rm(dirname(mergedConfigPath), { recursive: true, force: true });
+		}
 	}
 }
