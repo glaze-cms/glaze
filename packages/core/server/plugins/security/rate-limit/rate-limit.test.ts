@@ -211,9 +211,7 @@ describe('rateLimitPlugin', () => {
 				)
 				.get('/test', () => 'ok');
 
-			const response = await app.handle(
-				new Request('http://localhost/test'),
-			);
+			const response = await app.handle(new Request('http://localhost/test'));
 
 			expect(response.headers.has('RateLimit-Limit')).toBe(false);
 		});
@@ -233,9 +231,7 @@ describe('rateLimitPlugin', () => {
 				)
 				.get('/test', () => 'ok');
 
-			const response = await app.handle(
-				new Request('http://localhost/test'),
-			);
+			const response = await app.handle(new Request('http://localhost/test'));
 
 			expect(response.headers.has('RateLimit-Limit')).toBe(true);
 		});

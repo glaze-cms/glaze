@@ -160,7 +160,7 @@ export function extractRawSql(formattedOutput: string): string[] {
 				const stmt = parts[i]?.trim();
 				if (stmt) statements.push(stmt);
 			}
-			currentStatement = parts[parts.length - 1]?.trim() || '';
+			currentStatement = parts[parts.length - 1]?.trim() ?? '';
 			parenDepth = 0;
 		}
 		// 2. CREATE TABLE/CREATE INDEX/ALTER TABLE statements are complete when parens are balanced

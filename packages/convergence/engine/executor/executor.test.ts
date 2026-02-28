@@ -1,5 +1,4 @@
 import { describe, it, expect, beforeEach } from 'bun:test';
-import { sql } from 'drizzle-orm';
 
 import { createLogger, type Logger } from '@glaze/logger';
 

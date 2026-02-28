@@ -24,12 +24,17 @@ export interface SplitSchemaResult {
 	files: string[];
 }
 
-function parseHeaderImports(header: string): Array<{ specifiers: string[]; from: string }> {
+function parseHeaderImports(
+	header: string,
+): Array<{ specifiers: string[]; from: string }> {
 	const result: Array<{ specifiers: string[]; from: string }> = [];
 	const re = /import\s*\{([^}]+)\}\s*from\s*(['"][^'"]+['"])/g;
 	let m: RegExpExecArray | null;
 	while ((m = re.exec(header)) !== null) {
-		const specifiers = (m[1] ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+		const specifiers = (m[1] ?? '')
+			.split(',')
+			.map((s) => s.trim())
+			.filter(Boolean);
 		const from = m[2] ?? '';
 		if (specifiers.length > 0 && from) result.push({ specifiers, from });
 	}
@@ -42,15 +47,19 @@ function buildImportsForContent(
 ): string {
 	return imports
 		.flatMap(({ specifiers, from }) => {
-			const used = specifiers.filter((s) => new RegExp(`\\b${s}\\b`).test(fileContent));
-			return used.length > 0 ? [`import { ${used.join(', ')} } from ${from}`] : [];
+			const used = specifiers.filter((s) =>
+				new RegExp(`(?<!\\.)\\b${s}\\b`).test(fileContent),
+			);
+			return used.length > 0
+				? [`import { ${used.join(', ')} } from ${from}`]
+				: [];
 		})
 		.join('\n');
 }
 
 /**
  * Splits a drizzle-kit pull output (single schema.ts) into per-table files.
- * Enum blocks are included in every file that needs them.
+ * Only enum blocks referenced by a table are included in that table's file.
  * Generates an index.ts re-exporting all tables.
  */
 export async function splitSchema({
@@ -70,8 +79,9 @@ export async function splitSchema({
 
 	const blocks = scanTopLevelExports(content);
 
-	const enumBlocks = blocks.filter((b) => b.match(/export const \w+ = pgEnum\(/));
-	const enumContent = enumBlocks.join('\n\n');
+	const enumBlocks = blocks.filter((b) =>
+		b.match(/export const \w+ = pgEnum\(/),
+	);
 
 	for (const block of blocks) {
 		const isTable = block.match(/export const (\w+) = pgTable\(/);
@@ -88,7 +98,15 @@ export async function splitSchema({
 			.map((ref) => `import { ${ref} } from './${ref}';`)
 			.join('\n');
 
-		const fileContent = [enumContent, block.trim()].filter(Boolean).join('\n\n');
+		const usedEnums = enumBlocks.filter((enumBlock) => {
+			const enumName = enumBlock.match(/export const (\w+) = pgEnum\(/)?.[1];
+			return enumName && new RegExp(`\\b${enumName}\\b`).test(block);
+		});
+		const enumContent = usedEnums.join('\n\n');
+
+		const fileContent = [enumContent, block.trim()]
+			.filter(Boolean)
+			.join('\n\n');
 		const importLines = buildImportsForContent(parsedImports, fileContent);
 
 		const parts: string[] = [CODEGEN_HEADER];

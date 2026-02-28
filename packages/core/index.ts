@@ -1,8 +1,12 @@
 import { createLogger } from '@glaze/logger';
 
 /* Config */
-import { validateEnv, validateConfig, resolveConfig } from '@glaze/config';
-import type { GlazeConfig } from '@glaze/config';
+import {
+	validateEnv,
+	validateConfig,
+	resolveConfig,
+	type GlazeConfig,
+} from '@glaze/config';
 
 /* Server */
 import { createGlazeServer } from './server/server';

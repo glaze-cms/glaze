@@ -14,10 +14,16 @@ import {
 	tableExists,
 	columnExists,
 	tableIsEmpty,
+	columnHasNulls,
 } from '../validators/index';
 
 import type { DrizzleDatabase } from '../../types/index';
-import type { FieldDef, LiteralDefault, ExprDefault, OperationResult } from '../types/index';
+import type {
+	FieldDef,
+	LiteralDefault,
+	ExprDefault,
+	OperationResult,
+} from '../types/index';
 
 export async function addField(
 	db: DrizzleDatabase,
@@ -144,6 +150,7 @@ export async function dropField(
 
 export interface AlterFieldChanges {
 	nullable?: boolean;
+	// eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents
 	default?: LiteralDefault | ExprDefault | 'drop';
 }
 
@@ -172,11 +179,11 @@ export async function alterField(
 	const statements: string[] = [];
 
 	if (changes.nullable === false) {
-		// Adding NOT NULL — only safe if the column has no existing NULLs
-		if (!(await tableIsEmpty(db, collection))) {
+		// SET NOT NULL fails at the DB level if any existing rows have a NULL in this column
+		if (await columnHasNulls(db, collection, field)) {
 			return {
 				success: false,
-				code: 'FIELD_NOT_NULL_NO_DEFAULT',
+				code: 'FIELD_HAS_NULL_VALUES',
 				error: { collection, field },
 			};
 		}

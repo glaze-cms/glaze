@@ -11,7 +11,7 @@ describe('introspect-db', () => {
 		}));
 
 		expect(
-			introspectToSchema('url', { shell: mockFailShell as any }),
+			introspectToSchema('url', { shell: mockFailShell as never }),
 		).rejects.toThrow('drizzle-kit pull failed: Connection refused');
 	});
 });

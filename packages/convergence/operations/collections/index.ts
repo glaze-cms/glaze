@@ -1,1 +1,5 @@
-export { createCollection, renameCollection, dropCollection } from './collections';
+export {
+	createCollection,
+	renameCollection,
+	dropCollection,
+} from './collections';

@@ -21,7 +21,9 @@ export function runIntrospectionInBackground({
 }: IntrospectOptions): void {
 	syncSchema(connectionString, schemaOutDir).then(
 		(files) => {
-			logger.debug(`Schema sync complete: ${String(files.length)} files written`);
+			logger.debug(
+				`Schema sync complete: ${String(files.length)} files written`,
+			);
 		},
 		(err: unknown) => {
 			logger.warn(

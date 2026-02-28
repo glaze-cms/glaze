@@ -237,8 +237,8 @@ describe('looksLikeInteractiveRenamePrompt', () => {
 	});
 
 	it('returns false for unrelated questions (avoid false positives)', () => {
-		expect(
-			looksLikeInteractiveRenamePrompt('Do you want to continue?'),
-		).toBe(false);
+		expect(looksLikeInteractiveRenamePrompt('Do you want to continue?')).toBe(
+			false,
+		);
 	});
 });

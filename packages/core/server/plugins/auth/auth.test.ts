@@ -4,16 +4,16 @@ import type { GlazeInternalConfig, GlazeEnv } from '@glaze/config';
 
 const mockBetterAuth = mock(() => ({
 	handler: (_req: Request) => new Response('auth ok'),
-	api: { getSession: async () => null },
+	api: { getSession: () => Promise.resolve(null) },
 }));
 
 const mockDrizzleAdapter = mock(() => ({}));
 
-mock.module('better-auth', () => ({
+void mock.module('better-auth', () => ({
 	betterAuth: mockBetterAuth,
 }));
 
-mock.module('better-auth/adapters/drizzle', () => ({
+void mock.module('better-auth/adapters/drizzle', () => ({
 	drizzleAdapter: mockDrizzleAdapter,
 }));
 
@@ -93,6 +93,7 @@ describe('authPlugin', () => {
 
 	it('should use GLAZE_SERVER_URL as baseURL when available', () => {
 		const mockDb = {};
+		// eslint-disable-next-line @typescript-eslint/no-unsafe-argument
 		const env = createMockEnv({
 			GLAZE_SERVER_URL: 'https://myapp.com',
 		} as any);
@@ -167,6 +168,7 @@ describe('authPlugin', () => {
 
 		expect(mockBetterAuth).toHaveBeenCalledWith(
 			expect.objectContaining({
+				// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
 				emailAndPassword: expect.objectContaining({ enabled: true }),
 			}),
 		);

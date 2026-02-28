@@ -71,11 +71,9 @@ export async function detectDriftFromSchema(
 		);
 
 		// Run custom data validation if DB instance is provided
+		// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
 		if (db && hasDrift) {
-			const validationWarnings = await validateDataConstraints(
-				db,
-				statements,
-			);
+			const validationWarnings = await validateDataConstraints(db, statements);
 			if (validationWarnings.length > 0) {
 				warnings.push(...validationWarnings);
 			}
@@ -144,6 +142,6 @@ export async function detectDriftFromSchema(
 		};
 	} catch (error) {
 		const msg = error instanceof Error ? error.message : String(error);
-		throw new Error(`Drift detection failed: ${msg}`);
+		throw new Error(`Drift detection failed: ${msg}`, { cause: error });
 	}
 }

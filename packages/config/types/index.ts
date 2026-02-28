@@ -7,4 +7,8 @@ export type {
 } from './auth';
 export type { SecurityConfig, ResolvedSecurityConfig } from './security';
 export type { HealthCheckConfig, ResolvedHealthCheckConfig } from './health';
-export type { SyncConfig, SoloWorkflowConfig, TeamWorkflowConfig } from './sync';
+export type {
+	SyncConfig,
+	SoloWorkflowConfig,
+	TeamWorkflowConfig,
+} from './sync';

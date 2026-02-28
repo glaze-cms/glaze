@@ -12,7 +12,7 @@ export type DbExecuteResult = { rows: DbRow[] } | DbRow[];
  * Generic Drizzle database type.
  * Avoids tight coupling to specific Drizzle types.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+
 export interface DrizzleDatabase {
 	execute: (query: any) => Promise<any>;
 	transaction: (cb: (tx: any) => Promise<any>) => Promise<any>;

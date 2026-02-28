@@ -328,7 +328,7 @@ describe('validateConfig', () => {
 
 			expect(
 				(result.auth as { betterAuth?: { emailVerification?: unknown } })
-					?.betterAuth?.emailVerification,
+					.betterAuth?.emailVerification,
 			).toEqual({
 				sendOnSignUp: true,
 			});
@@ -352,7 +352,7 @@ describe('validateConfig', () => {
 
 			expect(
 				(result.auth as { betterAuth?: { emailAndPassword?: unknown } })
-					?.betterAuth?.emailAndPassword,
+					.betterAuth?.emailAndPassword,
 			).toEqual({
 				requireEmailVerification: true,
 			});
@@ -374,7 +374,7 @@ describe('validateConfig', () => {
 
 			expect(
 				(result.auth as { drizzleAdapter?: { debugLogs?: boolean } })
-					?.drizzleAdapter?.debugLogs,
+					.drizzleAdapter?.debugLogs,
 			).toBe(true);
 			expect(mockProcessExit).not.toHaveBeenCalled();
 		});

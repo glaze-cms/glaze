@@ -14,7 +14,10 @@ export async function runConvergence({
 
 	if (config.workflow === 'solo') {
 		const userConfigPath = config.solo?.configPath ?? 'drizzle.config.ts';
-		const mergedConfigPath = await mergeConfig({ userConfigPath, glazeSchemaPath });
+		const mergedConfigPath = await mergeConfig({
+			userConfigPath,
+			glazeSchemaPath,
+		});
 
 		await runSoloWorkflow({
 			db,

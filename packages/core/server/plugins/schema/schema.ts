@@ -9,12 +9,12 @@ import {
 	dropField,
 	alterField,
 	runIntrospectionInBackground,
+	type DrizzleDatabase,
 } from '@glaze/convergence';
 import { operationToResponse } from '../../../lib/utils/index';
 
 import type { GlazeInternalConfig, GlazeEnv } from '@glaze/config';
 import type { Logger } from '@glaze/logger';
-import type { DrizzleDatabase } from '@glaze/convergence';
 
 const FIELD_TYPE = t.Union([
 	t.Literal('text'),
@@ -54,14 +54,20 @@ const FIELD_DEF = t.Object({
 export const schemaPlugin =
 	(config: GlazeInternalConfig, env: GlazeEnv) =>
 	(
+		// eslint-disable-next-line @typescript-eslint/no-empty-object-type
 		app: Elysia<
 			string,
-			{ decorator: { db: DrizzleDatabase; logger: Logger }; store: {}; derive: {}; resolve: {} }
+			{
+				decorator: { db: DrizzleDatabase; logger: Logger };
+				store: {};
+				derive: {};
+				resolve: {};
+			}
 		>,
 	) => {
 		const connectionString = env.GLAZE_DATABASE_URL;
 		const schemaOutDir =
-			config.sync?.workflow === 'solo'
+			config.sync.workflow === 'solo'
 				? (config.sync.solo?.schemaOutDir ?? './schema')
 				: './schema';
 
@@ -80,7 +86,11 @@ export const schemaPlugin =
 							set.status = 422;
 							return operationToResponse(result);
 						}
-						runIntrospectionInBackground({ connectionString, schemaOutDir, logger });
+						runIntrospectionInBackground({
+							connectionString,
+							schemaOutDir,
+							logger,
+						});
 						return operationToResponse(result);
 					},
 					{
@@ -102,7 +112,11 @@ export const schemaPlugin =
 							set.status = 422;
 							return operationToResponse(result);
 						}
-						runIntrospectionInBackground({ connectionString, schemaOutDir, logger });
+						runIntrospectionInBackground({
+							connectionString,
+							schemaOutDir,
+							logger,
+						});
 						return operationToResponse(result);
 					},
 					{
@@ -118,7 +132,11 @@ export const schemaPlugin =
 						set.status = 422;
 						return operationToResponse(result);
 					}
-					runIntrospectionInBackground({ connectionString, schemaOutDir, logger });
+					runIntrospectionInBackground({
+						connectionString,
+						schemaOutDir,
+						logger,
+					});
 					return operationToResponse(result);
 				})
 
@@ -135,7 +153,11 @@ export const schemaPlugin =
 							set.status = 422;
 							return operationToResponse(result);
 						}
-						runIntrospectionInBackground({ connectionString, schemaOutDir, logger });
+						runIntrospectionInBackground({
+							connectionString,
+							schemaOutDir,
+							logger,
+						});
 						return operationToResponse(result);
 					},
 					{ body: FIELD_DEF },
@@ -154,7 +176,11 @@ export const schemaPlugin =
 								set.status = 422;
 								return operationToResponse(result);
 							}
-							runIntrospectionInBackground({ connectionString, schemaOutDir, logger });
+							runIntrospectionInBackground({
+								connectionString,
+								schemaOutDir,
+								logger,
+							});
 							return operationToResponse(result);
 						}
 
@@ -167,16 +193,18 @@ export const schemaPlugin =
 							set.status = 422;
 							return operationToResponse(result);
 						}
-						runIntrospectionInBackground({ connectionString, schemaOutDir, logger });
+						runIntrospectionInBackground({
+							connectionString,
+							schemaOutDir,
+							logger,
+						});
 						return operationToResponse(result);
 					},
 					{
 						body: t.Object({
 							newName: t.Optional(t.String()),
 							nullable: t.Optional(t.Boolean()),
-							default: t.Optional(
-								t.Union([t.Literal('drop'), FIELD_DEFAULT]),
-							),
+							default: t.Optional(t.Union([t.Literal('drop'), FIELD_DEFAULT])),
 						}),
 					},
 				)
@@ -192,7 +220,11 @@ export const schemaPlugin =
 							set.status = 422;
 							return operationToResponse(result);
 						}
-						runIntrospectionInBackground({ connectionString, schemaOutDir, logger });
+						runIntrospectionInBackground({
+							connectionString,
+							schemaOutDir,
+							logger,
+						});
 						return operationToResponse(result);
 					},
 				),

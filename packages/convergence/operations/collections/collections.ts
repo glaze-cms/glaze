@@ -28,6 +28,27 @@ export async function createCollection(
 		};
 	}
 
+	// Validate each field name: reserved names and duplicates
+	const seen = new Set<string>();
+	for (const field of fields) {
+		if (isReservedName(field.name)) {
+			return {
+				success: false,
+				code: 'RESERVED_NAME',
+				error: { field: field.name },
+			};
+		}
+		const key = field.name.toLowerCase();
+		if (seen.has(key)) {
+			return {
+				success: false,
+				code: 'DUPLICATE_FIELD_NAME',
+				error: { field: field.name },
+			};
+		}
+		seen.add(key);
+	}
+
 	// Target must not already exist
 	if (await tableExists(db, name)) {
 		return {

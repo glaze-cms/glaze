@@ -28,12 +28,17 @@ describe('runIntrospectionInBackground', () => {
 
 		await Promise.resolve();
 
-		expect(mockSyncSchema).toHaveBeenCalledWith('postgres://localhost:5432/mydb', '/out');
+		expect(mockSyncSchema).toHaveBeenCalledWith(
+			'postgres://localhost:5432/mydb',
+			'/out',
+		);
 	});
 
 	it('calls logger.debug with a message containing the file count on success', async () => {
 		const logger = createMockLogger();
-		mockSyncSchema.mockImplementation(() => Promise.resolve(['/out/a.ts', '/out/b.ts']));
+		mockSyncSchema.mockImplementation(() =>
+			Promise.resolve(['/out/a.ts', '/out/b.ts']),
+		);
 
 		runIntrospectionInBackground({
 			connectionString: 'postgres://localhost:5432/mydb',
@@ -49,7 +54,9 @@ describe('runIntrospectionInBackground', () => {
 
 	it('calls logger.warn with a message containing the error message on failure', async () => {
 		const logger = createMockLogger();
-		mockSyncSchema.mockImplementation(() => Promise.reject(new Error('DB down')));
+		mockSyncSchema.mockImplementation(() =>
+			Promise.reject(new Error('DB down')),
+		);
 
 		runIntrospectionInBackground({
 			connectionString: 'postgres://localhost:5432/mydb',
@@ -60,6 +67,8 @@ describe('runIntrospectionInBackground', () => {
 
 		await Promise.resolve();
 
-		expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining('DB down'));
+		expect(logger.warn).toHaveBeenCalledWith(
+			expect.stringContaining('DB down'),
+		);
 	});
 });

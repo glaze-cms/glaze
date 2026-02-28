@@ -53,7 +53,7 @@ export const posts = pgTable("posts", {
 			expect(indexCall[1]).toContain("export * from './posts';");
 		});
 
-		it('should extract and include enums', async () => {
+		it('should include an enum only in files whose table references it', async () => {
 			const content = `
 import { pgEnum, pgTable } from "drizzle-orm/pg-core";
 
@@ -62,14 +62,20 @@ export const roleEnum = pgEnum("role", ["admin", "user"]);
 export const users = pgTable("users", {
 	role: roleEnum("role"),
 });
+
+export const posts = pgTable("posts", {
+	id: text("id"),
+});
 `;
 			await splitSchema({ content, outDir: '/tmp/out', writer: mockWrite });
 
-			const call = mockWrite.mock.calls[0] as unknown as [string, string] | undefined;
-			if (!call) throw new Error('Call not found');
+			const calls = mockWrite.mock.calls as unknown as [string, string][];
+			const usersCall = calls.find((c) => c[0].includes('users.ts'));
+			const postsCall = calls.find((c) => c[0].includes('posts.ts'));
+			if (!usersCall || !postsCall) throw new Error('Expected calls not found');
 
-			expect(call[0]).toContain('users.ts');
-			expect(call[1]).toContain('export const roleEnum');
+			expect(usersCall[1]).toContain('export const roleEnum');
+			expect(postsCall[1]).not.toContain('export const roleEnum');
 		});
 
 		it('should include only the imports used by each table', async () => {
@@ -81,7 +87,9 @@ export const users = pgTable("users", {
 `;
 			await splitSchema({ content, outDir: '/tmp/out', writer: mockWrite });
 
-			const call = mockWrite.mock.calls[0] as unknown as [string, string] | undefined;
+			const call = mockWrite.mock.calls[0] as unknown as
+				| [string, string]
+				| undefined;
 			if (!call) throw new Error('Call not found');
 
 			expect(call[1]).toContain('pgTable');
@@ -98,7 +106,9 @@ export const posts = pgTable("posts", {
 `;
 			await splitSchema({ content, outDir: '/tmp/out', writer: mockWrite });
 
-			const call = mockWrite.mock.calls[0] as unknown as [string, string] | undefined;
+			const call = mockWrite.mock.calls[0] as unknown as
+				| [string, string]
+				| undefined;
 			if (!call) throw new Error('Call not found');
 
 			expect(call[0]).toContain('posts.ts');
@@ -113,7 +123,9 @@ export const category = pgTable("category", {
 `;
 			await splitSchema({ content, outDir: '/tmp/out', writer: mockWrite });
 
-			const call = mockWrite.mock.calls[0] as unknown as [string, string] | undefined;
+			const call = mockWrite.mock.calls[0] as unknown as
+				| [string, string]
+				| undefined;
 			if (!call) throw new Error('Call not found');
 
 			expect(call[0]).toContain('category.ts');
@@ -135,7 +147,9 @@ export const users = pgTable("users", {
 `;
 			await splitSchema({ content, outDir: '/tmp/out', writer: mockWrite });
 
-			const call = mockWrite.mock.calls[0] as unknown as [string, string] | undefined;
+			const call = mockWrite.mock.calls[0] as unknown as
+				| [string, string]
+				| undefined;
 			if (!call) throw new Error('Call not found');
 
 			expect(call[0]).toContain('users.ts');

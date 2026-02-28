@@ -1,8 +1,18 @@
-import { introspectToSchema, type IntrospectDbOptions } from '../introspect-db/index';
-import { splitSchema, type SplitSchemaOptions, type SplitSchemaResult } from '../splitter/index';
+import {
+	introspectToSchema,
+	type IntrospectDbOptions,
+} from '../introspect-db/index';
+import {
+	splitSchema,
+	type SplitSchemaOptions,
+	type SplitSchemaResult,
+} from '../splitter/index';
 
 export interface SyncSchemaOptions {
-	introspector?: (connectionString: string, options?: IntrospectDbOptions) => Promise<string>;
+	introspector?: (
+		connectionString: string,
+		options?: IntrospectDbOptions,
+	) => Promise<string>;
 	splitter?: (options: SplitSchemaOptions) => Promise<SplitSchemaResult>;
 }
 

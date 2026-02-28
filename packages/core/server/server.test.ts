@@ -2,20 +2,20 @@ import { describe, it, expect, mock, spyOn } from 'bun:test';
 import type { Logger } from '@glaze/logger';
 import type { GlazeInternalConfig, GlazeEnv } from '@glaze/config';
 
-const mockDb = { execute: async () => [{ '?column?': 1 }] };
+const mockDb = { execute: () => Promise.resolve([{ '?column?': 1 }]) };
 
-mock.module('drizzle-orm/node-postgres', () => ({
+void mock.module('drizzle-orm/node-postgres', () => ({
 	drizzle: () => mockDb,
 }));
 
-mock.module('better-auth', () => ({
+void mock.module('better-auth', () => ({
 	betterAuth: () => ({
 		handler: (_req: Request) => new Response('auth ok'),
-		api: { getSession: async () => null },
+		api: { getSession: () => Promise.resolve(null) },
 	}),
 }));
 
-mock.module('better-auth/adapters/drizzle', () => ({
+void mock.module('better-auth/adapters/drizzle', () => ({
 	drizzleAdapter: () => ({}),
 }));
 
@@ -47,6 +47,7 @@ const createTestConfig = (): GlazeInternalConfig =>
 		apiPrefix: '/api',
 		adminPrefix: '/admin',
 		schema: {},
+		sync: { workflow: 'solo' as const, enabled: false },
 		security: {
 			cors: {
 				methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -143,7 +144,7 @@ describe('createGlazeServer', () => {
 		const mockLogger = createMockLogger();
 		const infoSpy = spyOn(mockLogger, 'info');
 		const env = createMockEnv();
-		(env as any).GLAZE_SERVER_URL = 'https://myapp.com';
+		(env as Record<string, unknown>).GLAZE_SERVER_URL = 'https://myapp.com';
 
 		createGlazeServer({
 			env,

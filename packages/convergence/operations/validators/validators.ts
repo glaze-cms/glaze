@@ -1,4 +1,6 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
 import { sql } from 'drizzle-orm';
+import format from 'pg-format';
 
 import type { DrizzleDatabase } from '../../types/index';
 
@@ -62,13 +64,28 @@ export async function columnExists(
 	return Array.isArray(rows) && rows.length > 0;
 }
 
+export async function columnHasNulls(
+	db: DrizzleDatabase,
+	table: string,
+	column: string,
+): Promise<boolean> {
+	const result = await db.execute(
+		sql`SELECT EXISTS (
+            SELECT 1 FROM ${sql.raw(format('%I', table))}
+            WHERE ${sql.raw(format('%I', column))} IS NULL LIMIT 1
+        ) AS has_nulls`,
+	);
+	const rows = 'rows' in result ? result.rows : result;
+	return Boolean((rows as Array<{ has_nulls: boolean }>)[0]?.has_nulls);
+}
+
 export async function tableIsEmpty(
 	db: DrizzleDatabase,
 	table: string,
 ): Promise<boolean> {
 	// Use EXISTS for efficiency — stops at first row found
 	const result = await db.execute(
-		sql`SELECT NOT EXISTS (SELECT 1 FROM ${sql.raw(`"${table}"`)} LIMIT 1) AS empty`,
+		sql`SELECT NOT EXISTS (SELECT 1 FROM ${sql.raw(format('%I', table))} LIMIT 1) AS empty`,
 	);
 	const rows = 'rows' in result ? result.rows : result;
 	return Boolean((rows as Array<{ empty: boolean }>)[0]?.empty);

@@ -5,7 +5,10 @@ import { mergeConfig } from './merge-schema';
 
 const TMP_DIR = resolve(import.meta.dirname, '.test-tmp');
 const USER_CONFIG_PATH = resolve(TMP_DIR, 'drizzle.config.ts');
-const GLAZE_SCHEMA_PATH = resolve(TMP_DIR, 'node_modules/@glaze/core/schema.ts');
+const GLAZE_SCHEMA_PATH = resolve(
+	TMP_DIR,
+	'node_modules/@glaze/core/schema.ts',
+);
 
 function setupFixtures() {
 	mkdirSync(dirname(USER_CONFIG_PATH), { recursive: true });
@@ -24,7 +27,7 @@ describe('mergeConfig', () => {
 		rmSync(TMP_DIR, { recursive: true, force: true });
 	});
 
-	test('should throw if user config does not exist', async () => {
+	test('should throw if user config does not exist', () => {
 		const missingPath = resolve(TMP_DIR, 'missing.config.ts');
 
 		expect(
@@ -156,7 +159,7 @@ describe('mergeConfig', () => {
 		expect(content).toContain('process.env.DATABASE_URL');
 	});
 
-	test('should throw if glaze schema path does not exist', async () => {
+	test('should throw if glaze schema path does not exist', () => {
 		const fakePath = resolve(TMP_DIR, 'nonexistent/schema.ts');
 
 		expect(
@@ -175,6 +178,7 @@ describe('mergeConfig', () => {
 		Bun.write = writeMock as typeof Bun.write;
 
 		try {
+			// eslint-disable-next-line @typescript-eslint/await-thenable, @typescript-eslint/no-confusing-void-expression
 			await expect(
 				mergeConfig({
 					userConfigPath: USER_CONFIG_PATH,
@@ -200,10 +204,7 @@ describe('mergeConfig', () => {
 
 	test('should not strip non-.ts extensions from import paths', async () => {
 		const jsConfigPath = resolve(TMP_DIR, 'drizzle.config.js');
-		const jsSchemaPath = resolve(
-			TMP_DIR,
-			'node_modules/@glaze/core/schema.js',
-		);
+		const jsSchemaPath = resolve(TMP_DIR, 'node_modules/@glaze/core/schema.js');
 
 		writeFileSync(jsConfigPath, 'export default {}');
 		mkdirSync(dirname(jsSchemaPath), { recursive: true });

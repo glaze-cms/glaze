@@ -23,6 +23,10 @@ const columnNotFound = { rows: [] };
 const tableEmpty = { rows: [{ empty: true }] };
 /** tableIsEmpty → table is NOT empty */
 const tableNotEmpty = { rows: [{ empty: false }] };
+/** columnHasNulls → column contains NULL values */
+const nullsFound = { rows: [{ has_nulls: true }] };
+/** columnHasNulls → column contains no NULL values */
+const noNullsFound = { rows: [{ has_nulls: false }] };
 
 // ─── addField ─────────────────────────────────────────────────────────────────
 
@@ -61,7 +65,7 @@ describe('addField', () => {
 
 	it('returns FIELD_ALREADY_EXISTS when the column already exists', async () => {
 		mockExecute
-			.mockResolvedValueOnce(tableFound)  // tableExists
+			.mockResolvedValueOnce(tableFound) // tableExists
 			.mockResolvedValueOnce(columnFound); // columnExists
 
 		const result = await addField(mockDb as never, {
@@ -79,7 +83,7 @@ describe('addField', () => {
 
 	it('returns FIELD_NOT_NULL_NO_DEFAULT when NOT NULL, no default, and table is non-empty', async () => {
 		mockExecute
-			.mockResolvedValueOnce(tableFound)    // tableExists
+			.mockResolvedValueOnce(tableFound) // tableExists
 			.mockResolvedValueOnce(columnNotFound) // columnExists
 			.mockResolvedValueOnce(tableNotEmpty); // tableIsEmpty
 
@@ -98,10 +102,10 @@ describe('addField', () => {
 
 	it('succeeds when NOT NULL, no default, and table is empty', async () => {
 		mockExecute
-			.mockResolvedValueOnce(tableFound)    // tableExists
+			.mockResolvedValueOnce(tableFound) // tableExists
 			.mockResolvedValueOnce(columnNotFound) // columnExists
-			.mockResolvedValueOnce(tableEmpty)     // tableIsEmpty
-			.mockResolvedValueOnce({ rows: [] });  // execute statement
+			.mockResolvedValueOnce(tableEmpty) // tableIsEmpty
+			.mockResolvedValueOnce({ rows: [] }); // execute statement
 
 		const result = await addField(mockDb as never, {
 			collection: 'articles',
@@ -119,9 +123,9 @@ describe('addField', () => {
 
 	it('succeeds without checking tableIsEmpty when the field is nullable', async () => {
 		mockExecute
-			.mockResolvedValueOnce(tableFound)    // tableExists
+			.mockResolvedValueOnce(tableFound) // tableExists
 			.mockResolvedValueOnce(columnNotFound) // columnExists
-			.mockResolvedValueOnce({ rows: [] });  // execute statement
+			.mockResolvedValueOnce({ rows: [] }); // execute statement
 
 		const result = await addField(mockDb as never, {
 			collection: 'articles',
@@ -135,13 +139,18 @@ describe('addField', () => {
 
 	it('succeeds without checking tableIsEmpty when NOT NULL but a default is provided', async () => {
 		mockExecute
-			.mockResolvedValueOnce(tableFound)    // tableExists
+			.mockResolvedValueOnce(tableFound) // tableExists
 			.mockResolvedValueOnce(columnNotFound) // columnExists
-			.mockResolvedValueOnce({ rows: [] });  // execute statement
+			.mockResolvedValueOnce({ rows: [] }); // execute statement
 
 		const result = await addField(mockDb as never, {
 			collection: 'articles',
-			field: { name: 'title', type: 'text', nullable: false, default: 'untitled' },
+			field: {
+				name: 'title',
+				type: 'text',
+				nullable: false,
+				default: 'untitled',
+			},
 		});
 
 		expect(result.success).toBe(true);
@@ -172,7 +181,7 @@ describe('renameField', () => {
 
 	it('returns FIELD_NOT_FOUND when the source column does not exist', async () => {
 		mockExecute
-			.mockResolvedValueOnce(tableFound)    // tableExists
+			.mockResolvedValueOnce(tableFound) // tableExists
 			.mockResolvedValueOnce(columnNotFound); // columnExists (source)
 
 		const result = await renameField(mockDb as never, {
@@ -191,7 +200,7 @@ describe('renameField', () => {
 
 	it('returns RESERVED_NAME when the new name is reserved', async () => {
 		mockExecute
-			.mockResolvedValueOnce(tableFound)  // tableExists
+			.mockResolvedValueOnce(tableFound) // tableExists
 			.mockResolvedValueOnce(columnFound); // columnExists (source)
 
 		const result = await renameField(mockDb as never, {
@@ -210,7 +219,7 @@ describe('renameField', () => {
 
 	it('returns FIELD_ALREADY_EXISTS when the target column already exists', async () => {
 		mockExecute
-			.mockResolvedValueOnce(tableFound)  // tableExists
+			.mockResolvedValueOnce(tableFound) // tableExists
 			.mockResolvedValueOnce(columnFound) // columnExists (source)
 			.mockResolvedValueOnce(columnFound); // columnExists (target)
 
@@ -230,10 +239,10 @@ describe('renameField', () => {
 
 	it('succeeds and returns the RENAME COLUMN sql', async () => {
 		mockExecute
-			.mockResolvedValueOnce(tableFound)    // tableExists
-			.mockResolvedValueOnce(columnFound)   // columnExists (source)
+			.mockResolvedValueOnce(tableFound) // tableExists
+			.mockResolvedValueOnce(columnFound) // columnExists (source)
 			.mockResolvedValueOnce(columnNotFound) // columnExists (target)
-			.mockResolvedValueOnce({ rows: [] });  // execute statement
+			.mockResolvedValueOnce({ rows: [] }); // execute statement
 
 		const result = await renameField(mockDb as never, {
 			collection: 'articles',
@@ -270,7 +279,7 @@ describe('dropField', () => {
 
 	it('returns FIELD_NOT_FOUND when the column does not exist', async () => {
 		mockExecute
-			.mockResolvedValueOnce(tableFound)    // tableExists
+			.mockResolvedValueOnce(tableFound) // tableExists
 			.mockResolvedValueOnce(columnNotFound); // columnExists
 
 		const result = await dropField(mockDb as never, {
@@ -288,7 +297,7 @@ describe('dropField', () => {
 
 	it('succeeds and returns the DROP COLUMN sql', async () => {
 		mockExecute
-			.mockResolvedValueOnce(tableFound)  // tableExists
+			.mockResolvedValueOnce(tableFound) // tableExists
 			.mockResolvedValueOnce(columnFound) // columnExists
 			.mockResolvedValueOnce({ rows: [] }); // execute statement
 
@@ -327,7 +336,7 @@ describe('alterField', () => {
 
 	it('returns FIELD_NOT_FOUND when the column does not exist', async () => {
 		mockExecute
-			.mockResolvedValueOnce(tableFound)    // tableExists
+			.mockResolvedValueOnce(tableFound) // tableExists
 			.mockResolvedValueOnce(columnNotFound); // columnExists
 
 		const result = await alterField(mockDb as never, {
@@ -346,7 +355,7 @@ describe('alterField', () => {
 
 	it('returns NO_CHANGES when the changes object is empty', async () => {
 		mockExecute
-			.mockResolvedValueOnce(tableFound)  // tableExists
+			.mockResolvedValueOnce(tableFound) // tableExists
 			.mockResolvedValueOnce(columnFound); // columnExists
 
 		const result = await alterField(mockDb as never, {
@@ -363,11 +372,11 @@ describe('alterField', () => {
 		expect(mockExecute).toHaveBeenCalledTimes(2);
 	});
 
-	it('returns FIELD_NOT_NULL_NO_DEFAULT when nullable: false and table is non-empty', async () => {
+	it('returns FIELD_HAS_NULL_VALUES when nullable: false and column contains NULLs', async () => {
 		mockExecute
-			.mockResolvedValueOnce(tableFound)    // tableExists
-			.mockResolvedValueOnce(columnFound)   // columnExists
-			.mockResolvedValueOnce(tableNotEmpty); // tableIsEmpty
+			.mockResolvedValueOnce(tableFound) // tableExists
+			.mockResolvedValueOnce(columnFound) // columnExists
+			.mockResolvedValueOnce(nullsFound); // columnHasNulls
 
 		const result = await alterField(mockDb as never, {
 			collection: 'articles',
@@ -377,17 +386,17 @@ describe('alterField', () => {
 
 		expect(result).toEqual({
 			success: false,
-			code: 'FIELD_NOT_NULL_NO_DEFAULT',
+			code: 'FIELD_HAS_NULL_VALUES',
 			error: { collection: 'articles', field: 'title' },
 		});
 		expect(mockExecute).toHaveBeenCalledTimes(3);
 	});
 
-	it('succeeds with SET NOT NULL sql when nullable: false and table is empty', async () => {
+	it('succeeds with SET NOT NULL sql when nullable: false and column has no NULLs', async () => {
 		mockExecute
-			.mockResolvedValueOnce(tableFound)   // tableExists
-			.mockResolvedValueOnce(columnFound)  // columnExists
-			.mockResolvedValueOnce(tableEmpty)   // tableIsEmpty
+			.mockResolvedValueOnce(tableFound) // tableExists
+			.mockResolvedValueOnce(columnFound) // columnExists
+			.mockResolvedValueOnce(noNullsFound) // columnHasNulls
 			.mockResolvedValueOnce({ rows: [] }); // execute statement
 
 		const result = await alterField(mockDb as never, {
@@ -405,8 +414,8 @@ describe('alterField', () => {
 
 	it('succeeds with DROP NOT NULL sql when nullable: true', async () => {
 		mockExecute
-			.mockResolvedValueOnce(tableFound)   // tableExists
-			.mockResolvedValueOnce(columnFound)  // columnExists
+			.mockResolvedValueOnce(tableFound) // tableExists
+			.mockResolvedValueOnce(columnFound) // columnExists
 			.mockResolvedValueOnce({ rows: [] }); // execute statement
 
 		const result = await alterField(mockDb as never, {
@@ -424,8 +433,8 @@ describe('alterField', () => {
 
 	it("succeeds with DROP DEFAULT sql when default: 'drop'", async () => {
 		mockExecute
-			.mockResolvedValueOnce(tableFound)   // tableExists
-			.mockResolvedValueOnce(columnFound)  // columnExists
+			.mockResolvedValueOnce(tableFound) // tableExists
+			.mockResolvedValueOnce(columnFound) // columnExists
 			.mockResolvedValueOnce({ rows: [] }); // execute statement
 
 		const result = await alterField(mockDb as never, {
@@ -443,8 +452,8 @@ describe('alterField', () => {
 
 	it('succeeds with SET DEFAULT sql when a default value is provided', async () => {
 		mockExecute
-			.mockResolvedValueOnce(tableFound)   // tableExists
-			.mockResolvedValueOnce(columnFound)  // columnExists
+			.mockResolvedValueOnce(tableFound) // tableExists
+			.mockResolvedValueOnce(columnFound) // columnExists
 			.mockResolvedValueOnce({ rows: [] }); // execute statement
 
 		const result = await alterField(mockDb as never, {
@@ -462,8 +471,8 @@ describe('alterField', () => {
 
 	it('succeeds with two statements joined by newline when both nullable: true and default value are changed', async () => {
 		mockExecute
-			.mockResolvedValueOnce(tableFound)   // tableExists
-			.mockResolvedValueOnce(columnFound)  // columnExists
+			.mockResolvedValueOnce(tableFound) // tableExists
+			.mockResolvedValueOnce(columnFound) // columnExists
 			.mockResolvedValueOnce({ rows: [] }) // execute DROP NOT NULL
 			.mockResolvedValueOnce({ rows: [] }); // execute SET DEFAULT
 
@@ -477,8 +486,12 @@ describe('alterField', () => {
 		if (result.success) {
 			const parts = result.sql.split('\n');
 			expect(parts).toHaveLength(2);
-			expect(parts[0]).toBe('ALTER TABLE articles ALTER COLUMN title DROP NOT NULL;');
-			expect(parts[1]).toBe("ALTER TABLE articles ALTER COLUMN title SET DEFAULT 'untitled';");
+			expect(parts[0]).toBe(
+				'ALTER TABLE articles ALTER COLUMN title DROP NOT NULL;',
+			);
+			expect(parts[1]).toBe(
+				"ALTER TABLE articles ALTER COLUMN title SET DEFAULT 'untitled';",
+			);
 		}
 		expect(mockExecute).toHaveBeenCalledTimes(4);
 	});

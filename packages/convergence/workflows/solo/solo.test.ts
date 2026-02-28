@@ -208,7 +208,10 @@ describe('runSoloWorkflow', () => {
 		});
 
 		const originalIsTTY = process.stdout.isTTY;
-		Object.defineProperty(process.stdout, 'isTTY', { value: false, configurable: true });
+		Object.defineProperty(process.stdout, 'isTTY', {
+			value: false,
+			configurable: true,
+		});
 
 		try {
 			await runSoloWorkflow({
@@ -219,7 +222,10 @@ describe('runSoloWorkflow', () => {
 				configPath: '/tmp/merged-config.ts',
 			});
 		} finally {
-			Object.defineProperty(process.stdout, 'isTTY', { value: originalIsTTY, configurable: true });
+			Object.defineProperty(process.stdout, 'isTTY', {
+				value: originalIsTTY,
+				configurable: true,
+			});
 		}
 
 		expect(confirmSpy).not.toHaveBeenCalled();
@@ -246,7 +252,10 @@ describe('runSoloWorkflow', () => {
 			appliedCount: 1,
 		});
 
-		Object.defineProperty(process.stdout, 'isTTY', { value: true, configurable: true });
+		Object.defineProperty(process.stdout, 'isTTY', {
+			value: true,
+			configurable: true,
+		});
 		try {
 			await runSoloWorkflow({
 				db: mockDb,
@@ -256,7 +265,10 @@ describe('runSoloWorkflow', () => {
 				configPath: '/tmp/merged-config.ts',
 			});
 		} finally {
-			Object.defineProperty(process.stdout, 'isTTY', { value: undefined, configurable: true });
+			Object.defineProperty(process.stdout, 'isTTY', {
+				value: undefined,
+				configurable: true,
+			});
 		}
 
 		expect(confirmSpy).toHaveBeenCalled();
@@ -276,16 +288,17 @@ describe('runSoloWorkflow', () => {
 			warnings: ['Dropping table "test" will cause data loss'],
 		});
 
-		const confirmSpy = spyOn(promptsModule, 'confirm').mockResolvedValue(
-			false,
-		);
+		const confirmSpy = spyOn(promptsModule, 'confirm').mockResolvedValue(false);
 
 		executeSpy = spyOn(executorModule, 'applyStatements').mockResolvedValue({
 			success: true,
 			appliedCount: 1,
 		});
 
-		Object.defineProperty(process.stdout, 'isTTY', { value: true, configurable: true });
+		Object.defineProperty(process.stdout, 'isTTY', {
+			value: true,
+			configurable: true,
+		});
 		try {
 			await runSoloWorkflow({
 				db: mockDb,
@@ -295,7 +308,10 @@ describe('runSoloWorkflow', () => {
 				configPath: '/tmp/merged-config.ts',
 			});
 		} finally {
-			Object.defineProperty(process.stdout, 'isTTY', { value: undefined, configurable: true });
+			Object.defineProperty(process.stdout, 'isTTY', {
+				value: undefined,
+				configurable: true,
+			});
 		}
 
 		expect(confirmSpy).toHaveBeenCalled();

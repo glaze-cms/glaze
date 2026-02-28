@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
 import { isValidIdentifier } from '@glaze/shared';
 import { sql } from 'drizzle-orm';
 import type { Logger } from '@glaze/logger';

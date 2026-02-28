@@ -23,7 +23,7 @@ describe('sync-schema-from-db', () => {
 		expect(mockSplit).toHaveBeenCalled();
 		const call = (mockSplit.mock.calls as unknown as unknown[][])[0];
 		if (!call) throw new Error('Call not found');
-		const splitArgs = call[0] as unknown as { content: string; outDir: string };
+		const splitArgs = call[0] as { content: string; outDir: string };
 
 		expect(splitArgs.content).toBe('export const mock = {};');
 		expect(splitArgs.outDir).toBe('/out');

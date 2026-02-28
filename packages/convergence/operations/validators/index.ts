@@ -3,6 +3,7 @@ export {
 	isReservedName,
 	tableExists,
 	columnExists,
+	columnHasNulls,
 	tableIsEmpty,
 	getTableReferences,
 } from './validators';

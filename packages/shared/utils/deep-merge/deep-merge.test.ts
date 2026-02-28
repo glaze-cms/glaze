@@ -83,9 +83,12 @@ describe('deepMerge', () => {
 
 			const result = deepMerge(target, source);
 
+			// eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
 			expect((result as any).b).toBe(2);
+			// eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
 			expect((result as any).polluted).toBeUndefined();
 			// Ensure Object prototype is not polluted
+			// eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
 			expect(({} as any).polluted).toBeUndefined();
 		});
 
@@ -105,6 +108,7 @@ describe('deepMerge', () => {
 
 			const result = deepMerge(target, source);
 
+			// eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
 			expect((result as any).prototype).toBeUndefined();
 		});
 	});

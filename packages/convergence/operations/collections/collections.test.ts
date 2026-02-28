@@ -19,7 +19,7 @@ describe('collections', () => {
 
 	describe('createCollection', () => {
 		it('returns RESERVED_NAME for a reserved collection name without hitting the DB', async () => {
-			const result = await createCollection(mockDb as any, {
+			const result = await createCollection(mockDb as never, {
 				name: 'users',
 				fields: [],
 			});
@@ -32,11 +32,42 @@ describe('collections', () => {
 			expect(mockExecute).toHaveBeenCalledTimes(0);
 		});
 
+		it('returns RESERVED_NAME for a reserved field name without hitting the DB', async () => {
+			const result = await createCollection(mockDb as never, {
+				name: 'articles',
+				fields: [{ name: 'sessions', type: 'text' }],
+			});
+
+			expect(result).toEqual({
+				success: false,
+				code: 'RESERVED_NAME',
+				error: { field: 'sessions' },
+			});
+			expect(mockExecute).toHaveBeenCalledTimes(0);
+		});
+
+		it('returns DUPLICATE_FIELD_NAME when two fields share the same name', async () => {
+			const result = await createCollection(mockDb as never, {
+				name: 'articles',
+				fields: [
+					{ name: 'title', type: 'text' },
+					{ name: 'title', type: 'text' },
+				],
+			});
+
+			expect(result).toEqual({
+				success: false,
+				code: 'DUPLICATE_FIELD_NAME',
+				error: { field: 'title' },
+			});
+			expect(mockExecute).toHaveBeenCalledTimes(0);
+		});
+
 		it('returns COLLECTION_ALREADY_EXISTS when the table already exists', async () => {
 			// tableExists → rows present
 			mockExecute.mockResolvedValueOnce({ rows: [{ '?column?': 1 }] });
 
-			const result = await createCollection(mockDb as any, {
+			const result = await createCollection(mockDb as never, {
 				name: 'posts',
 				fields: [],
 			});
@@ -56,7 +87,7 @@ describe('collections', () => {
 			// final db.execute → no meaningful return
 			mockExecute.mockResolvedValueOnce({ rows: [] });
 
-			const result = await createCollection(mockDb as any, {
+			const result = await createCollection(mockDb as never, {
 				name: 'articles',
 				fields: [
 					{ name: 'id', type: 'uuid', primaryKey: true },
@@ -82,7 +113,7 @@ describe('collections', () => {
 			// tableExists for source → empty
 			mockExecute.mockResolvedValueOnce({ rows: [] });
 
-			const result = await renameCollection(mockDb as any, {
+			const result = await renameCollection(mockDb as never, {
 				collection: 'articles',
 				newName: 'blog_posts',
 			});
@@ -99,7 +130,7 @@ describe('collections', () => {
 			// tableExists for source → exists
 			mockExecute.mockResolvedValueOnce({ rows: [{ '?column?': 1 }] });
 
-			const result = await renameCollection(mockDb as any, {
+			const result = await renameCollection(mockDb as never, {
 				collection: 'articles',
 				newName: 'sessions',
 			});
@@ -119,7 +150,7 @@ describe('collections', () => {
 			// tableExists for target → exists
 			mockExecute.mockResolvedValueOnce({ rows: [{ '?column?': 1 }] });
 
-			const result = await renameCollection(mockDb as any, {
+			const result = await renameCollection(mockDb as never, {
 				collection: 'articles',
 				newName: 'blog_posts',
 			});
@@ -140,7 +171,7 @@ describe('collections', () => {
 			// final db.execute
 			mockExecute.mockResolvedValueOnce({ rows: [] });
 
-			const result = await renameCollection(mockDb as any, {
+			const result = await renameCollection(mockDb as never, {
 				collection: 'articles',
 				newName: 'blog_posts',
 			});
@@ -162,7 +193,7 @@ describe('collections', () => {
 			// tableExists → empty
 			mockExecute.mockResolvedValueOnce({ rows: [] });
 
-			const result = await dropCollection(mockDb as any, {
+			const result = await dropCollection(mockDb as never, {
 				collection: 'articles',
 			});
 
@@ -182,7 +213,7 @@ describe('collections', () => {
 				rows: [{ referencing_table: 'posts' }],
 			});
 
-			const result = await dropCollection(mockDb as any, {
+			const result = await dropCollection(mockDb as never, {
 				collection: 'articles',
 			});
 
@@ -203,7 +234,7 @@ describe('collections', () => {
 			// final db.execute
 			mockExecute.mockResolvedValueOnce({ rows: [] });
 
-			const result = await dropCollection(mockDb as any, {
+			const result = await dropCollection(mockDb as never, {
 				collection: 'articles',
 			});
 

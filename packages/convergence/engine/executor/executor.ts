@@ -28,6 +28,7 @@ export async function applyStatements(
 		await db.transaction(async (tx) => {
 			for (const statement of statements) {
 				logger.debug(`Executing: ${statement}`);
+				// eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
 				await tx.execute(sql.raw(statement));
 			}
 		});

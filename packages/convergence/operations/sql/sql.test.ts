@@ -55,9 +55,7 @@ describe('mapType', () => {
 
 describe('buildCreateTableSQL', () => {
 	it('builds a basic table with a single column', () => {
-		const sql = buildCreateTableSQL('articles', [
-			{ name: 'id', type: 'uuid' },
-		]);
+		const sql = buildCreateTableSQL('articles', [{ name: 'id', type: 'uuid' }]);
 		expect(sql).toBe('CREATE TABLE articles (id UUID);');
 	});
 
@@ -121,9 +119,7 @@ describe('buildCreateTableSQL', () => {
 		const sql = buildCreateTableSQL('posts', [
 			{ name: 'deleted_at', type: 'timestamp', default: null },
 		]);
-		expect(sql).toBe(
-			'CREATE TABLE posts (deleted_at TIMESTAMP DEFAULT NULL);',
-		);
+		expect(sql).toBe('CREATE TABLE posts (deleted_at TIMESTAMP DEFAULT NULL);');
 	});
 
 	it('emits an expression default unquoted and raw', () => {
