@@ -1,4 +1,4 @@
-import { join } from 'node:path';
+import { join, basename } from 'node:path';
 import { mkdir } from 'node:fs/promises';
 
 import { scanTopLevelExports } from '../parser/index';
@@ -123,10 +123,7 @@ export async function splitSchema({
 	}
 
 	const exports = files
-		.map((f) => {
-			const name = f.split('/').pop()?.replace('.ts', '') ?? '';
-			return `export * from './${name}';`;
-		})
+		.map((f) => `export * from './${basename(f, '.ts')}';`)
 		.join('\n');
 
 	const indexPath = join(outDir, 'index.ts');

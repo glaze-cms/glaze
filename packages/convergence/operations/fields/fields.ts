@@ -206,9 +206,12 @@ export async function alterField(
 		};
 	}
 
-	for (const statement of statements) {
-		await db.execute(sql.raw(statement));
-	}
+	await db.transaction(async (tx) => {
+		for (const statement of statements) {
+			// eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+			await tx.execute(sql.raw(statement));
+		}
+	});
 
 	return { success: true, sql: statements.join('\n') };
 }

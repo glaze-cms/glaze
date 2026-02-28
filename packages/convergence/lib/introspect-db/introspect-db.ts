@@ -1,5 +1,6 @@
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 
 export interface IntrospectDbOptions {
 	shell?: typeof Bun.$;
@@ -15,7 +16,7 @@ export async function introspectToSchema(
 ): Promise<string> {
 	const $ = options.shell ?? Bun.$;
 
-	const tempDir = mkdtempSync(join(process.cwd(), '.glaze-introspection-'));
+	const tempDir = mkdtempSync(join(tmpdir(), 'glaze-introspection-'));
 	const schemaOutDir = join(tempDir, 'out');
 	const configPath = join(tempDir, 'drizzle.config.ts');
 

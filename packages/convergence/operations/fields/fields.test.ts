@@ -3,7 +3,13 @@ import { describe, it, expect, beforeEach, mock } from 'bun:test';
 import { addField, renameField, dropField, alterField } from './fields';
 
 const mockExecute = mock(() => Promise.resolve({ rows: [] as any[] }));
-const mockDb = { execute: mockExecute };
+const mockDb = {
+	execute: mockExecute,
+	// eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+	transaction: async (cb: (tx: { execute: typeof mockExecute }) => Promise<void>) => {
+		await cb({ execute: mockExecute });
+	},
+};
 
 beforeEach(() => {
 	mockExecute.mockClear();
