@@ -12,7 +12,7 @@ ARG GLAZE_REGISTRY_URL
 RUN printf '[install.scopes]\n"@glaze" = { token = "%s", url = "%s" }\n' \
     "$GLAZE_REGISTRY_TOKEN" "$GLAZE_REGISTRY_URL" > /root/.bunfig.toml
 
-COPY package.json .
+COPY package.json bun.lock ./
 RUN bun install --frozen-lockfile
 
 # ---- Build stage ----
@@ -27,6 +27,7 @@ FROM base AS runner
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package.json .
+COPY --from=builder /app/drizzle.config.ts .
 
 ENV NODE_ENV=production
 EXPOSE 4000
