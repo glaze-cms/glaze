@@ -17,9 +17,12 @@ services:
       - /app/node_modules
       - /app/packages/admin/node_modules
       - /app/packages/cms/node_modules
+      - /app/packages/config/node_modules
+      - /app/packages/convergence/node_modules
       - /app/packages/core/node_modules
       - /app/packages/development/node_modules
       - /app/packages/logger/node_modules
+      - /app/packages/shared/node_modules
       - bun_cache:/root/.bun
     environment:
       NODE_ENV: local

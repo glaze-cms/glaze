@@ -18,7 +18,7 @@ function isProductionLike(nodeEnv: NodeEnv): boolean {
 function resolveSoloDefaults(
 	nodeEnv: NodeEnv,
 	userConfig?: SoloWorkflowConfig,
-): Required<Omit<SoloWorkflowConfig, 'configPath'>> {
+): Required<Omit<SoloWorkflowConfig, 'configPath' | 'schemaOutDir'>> {
 	const isProd = isProductionLike(nodeEnv);
 
 	return {
@@ -50,6 +50,7 @@ export function syncResolver(
 			solo: {
 				...resolveSoloDefaults(nodeEnv, userSoloConfig),
 				configPath: userSoloConfig?.configPath,
+				schemaOutDir: userSoloConfig?.schemaOutDir,
 			},
 		};
 	}

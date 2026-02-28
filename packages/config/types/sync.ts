@@ -30,6 +30,14 @@ export interface SoloWorkflowConfig {
 	 * @default 'drizzle.config.ts'
 	 */
 	configPath?: string;
+
+	/**
+	 * Output directory for generated per-entity Drizzle schema files.
+	 * After each admin schema operation, the DB is introspected and schema
+	 * files are regenerated here.
+	 * @default './schema'
+	 */
+	schemaOutDir?: string;
 }
 
 /**

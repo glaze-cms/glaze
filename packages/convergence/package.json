@@ -41,10 +41,12 @@
 		"@glaze/logger": "workspace:*",
 		"@glaze/shared": "workspace:*",
 		"drizzle-kit": "catalog:drizzle",
-		"drizzle-orm": "catalog:drizzle"
+		"drizzle-orm": "catalog:drizzle",
+		"pg-format": "latest"
 	},
 	"devDependencies": {
 		"@types/bun": "catalog:development",
+		"@types/pg-format": "latest",
 		"typescript": "catalog:development"
 	}
 }

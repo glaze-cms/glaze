@@ -1,0 +1,1 @@
+export { schemaPlugin } from './schema';

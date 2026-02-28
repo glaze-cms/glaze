@@ -5,6 +5,7 @@ import { drizzle } from 'drizzle-orm/node-postgres';
 import { authPlugin } from './plugins/auth';
 import { healthCheckPlugin } from './plugins/health';
 import { adminPlugin } from './plugins/admin';
+import { schemaPlugin } from './plugins/schema';
 import { corsPlugin, rateLimitPlugin } from './plugins/security';
 
 /* Hooks */
@@ -44,6 +45,7 @@ export function createGlazeServer({
 		.use(rateLimitPlugin(config.security, env, logger))
 		.use(healthCheckPlugin(config.healthCheck))
 		.use(adminPlugin(config))
+		.use(schemaPlugin(config, env))
 		.use(corsPlugin(config.security, env, logger))
 		.use(authPlugin(config, env))
 		.get('/', () => ({
