@@ -103,14 +103,14 @@ describe('mergeConfig', () => {
 		expect(schemaLine).toMatch(/\.ts'/);
 	});
 
-	test('should include schema filter with auth and drizzle', async () => {
+	test('should include schema filter with glaze_auth and drizzle', async () => {
 		const result = await mergeConfig({
 			userConfigPath: USER_CONFIG_PATH,
 			glazeSchemaPath: GLAZE_SCHEMA_PATH,
 		});
 
 		const content = readFileSync(result, 'utf-8');
-		expect(content).toContain('"auth"');
+		expect(content).toContain('"glaze_auth"');
 		expect(content).toContain('"drizzle"');
 	});
 

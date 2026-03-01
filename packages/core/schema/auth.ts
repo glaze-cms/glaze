@@ -4,7 +4,7 @@ import { boolean, pgSchema, text, timestamp } from 'drizzle-orm/pg-core';
  * Better Auth table schemas.
  * These are automatically injected by Glaze Core.
  */
-export const authSchema = pgSchema('auth');
+export const authSchema = pgSchema('glaze_auth');
 
 export const users = authSchema.table('users', {
 	id: text('id').primaryKey(),
