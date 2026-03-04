@@ -16,5 +16,8 @@ export type {
 	SyncConfig,
 	SoloWorkflowConfig,
 	TeamWorkflowConfig,
+	Role,
+	Entitlement,
 } from './types';
 export * from './consts/defaults';
+export { ROLE_HIERARCHY, ENTITLEMENTS, hasMinRole } from './consts/rbac';

@@ -21,9 +21,9 @@ Four fixed roles, highest to lowest privilege:
 
 ---
 
-## Capability Domains
+## Entitlement Domains
 
-Each role maps to a set of capabilities across six domains:
+Each role maps to a set of entitlements across six domains:
 
 | Domain                                                          | admin | editor | writer                 | guest     |
 | --------------------------------------------------------------- | ----- | ------ | ---------------------- | --------- |
@@ -73,7 +73,7 @@ public.<any_collection>
 
 ### 1. Content API (`/api/:collection/*`)
 
-The CRUD route generator currently has a basic auth guard (is user logged in?). This needs to be extended to check role capabilities per operation:
+The CRUD route generator currently has a basic auth guard (is user logged in?). This needs to be extended to check role entitlements per operation:
 
 - `GET` — guest and above
 - `POST` — writer and above
@@ -108,6 +108,44 @@ The frontend must reflect the user's role:
 
 ---
 
+## Suggested Approaches
+
+### Guard via Elysia macro
+
+Use Elysia's macro system to create a declarative `requireRole` guard that can be applied per-route or per-group. This keeps authorization logic out of individual handlers.
+
+```typescript
+// Usage on a route
+.post('/schema/collections', handler, { requireRole: 'editor' })
+
+// Usage on a group
+.guard({ requireRole: 'admin' }, (app) =>
+  app
+    .get('/admin/users', listUsers)
+    .post('/admin/users', createUser)
+)
+```
+
+The macro resolves the user from the session (already derived by the auth plugin) and checks their role against the required minimum. Returns 401 if not authenticated, 403 if insufficient role.
+
+### Entitlements as string patterns
+
+Define entitlements as `domain:action` strings (e.g., `schema:write`, `content:delete`, `users:manage`). Map each role to a static set of entitlements. The guard checks entitlement inclusion, not role names — this way V2 can introduce per-collection entitlements (`content:posts:write`) without changing the guard interface.
+
+### Role from session, not from DB
+
+The user's role should be included in the Better-Auth session payload so it's available on every request without an extra DB query. Better-Auth supports custom fields on the user object — the `role` column added to `auth.users` should be surfaced through the session derive.
+
+### Ownership filter via query modifier
+
+For writer-scoped access, inject a WHERE clause (`created_by = current_user.id`) at the query level in the CRUD generator, not in the handler. This ensures writers can never accidentally access other users' entries regardless of how the API is called.
+
+### Admin UI: entitlement endpoint
+
+Expose a `GET /api/auth/entitlements` endpoint that returns the current user's entitlement set. The Admin UI fetches this on login and uses it to conditionally render navigation, buttons, and form fields. This keeps the UI logic simple (check entitlement set) and decoupled from role names.
+
+---
+
 ## What This Spec Does NOT Cover (V2+)
 
 - **System settings table** (`glaze.settings` for editable app name, logo, etc.)
@@ -119,4 +157,4 @@ The frontend must reflect the user's role:
 - **API tokens with scoped permissions** (for external integrations)
 - **Audit logging** (who did what, when)
 
-These are intentionally deferred. The V1 capability map is designed so that per-collection granularity can be layered on top (e.g., `content:posts:create` extending `content:create`) without breaking the existing guard system.
+These are intentionally deferred. The V1 entitlement map is designed so that per-collection granularity can be layered on top (e.g., `content:posts:create` extending `content:create`) without breaking the existing guard system.

@@ -87,17 +87,17 @@ describe('handleStart', () => {
 		const cause = new Error('ECONNREFUSED 127.0.0.1:5432');
 
 		const drizzleOrm = await import('drizzle-orm');
-		// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
+		const drizzleOrmAny = drizzleOrm as Record<string, unknown>;
 		const ErrorClass =
-			(drizzleOrm as any).DrizzleQueryError ?? drizzleOrm.DrizzleError;
+			(drizzleOrmAny['DrizzleQueryError'] as
+				| typeof drizzleOrm.DrizzleError
+				| undefined) ?? drizzleOrm.DrizzleError;
 
 		let drizzleError: Error;
 		try {
-			// eslint-disable-next-line @typescript-eslint/no-unsafe-call
 			drizzleError = new ErrorClass('Query failed', cause) as Error;
 		} catch {
 			// Constructor might use object form
-			// eslint-disable-next-line @typescript-eslint/no-unsafe-call
 			drizzleError = new ErrorClass({
 				message: 'Query failed',
 				cause,
