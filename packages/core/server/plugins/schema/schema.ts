@@ -1,4 +1,4 @@
-import { Elysia, t } from 'elysia';
+import { t } from 'elysia';
 
 import {
 	createCollection,
@@ -9,12 +9,11 @@ import {
 	dropField,
 	alterField,
 	runIntrospectionInBackground,
-	type DrizzleDatabase,
 } from '@glaze/convergence';
 import { operationToResponse } from '../../../lib/utils/index';
 
 import type { GlazeInternalConfig, GlazeEnv } from '@glaze/config';
-import type { Logger } from '@glaze/logger';
+import { glazeHook, type GlazeApp } from '../../types';
 
 const FIELD_TYPE = t.Union([
 	t.Literal('text'),
@@ -52,19 +51,7 @@ const FIELD_DEF = t.Object({
 });
 
 export const schemaPlugin =
-	(config: GlazeInternalConfig, env: GlazeEnv) =>
-	(
-		// eslint-disable-next-line @typescript-eslint/no-empty-object-type
-		app: Elysia<
-			string,
-			{
-				decorator: { db: DrizzleDatabase; logger: Logger };
-				store: {};
-				derive: {};
-				resolve: {};
-			}
-		>,
-	) => {
+	(config: GlazeInternalConfig, env: GlazeEnv) => (app: GlazeApp) => {
 		const connectionString = env.GLAZE_DATABASE_URL;
 		const schemaOutDir =
 			config.sync.workflow === 'solo'
@@ -75,7 +62,6 @@ export const schemaPlugin =
 
 		return app.group('/schema', (group) =>
 			group
-
 				// ─── Collections ──────────────────────────────────────────────────
 
 				.post(
@@ -93,12 +79,13 @@ export const schemaPlugin =
 						});
 						return operationToResponse(result);
 					},
-					{
+					glazeHook({
+						requireRole: 'editor',
 						body: t.Object({
 							name: t.String(),
 							fields: t.Array(FIELD_DEF),
 						}),
-					},
+					}),
 				)
 
 				.patch(
@@ -119,26 +106,31 @@ export const schemaPlugin =
 						});
 						return operationToResponse(result);
 					},
-					{
+					glazeHook({
+						requireRole: 'editor',
 						body: t.Object({ newName: t.String() }),
-					},
+					}),
 				)
 
-				.delete('/collections/:collection', async ({ set, params }) => {
-					const result = await dropCollection(db, {
-						collection: params.collection,
-					});
-					if (!result.success) {
-						set.status = 422;
+				.delete(
+					'/collections/:collection',
+					async ({ set, params }) => {
+						const result = await dropCollection(db, {
+							collection: params.collection,
+						});
+						if (!result.success) {
+							set.status = 422;
+							return operationToResponse(result);
+						}
+						runIntrospectionInBackground({
+							connectionString,
+							schemaOutDir,
+							logger,
+						});
 						return operationToResponse(result);
-					}
-					runIntrospectionInBackground({
-						connectionString,
-						schemaOutDir,
-						logger,
-					});
-					return operationToResponse(result);
-				})
+					},
+					glazeHook({ requireRole: 'editor' }),
+				)
 
 				// ─── Fields ───────────────────────────────────────────────────────
 
@@ -160,7 +152,7 @@ export const schemaPlugin =
 						});
 						return operationToResponse(result);
 					},
-					{ body: FIELD_DEF },
+					glazeHook({ requireRole: 'editor', body: FIELD_DEF }),
 				)
 
 				.patch(
@@ -200,13 +192,15 @@ export const schemaPlugin =
 						});
 						return operationToResponse(result);
 					},
-					{
+
+					glazeHook({
+						requireRole: 'editor',
 						body: t.Object({
 							newName: t.Optional(t.String()),
 							nullable: t.Optional(t.Boolean()),
 							default: t.Optional(t.Union([t.Literal('drop'), FIELD_DEFAULT])),
 						}),
-					},
+					}),
 				)
 
 				.delete(
@@ -227,6 +221,7 @@ export const schemaPlugin =
 						});
 						return operationToResponse(result);
 					},
+					glazeHook({ requireRole: 'editor' }),
 				),
 		);
 	};

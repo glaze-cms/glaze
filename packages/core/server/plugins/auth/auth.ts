@@ -1,6 +1,5 @@
-import { Elysia } from 'elysia';
 import { betterAuth } from 'better-auth';
-import { drizzleAdapter, type DB } from 'better-auth/adapters/drizzle';
+import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 
 import {
 	authResolver,
@@ -8,6 +7,8 @@ import {
 	type GlazeInternalConfig,
 	type GlazeEnv,
 } from '@glaze/config';
+
+import type { GlazeApp } from '../../types';
 
 /**
  * Creates the Better Auth plugin for Elysia.
@@ -17,14 +18,7 @@ import {
  * @returns A plugin function that receives the Elysia instance with `db` in decorators
  */
 export const authPlugin =
-	(config: GlazeInternalConfig, env: GlazeEnv) =>
-	(
-		// eslint-disable-next-line @typescript-eslint/no-empty-object-type
-		app: Elysia<
-			string,
-			{ decorator: { db: DB }; store: {}; derive: {}; resolve: {} }
-		>,
-	) => {
+	(config: GlazeInternalConfig, env: GlazeEnv) => (app: GlazeApp) => {
 		const { db } = app.decorator;
 
 		const resolvedAuth = authResolver(
@@ -51,20 +45,19 @@ export const authPlugin =
 			rateLimit: {
 				enabled: false,
 			},
+			user: {
+				additionalFields: {
+					role: {
+						type: 'string',
+						defaultValue: 'guest',
+						required: true,
+						input: false,
+					},
+				},
+			},
 		});
 
-		// Mount the Better Auth plugin and derive user and session information for each request
-		return app
-			.decorate('auth', auth)
-			.mount(auth.handler)
-			.derive(async ({ request }) => {
-				const session = await auth.api.getSession({
-					headers: request.headers,
-				});
-
-				return {
-					user: session?.user ?? null,
-					session: session?.session ?? null,
-				};
-			});
+		// Mount the Better Auth handler and expose the auth instance as a decorator.
+		// Session resolution is handled on-demand by the requireRole macro in rbacPlugin.
+		return app.decorate('auth', auth).mount(auth.handler);
 	};

@@ -5,8 +5,10 @@ import { addField, renameField, dropField, alterField } from './fields';
 const mockExecute = mock(() => Promise.resolve({ rows: [] as any[] }));
 const mockDb = {
 	execute: mockExecute,
-	// eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-	transaction: async (cb: (tx: { execute: typeof mockExecute }) => Promise<void>) => {
+
+	transaction: async (
+		cb: (tx: { execute: typeof mockExecute }) => Promise<void>,
+	) => {
 		await cb({ execute: mockExecute });
 	},
 };

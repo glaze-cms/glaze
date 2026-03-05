@@ -12,3 +12,4 @@ export type {
 	SoloWorkflowConfig,
 	TeamWorkflowConfig,
 } from './sync';
+export type { Role, Entitlement } from './rbac';
