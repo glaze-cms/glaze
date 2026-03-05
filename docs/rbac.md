@@ -14,7 +14,7 @@ Four fixed roles, highest to lowest privilege:
 
 | Role     | Purpose                                                                                                                                                             |
 | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `admin`  | Full system access. Users, settings, schema, content. The first user created is always admin.                                                                       |
+| `admin`  | Full system access. Users, settings, schema, content.                                                                                                               |
 | `editor` | Schema + content management. Can structure collections, create/edit/publish/delete content across all collections. No access to user management or system settings. |
 | `writer` | Content creation only. Can create and edit their own entries. Cannot delete, publish, or touch schema.                                                              |
 | `guest`  | Read-only. Can view content and schema in the Admin UI but cannot modify anything.                                                                                  |
@@ -46,15 +46,15 @@ Each role maps to a set of entitlements across six domains:
 
 ### 1. Role field on users
 
-Add a `role` column to the existing Better-Auth `auth.users` table. Better-Auth supports extending the user schema with additional fields.
+Add a `role` column to the existing Better-Auth `glaze_auth.users` table. Better-Auth supports extending the user schema with additional fields.
 
 ```
-auth.users
+glaze_auth.users
 ├── ...existing columns...
-└── role: text NOT NULL DEFAULT 'writer'
+└── role: text NOT NULL DEFAULT 'guest'
 ```
 
-The default role for new users should be configurable by the admin. The first user created bypasses this and is always `admin`.
+New users are assigned `guest` by default — the least privileged role. An admin must explicitly elevate their role.
 
 ### 2. Content ownership tracking
 
@@ -63,8 +63,8 @@ Every user-defined content table needs a `created_by` column to support writer-s
 ```
 public.<any_collection>
 ├── ...user-defined columns...
-├── created_by: text REFERENCES auth.users(id)
-└── updated_by: text REFERENCES auth.users(id)
+├── created_by: text REFERENCES glaze_auth.users(id)
+└── updated_by: text REFERENCES glaze_auth.users(id)
 ```
 
 ---
@@ -134,7 +134,7 @@ Define entitlements as `domain:action` strings (e.g., `schema:write`, `content:d
 
 ### Role from session, not from DB
 
-The user's role should be included in the Better-Auth session payload so it's available on every request without an extra DB query. Better-Auth supports custom fields on the user object — the `role` column added to `auth.users` should be surfaced through the session derive.
+The user's role should be included in the Better-Auth session payload so it's available on every request without an extra DB query. Better-Auth supports custom fields on the user object — the `role` column added to `glaze_auth.users` should be surfaced through the session derive.
 
 ### Ownership filter via query modifier
 
@@ -142,7 +142,7 @@ For writer-scoped access, inject a WHERE clause (`created_by = current_user.id`)
 
 ### Admin UI: entitlement endpoint
 
-Expose a `GET /api/auth/entitlements` endpoint that returns the current user's entitlement set. The Admin UI fetches this on login and uses it to conditionally render navigation, buttons, and form fields. This keeps the UI logic simple (check entitlement set) and decoupled from role names.
+Expose a `GET /api/entitlements` endpoint that returns the current user's entitlement set. The Admin UI fetches this on login and uses it to conditionally render navigation, buttons, and form fields. This keeps the UI logic simple (check entitlement set) and decoupled from role names.
 
 ---
 

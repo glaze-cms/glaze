@@ -11,8 +11,8 @@ export function hasMinRole(userRole: Role, minRole: Role): boolean {
 	return ROLE_HIERARCHY.indexOf(userRole) >= ROLE_HIERARCHY.indexOf(minRole);
 }
 
-export const ENTITLEMENTS: Record<Role, ReadonlySet<Entitlement>> = {
-	admin: new Set([
+export const ENTITLEMENTS: Record<Role, readonly Entitlement[]> = Object.freeze({
+	admin: Object.freeze([
 		'system:write',
 		'users:manage',
 		'schema:read',
@@ -21,15 +21,15 @@ export const ENTITLEMENTS: Record<Role, ReadonlySet<Entitlement>> = {
 		'content:write',
 		'content:delete',
 		'content:publish',
-	]),
-	editor: new Set([
+	] as const),
+	editor: Object.freeze([
 		'schema:read',
 		'schema:write',
 		'content:read',
 		'content:write',
 		'content:delete',
 		'content:publish',
-	]),
-	writer: new Set(['content:read', 'content:write']),
-	guest: new Set(['schema:read', 'content:read']),
-} as const;
+	] as const),
+	writer: Object.freeze(['content:read', 'content:write'] as const),
+	guest: Object.freeze(['schema:read', 'content:read'] as const),
+});

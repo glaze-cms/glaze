@@ -49,7 +49,7 @@ export const authPlugin =
 				additionalFields: {
 					role: {
 						type: 'string',
-						defaultValue: 'writer',
+						defaultValue: 'guest',
 						required: true,
 						input: false,
 					},

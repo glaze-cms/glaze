@@ -87,11 +87,12 @@ describe('handleStart', () => {
 		const cause = new Error('ECONNREFUSED 127.0.0.1:5432');
 
 		const drizzleOrm = await import('drizzle-orm');
-		const drizzleOrmAny = drizzleOrm as Record<string, unknown>;
+		type WithQueryError = typeof drizzleOrm & {
+			DrizzleQueryError?: typeof drizzleOrm.DrizzleError;
+		};
 		const ErrorClass =
-			(drizzleOrmAny['DrizzleQueryError'] as
-				| typeof drizzleOrm.DrizzleError
-				| undefined) ?? drizzleOrm.DrizzleError;
+			(drizzleOrm as WithQueryError).DrizzleQueryError ??
+			drizzleOrm.DrizzleError;
 
 		let drizzleError: Error;
 		try {

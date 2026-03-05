@@ -14,7 +14,7 @@ export const users = authSchema.table('users', {
 	image: text('image'),
 	createdAt: timestamp('created_at').notNull(),
 	updatedAt: timestamp('updated_at').notNull(),
-	role: text('role').notNull().default('writer'),
+	role: text('role').notNull().default('guest'),
 });
 
 export const sessions = authSchema.table('sessions', {
