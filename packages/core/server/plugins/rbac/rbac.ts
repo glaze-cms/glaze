@@ -21,8 +21,8 @@ type AuthDecorator = {
  *
  * Defines the `requireRole` macro and exposes the entitlements endpoint.
  * Must be registered after `authPlugin` (needs the `auth` decorator).
- * @config - The Glaze internal configuration object
- * @return An Elysia plugin instance that provides RBAC functionality
+ * @param config - The Glaze internal configuration object
+ * @returns An Elysia plugin instance that provides RBAC functionality
  */
 export const rbacPlugin = (config: GlazeInternalConfig) =>
 	new Elysia({ name: '@glaze/rbac' })
@@ -50,7 +50,7 @@ export const rbacPlugin = (config: GlazeInternalConfig) =>
 			`${config.apiPrefix}/entitlements`,
 			(ctx) => {
 				const user = (ctx as unknown as { user: { role: string } }).user;
-				const entitlements = ENTITLEMENTS[user.role as Role];
+				const entitlements = ENTITLEMENTS[user.role as Role] ?? [];
 				return { entitlements: [...entitlements] };
 			},
 			{ requireRole: 'guest' },

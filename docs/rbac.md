@@ -126,15 +126,15 @@ Use Elysia's macro system to create a declarative `requireRole` guard that can b
 )
 ```
 
-The macro resolves the user from the session (already derived by the auth plugin) and checks their role against the required minimum. Returns 401 if not authenticated, 403 if insufficient role.
+The macro resolves the current user from Better-Auth's request context and checks their role against the required minimum using the role hierarchy helper. It returns 401 if not authenticated, 403 if the user's role is below the required minimum.
 
 ### Entitlements as string patterns
 
-Define entitlements as `domain:action` strings (e.g., `schema:write`, `content:delete`, `users:manage`). Map each role to a static set of entitlements. The guard checks entitlement inclusion, not role names — this way V2 can introduce per-collection entitlements (`content:posts:write`) without changing the guard interface.
+Define entitlements as `domain:action` strings (e.g., `schema:write`, `content:delete`, `users:manage`). Map each role to a static set of entitlements derived from the role hierarchy. In V1, the runtime guard operates on roles via `requireRole`/`hasMinRole`; entitlements are a convenience layer for the Admin UI and future V2 features (e.g., per-collection entitlements like `content:posts:write`) without changing the guard interface.
 
-### Role from session, not from DB
+### Role from auth user, not separate DB lookup
 
-The user's role should be included in the Better-Auth session payload so it's available on every request without an extra DB query. Better-Auth supports custom fields on the user object — the `role` column added to `glaze_auth.users` should be surfaced through the session derive.
+The user's role should be stored on the Better-Auth user object so it's available on every request without an extra RBAC-specific DB query. Better-Auth supports custom fields on the user object — the `role` column added to `glaze_auth.users` should be exposed through that user payload.
 
 ### Ownership filter via query modifier
 
