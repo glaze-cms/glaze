@@ -3,6 +3,7 @@ import { drizzle } from 'drizzle-orm/node-postgres';
 
 /* Plugins */
 import { authPlugin } from './plugins/auth';
+import { rbacPlugin } from './plugins/rbac';
 import { healthCheckPlugin } from './plugins/health';
 import { adminPlugin } from './plugins/admin';
 import { schemaPlugin } from './plugins/schema';
@@ -43,11 +44,12 @@ export function createGlazeServer({
 		.decorate('schema', schema)
 		.decorate('db', drizzle(env.GLAZE_DATABASE_URL, { schema }))
 		.use(rateLimitPlugin(config.security, env, logger))
+		.use(corsPlugin(config.security, env, logger))
 		.use(healthCheckPlugin(config.healthCheck))
 		.use(adminPlugin(config))
-		.use(schemaPlugin(config, env))
-		.use(corsPlugin(config.security, env, logger))
 		.use(authPlugin(config, env))
+		.use(rbacPlugin(config))
+		.use(schemaPlugin(config, env))
 		.get('/', () => ({
 			message: 'Glaze CMS Server',
 			admin: config.adminPrefix,

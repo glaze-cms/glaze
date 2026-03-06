@@ -89,7 +89,7 @@ const userFilters = Array.isArray(userConfig.schemaFilter)
 export default defineConfig({
   ...userConfig,
   schema: [...userSchemas, '${relativeGlazeSchemaPath}'],
-  schemaFilter: [...new Set([...userFilters, "auth", "drizzle"])],
+  schemaFilter: [...new Set([...userFilters, "glaze_auth", "drizzle"])],
   dbCredentials: {
     url: process.env.DATABASE_URL!,
   },

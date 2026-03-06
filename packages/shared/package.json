@@ -1,6 +1,6 @@
 {
 	"name": "@glaze/shared",
-	"version": "0.0.1",
+	"version": "0.0.2",
 	"description": "Shared utilities and types for Glaze packages.",
 	"license": "MIT",
 	"type": "module",
