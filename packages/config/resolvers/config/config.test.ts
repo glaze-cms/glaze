@@ -1,13 +1,13 @@
 import { describe, it, expect } from 'bun:test';
-import { resolveConfig } from '.';
-import type { GlazeConfig } from '../types';
+import { resolveConfig } from './config';
+import type { GlazeConfig } from '../../types';
 import {
 	DEFAULT_API_PREFIX,
 	DEFAULT_ADMIN_PREFIX,
 	DEFAULT_HEALTH_CHECK_PATH,
 	DEFAULT_CORS_METHODS,
 	DEFAULT_CORS_ALLOWED_HEADERS,
-} from '../consts/defaults';
+} from '../../consts/defaults';
 
 const mockSchema = {};
 
