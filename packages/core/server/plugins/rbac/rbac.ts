@@ -50,7 +50,7 @@ export const rbacPlugin = (config: GlazeInternalConfig) =>
 			`${config.apiPrefix}/entitlements`,
 			(ctx) => {
 				const user = (ctx as unknown as { user: { role: string } }).user;
-				const entitlements = ENTITLEMENTS[user.role as Role] ?? [];
+				const entitlements = ENTITLEMENTS[user.role as Role];
 				return { entitlements: [...entitlements] };
 			},
 			{ requireRole: 'guest' },

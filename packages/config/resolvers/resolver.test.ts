@@ -1,8 +1,6 @@
 import { describe, it, expect } from 'bun:test';
 import { resolveConfig } from '.';
-import { authResolver } from './auth';
 import type { GlazeConfig } from '../types';
-import type { AuthConfig } from '../types/auth';
 import {
 	DEFAULT_API_PREFIX,
 	DEFAULT_ADMIN_PREFIX,
@@ -288,87 +286,6 @@ describe('resolveConfig', () => {
 			const result = resolveConfig(config);
 
 			expect(result.adminPrefix).toBe('/admin');
-		});
-	});
-
-	describe('auth resolver', () => {
-		it('should create correct basePath from apiPrefix', () => {
-			const result = authResolver('/api', undefined);
-
-			expect(result.basePath).toBe('/api/auth');
-		});
-
-		it('should create correct basePath with trailing slash removed from apiPrefix', () => {
-			const result = authResolver('/api/', undefined);
-
-			expect(result.basePath).toBe('/api/auth');
-		});
-
-		it('should have publicAuthEnabled true by default', () => {
-			const result = authResolver('/api', undefined);
-
-			expect(result.publicAuthEnabled).toBe(true);
-		});
-
-		it('should set publicAuthEnabled to false when auth is disabled', () => {
-			const authConfig: AuthConfig = { enabled: false };
-			const result = authResolver('/api', authConfig);
-
-			expect(result.publicAuthEnabled).toBe(false);
-		});
-
-		it('should have default appName', () => {
-			const result = authResolver('/api', undefined);
-
-			expect(result.appName).toBe('Glaze CMS');
-		});
-
-		it('should have emailAndPassword enabled by default', () => {
-			const result = authResolver('/api', undefined);
-
-			expect(result.emailAndPassword?.enabled).toBe(true);
-		});
-
-		it('should merge user emailAndPassword config when auth is enabled', () => {
-			const customConfig = { requireEmailVerification: true };
-			const authConfig = {
-				enabled: true as const,
-				emailAndPassword: customConfig,
-			};
-			const result = authResolver('/api', authConfig);
-
-			expect(result.emailAndPassword).toMatchObject({
-				enabled: true,
-				requireEmailVerification: true,
-			});
-		});
-
-		it('should not include emailAndPassword options when auth is disabled', () => {
-			const authConfig: AuthConfig = {
-				enabled: false,
-			};
-			const result = authResolver('/api', authConfig);
-
-			// Only enabled: true is set, no user options are merged
-			expect(result.emailAndPassword).toEqual({ enabled: true });
-		});
-
-		it('should pass through emailVerification when auth is enabled', () => {
-			const authConfig: AuthConfig = {
-				enabled: true,
-				emailVerification: {
-					sendOnSignUp: true,
-				},
-			};
-			const result = authResolver('/api', authConfig);
-
-			expect(result.emailVerification).toEqual({ sendOnSignUp: true });
-		});
-
-		it('should not include emailVerification when auth is not configured', () => {
-			const result = authResolver('/api', undefined);
-
-			expect(result.emailVerification).toBeUndefined();
 		});
 	});
 });

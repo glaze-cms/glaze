@@ -1,5 +1,6 @@
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
+import { jwt } from 'better-auth/plugins';
 
 import {
 	authResolver,
@@ -29,6 +30,12 @@ export const authPlugin =
 		const baseURL =
 			env.GLAZE_SERVER_URL ?? `http://localhost:${env.GLAZE_PORT}`;
 
+		// Deduplicate user-provided plugins, then always append jwt
+		const userPlugins = (resolvedAuth.plugins ?? []).filter(
+			(p) => p.id !== 'jwt',
+		);
+		const plugins = [...userPlugins, jwt()];
+
 		// Initialize Better Auth with the resolved configuration and the Drizzle adapter
 		const auth = betterAuth({
 			appName: resolvedAuth.appName,
@@ -42,6 +49,7 @@ export const authPlugin =
 			secret: env.GLAZE_AUTH_SECRET,
 			emailAndPassword: resolvedAuth.emailAndPassword,
 			emailVerification: resolvedAuth.emailVerification,
+			plugins,
 			rateLimit: {
 				enabled: false,
 			},

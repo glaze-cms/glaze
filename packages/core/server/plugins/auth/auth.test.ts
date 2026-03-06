@@ -9,12 +9,19 @@ const mockBetterAuth = mock(() => ({
 
 const mockDrizzleAdapter = mock(() => ({}));
 
+const mockJwtInstance = { id: 'jwt' };
+const mockJwt = mock(() => mockJwtInstance);
+
 void mock.module('better-auth', () => ({
 	betterAuth: mockBetterAuth,
 }));
 
 void mock.module('better-auth/adapters/drizzle', () => ({
 	drizzleAdapter: mockDrizzleAdapter,
+}));
+
+void mock.module('better-auth/plugins', () => ({
+	jwt: mockJwt,
 }));
 
 import { authPlugin } from './auth';
@@ -55,6 +62,7 @@ describe('authPlugin', () => {
 	beforeEach(() => {
 		mockBetterAuth.mockClear();
 		mockDrizzleAdapter.mockClear();
+		mockJwt.mockClear();
 	});
 
 	it('should return a plugin function', () => {
@@ -67,7 +75,7 @@ describe('authPlugin', () => {
 
 		new Elysia()
 			.decorate('db', mockDb)
-			.use(authPlugin(createTestConfig(), createMockEnv()) as any);
+			.use(authPlugin(createTestConfig(), createMockEnv()));
 
 		expect(mockBetterAuth).toHaveBeenCalledWith(
 			expect.objectContaining({ appName: 'Glaze CMS' }),
@@ -83,7 +91,7 @@ describe('authPlugin', () => {
 				authPlugin(
 					createTestConfig({ apiPrefix: '/custom-api' }),
 					createMockEnv(),
-				) as any,
+				),
 			);
 
 		expect(mockBetterAuth).toHaveBeenCalledWith(
@@ -93,14 +101,14 @@ describe('authPlugin', () => {
 
 	it('should use GLAZE_SERVER_URL as baseURL when available', () => {
 		const mockDb = {};
-		// eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+
 		const env = createMockEnv({
 			GLAZE_SERVER_URL: 'https://myapp.com',
-		} as any);
+		});
 
 		new Elysia()
 			.decorate('db', mockDb)
-			.use(authPlugin(createTestConfig(), env) as any);
+			.use(authPlugin(createTestConfig(), env));
 
 		expect(mockBetterAuth).toHaveBeenCalledWith(
 			expect.objectContaining({ baseURL: 'https://myapp.com' }),
@@ -113,7 +121,7 @@ describe('authPlugin', () => {
 
 		new Elysia()
 			.decorate('db', mockDb)
-			.use(authPlugin(createTestConfig(), env) as any);
+			.use(authPlugin(createTestConfig(), env));
 
 		expect(mockBetterAuth).toHaveBeenCalledWith(
 			expect.objectContaining({ baseURL: 'http://localhost:4000' }),
@@ -126,7 +134,7 @@ describe('authPlugin', () => {
 
 		new Elysia()
 			.decorate('db', mockDb)
-			.use(authPlugin(createTestConfig(), env) as any);
+			.use(authPlugin(createTestConfig(), env));
 
 		expect(mockBetterAuth).toHaveBeenCalledWith(
 			expect.objectContaining({ baseURL: 'http://localhost:8080' }),
@@ -138,7 +146,7 @@ describe('authPlugin', () => {
 
 		new Elysia()
 			.decorate('db', mockDb)
-			.use(authPlugin(createTestConfig(), createMockEnv()) as any);
+			.use(authPlugin(createTestConfig(), createMockEnv()));
 
 		expect(mockBetterAuth).toHaveBeenCalledWith(
 			expect.objectContaining({ rateLimit: { enabled: false } }),
@@ -152,7 +160,7 @@ describe('authPlugin', () => {
 
 		new Elysia()
 			.decorate('db', mockDb)
-			.use(authPlugin(createTestConfig(), env) as any);
+			.use(authPlugin(createTestConfig(), env));
 
 		expect(mockBetterAuth).toHaveBeenCalledWith(
 			expect.objectContaining({ secret }),
@@ -164,7 +172,7 @@ describe('authPlugin', () => {
 
 		new Elysia()
 			.decorate('db', mockDb)
-			.use(authPlugin(createTestConfig(), createMockEnv()) as any);
+			.use(authPlugin(createTestConfig(), createMockEnv()));
 
 		expect(mockBetterAuth).toHaveBeenCalledWith(
 			expect.objectContaining({
@@ -179,7 +187,7 @@ describe('authPlugin', () => {
 
 		new Elysia()
 			.decorate('db', mockDb)
-			.use(authPlugin(createTestConfig(), createMockEnv()) as any);
+			.use(authPlugin(createTestConfig(), createMockEnv()));
 
 		expect(mockDrizzleAdapter).toHaveBeenCalledWith(
 			mockDb,
@@ -188,5 +196,76 @@ describe('authPlugin', () => {
 				usePlural: true,
 			}),
 		);
+	});
+
+	describe('plugins', () => {
+		const getCalledPlugins = () =>
+			(
+				mockBetterAuth.mock.calls as unknown as Array<[{ plugins: unknown[] }]>
+			)[0]?.[0]?.plugins ?? [];
+
+		it('should always include jwt plugin', () => {
+			new Elysia()
+				.decorate('db', {})
+				.use(authPlugin(createTestConfig(), createMockEnv()));
+
+			expect(mockJwt).toHaveBeenCalledTimes(1);
+			expect(mockBetterAuth).toHaveBeenCalledWith(
+				expect.objectContaining({
+					// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+					plugins: expect.arrayContaining([mockJwtInstance]),
+				}),
+			);
+		});
+
+		it('should include user-provided plugins alongside jwt', () => {
+			const userPlugin = { id: 'my-plugin' };
+			const config = createTestConfig({
+				auth: {
+					...createTestConfig().auth,
+					plugins: [userPlugin],
+				},
+			});
+
+			new Elysia().decorate('db', {}).use(authPlugin(config, createMockEnv()));
+
+			const calledPlugins = getCalledPlugins();
+			expect(calledPlugins).toContain(userPlugin);
+			expect(calledPlugins).toContain(mockJwtInstance);
+		});
+
+		it('should deduplicate jwt if user passes it explicitly', () => {
+			const userJwtPlugin = { id: 'jwt' };
+			const config = createTestConfig({
+				auth: {
+					...createTestConfig().auth,
+					plugins: [userJwtPlugin],
+				},
+			});
+
+			new Elysia().decorate('db', {}).use(authPlugin(config, createMockEnv()));
+
+			const calledPlugins = getCalledPlugins();
+			const jwtPlugins = calledPlugins.filter(
+				(p) => (p as { id: string }).id === 'jwt',
+			);
+			expect(jwtPlugins).toHaveLength(1);
+			// Glaze's jwt instance is used, not the user's
+			expect(jwtPlugins[0]).toBe(mockJwtInstance);
+		});
+
+		it('jwt should be last in the plugins array', () => {
+			const userPlugin = { id: 'other' };
+			const config = createTestConfig({
+				auth: {
+					...createTestConfig().auth,
+					plugins: [userPlugin],
+				},
+			});
+
+			new Elysia().decorate('db', {}).use(authPlugin(config, createMockEnv()));
+
+			expect(getCalledPlugins().at(-1)).toBe(mockJwtInstance);
+		});
 	});
 });
