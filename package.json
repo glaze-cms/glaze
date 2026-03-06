@@ -20,6 +20,7 @@
 	],
 	"catalogs": {
 		"auth": {
+			"@better-auth/drizzle-adapter": "latest",
 			"better-auth": "latest"
 		},
 		"development": {

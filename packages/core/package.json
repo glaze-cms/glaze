@@ -46,6 +46,7 @@
 		"@glaze/convergence": "workspace:*",
 		"@glaze/logger": "workspace:*",
 		"@glaze/shared": "workspace:*",
+		"@better-auth/drizzle-adapter": "catalog:auth",
 		"better-auth": "catalog:auth",
 		"drizzle-kit": "catalog:drizzle",
 		"elysia": "catalog:elysia",
