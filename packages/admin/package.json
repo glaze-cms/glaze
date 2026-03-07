@@ -17,6 +17,8 @@
 		"dist"
 	],
 	"dependencies": {
+		"@tanstack/router-plugin": "latest",
+		"@tanstack/react-router": "latest",
 		"react": "catalog:react",
 		"react-dom": "catalog:react"
 	},
@@ -33,7 +35,8 @@
 		"globals": "latest",
 		"typescript": "catalog:development",
 		"typescript-eslint": "catalog:development",
-		"vite": "npm:rolldown-vite@latest"
+		"vite": "npm:rolldown-vite@latest",
+		"vite-tsconfig-paths": "latest"
 	},
 	"overrides": {
 		"vite": "npm:rolldown-vite@latest"
