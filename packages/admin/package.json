@@ -19,6 +19,7 @@
 	"dependencies": {
 		"@tanstack/router-plugin": "latest",
 		"@tanstack/react-router": "latest",
+		"better-auth": "catalog:auth",
 		"react": "catalog:react",
 		"react-dom": "catalog:react"
 	},

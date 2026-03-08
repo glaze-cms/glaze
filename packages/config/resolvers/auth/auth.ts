@@ -32,6 +32,10 @@ export function authResolver(
 		? authConfig.betterAuth
 		: undefined;
 
+	const userSession =
+		betterAuthConfig?.session ??
+		(hasUserAuthConfig ? authConfig.session : undefined);
+
 	return {
 		appName: 'Glaze CMS',
 		basePath: `${normalizedPrefix}/auth`,
@@ -44,6 +48,15 @@ export function authResolver(
 		emailVerification:
 			betterAuthConfig?.emailVerification ??
 			(hasUserAuthConfig ? authConfig.emailVerification : undefined),
+		session: {
+			...userSession,
+			cookieCache: {
+				enabled: true,
+				maxAge: 60 * 60, // 1 hour default
+				strategy: 'jwe' as const,
+				...userSession?.cookieCache,
+			},
+		},
 		drizzleAdapter: hasUserAuthConfig ? authConfig.drizzleAdapter : undefined,
 		plugins:
 			betterAuthConfig?.plugins ??

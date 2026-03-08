@@ -130,52 +130,51 @@ describe('authResolver', () => {
 		});
 	});
 
-	describe('plugins', () => {
-		it('should be undefined by default', () => {
+	describe('session', () => {
+		it('should default cookieCache to enabled with 1 hour maxAge and jwe strategy', () => {
 			const result = authResolver('/api', undefined);
 
-			expect(result.plugins).toBeUndefined();
+			expect(result.session?.cookieCache).toEqual({ enabled: true, maxAge: 3600, strategy: 'jwe' });
 		});
 
-		it('should be undefined when auth is disabled', () => {
+		it('should allow user to override cookieCache maxAge', () => {
+			const authConfig: AuthConfig = {
+				enabled: true,
+				session: { cookieCache: { maxAge: 300 } },
+			};
+			const result = authResolver('/api', authConfig);
+
+			expect(result.session?.cookieCache?.maxAge).toBe(300);
+			expect(result.session?.cookieCache?.enabled).toBe(true);
+			expect(result.session?.cookieCache?.strategy).toBe('jwe');
+		});
+
+		it('should allow user to override cookieCache strategy', () => {
+			const authConfig: AuthConfig = {
+				enabled: true,
+				session: { cookieCache: { strategy: 'jwt' } },
+			};
+			const result = authResolver('/api', authConfig);
+
+			expect(result.session?.cookieCache?.strategy).toBe('jwt');
+			expect(result.session?.cookieCache?.enabled).toBe(true);
+		});
+
+		it('should merge user session config with cookieCache defaults', () => {
+			const authConfig: AuthConfig = {
+				enabled: true,
+				session: { expiresIn: 86400 },
+			};
+			const result = authResolver('/api', authConfig);
+
+			expect(result.session?.expiresIn).toBe(86400);
+			expect(result.session?.cookieCache).toEqual({ enabled: true, maxAge: 3600, strategy: 'jwe' });
+		});
+
+		it('should still apply cookieCache defaults when auth is disabled', () => {
 			const result = authResolver('/api', { enabled: false });
 
-			expect(result.plugins).toBeUndefined();
-		});
-
-		it('should pass through top-level plugins', () => {
-			const plugin = { id: 'my-plugin' };
-			const authConfig: AuthConfig = {
-				enabled: true,
-				plugins: [plugin],
-			};
-			const result = authResolver('/api', authConfig);
-
-			expect(result.plugins).toEqual([plugin]);
-		});
-
-		it('should pass through betterAuth.plugins', () => {
-			const plugin = { id: 'my-plugin' };
-			const authConfig: AuthConfig = {
-				enabled: true,
-				betterAuth: { plugins: [plugin] },
-			};
-			const result = authResolver('/api', authConfig);
-
-			expect(result.plugins).toEqual([plugin]);
-		});
-
-		it('should prefer betterAuth.plugins over top-level plugins', () => {
-			const topLevel = { id: 'top-level' };
-			const nested = { id: 'nested' };
-			const authConfig: AuthConfig = {
-				enabled: true,
-				plugins: [topLevel],
-				betterAuth: { plugins: [nested] },
-			};
-			const result = authResolver('/api', authConfig);
-
-			expect(result.plugins).toEqual([nested]);
+			expect(result.session?.cookieCache).toEqual({ enabled: true, maxAge: 3600, strategy: 'jwe' });
 		});
 	});
 

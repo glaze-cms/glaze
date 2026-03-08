@@ -17,8 +17,13 @@ export type Auth = {
 	/** Email verification configuration */
 	emailVerification?: BetterAuthOptions['emailVerification'];
 	/** Email and password authentication configuration - enabled is always true */
-	emailAndPassword?: Omit<NonNullable<BetterAuthOptions['emailAndPassword']>, 'enabled'>;
-	/** Additional Better Auth plugins (jwt is always appended by Glaze) */
+	emailAndPassword?: Omit<
+		NonNullable<BetterAuthOptions['emailAndPassword']>,
+		'enabled'
+	>;
+	/** Session configuration */
+	session?: BetterAuthOptions['session'];
+	/** Additional Better Auth plugins */
 	plugins?: BetterAuthOptions['plugins'];
 };
 
@@ -46,7 +51,9 @@ export type AuthConfig =
 			> & {
 				enabled?: never;
 			};
-			/** Additional Better Auth plugins (jwt is always appended by Glaze) */
+			/** Session configuration */
+			session?: BetterAuthOptions['session'];
+			/** Additional Better Auth plugins */
 			plugins?: BetterAuthOptions['plugins'];
 	  };
 
@@ -64,7 +71,9 @@ export type ResolvedAuthConfig = {
 	emailVerification?: BetterAuthOptions['emailVerification'];
 	/** Drizzle adapter configuration */
 	drizzleAdapter?: DrizzleAdapterConfig;
-	/** User-provided plugins (jwt will be appended by the auth plugin) */
+	/** Session configuration */
+	session?: BetterAuthOptions['session'];
+	/** User-provided Better Auth plugins */
 	plugins?: BetterAuthOptions['plugins'];
 	/** Whether end-user auth routes are exposed */
 	publicAuthEnabled: boolean;
