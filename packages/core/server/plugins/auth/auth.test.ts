@@ -67,7 +67,7 @@ describe('authPlugin', () => {
 
 		new Elysia()
 			.decorate('db', mockDb)
-			.use(authPlugin(createTestConfig(), createMockEnv()) as any);
+			.use(authPlugin(createTestConfig(), createMockEnv()));
 
 		expect(mockBetterAuth).toHaveBeenCalledWith(
 			expect.objectContaining({ appName: 'Glaze CMS' }),
@@ -83,7 +83,7 @@ describe('authPlugin', () => {
 				authPlugin(
 					createTestConfig({ apiPrefix: '/custom-api' }),
 					createMockEnv(),
-				) as any,
+				),
 			);
 
 		expect(mockBetterAuth).toHaveBeenCalledWith(
@@ -93,14 +93,14 @@ describe('authPlugin', () => {
 
 	it('should use GLAZE_SERVER_URL as baseURL when available', () => {
 		const mockDb = {};
-		// eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+
 		const env = createMockEnv({
 			GLAZE_SERVER_URL: 'https://myapp.com',
-		} as any);
+		});
 
 		new Elysia()
 			.decorate('db', mockDb)
-			.use(authPlugin(createTestConfig(), env) as any);
+			.use(authPlugin(createTestConfig(), env));
 
 		expect(mockBetterAuth).toHaveBeenCalledWith(
 			expect.objectContaining({ baseURL: 'https://myapp.com' }),
@@ -113,7 +113,7 @@ describe('authPlugin', () => {
 
 		new Elysia()
 			.decorate('db', mockDb)
-			.use(authPlugin(createTestConfig(), env) as any);
+			.use(authPlugin(createTestConfig(), env));
 
 		expect(mockBetterAuth).toHaveBeenCalledWith(
 			expect.objectContaining({ baseURL: 'http://localhost:4000' }),
@@ -126,7 +126,7 @@ describe('authPlugin', () => {
 
 		new Elysia()
 			.decorate('db', mockDb)
-			.use(authPlugin(createTestConfig(), env) as any);
+			.use(authPlugin(createTestConfig(), env));
 
 		expect(mockBetterAuth).toHaveBeenCalledWith(
 			expect.objectContaining({ baseURL: 'http://localhost:8080' }),
@@ -138,7 +138,7 @@ describe('authPlugin', () => {
 
 		new Elysia()
 			.decorate('db', mockDb)
-			.use(authPlugin(createTestConfig(), createMockEnv()) as any);
+			.use(authPlugin(createTestConfig(), createMockEnv()));
 
 		expect(mockBetterAuth).toHaveBeenCalledWith(
 			expect.objectContaining({ rateLimit: { enabled: false } }),
@@ -152,7 +152,7 @@ describe('authPlugin', () => {
 
 		new Elysia()
 			.decorate('db', mockDb)
-			.use(authPlugin(createTestConfig(), env) as any);
+			.use(authPlugin(createTestConfig(), env));
 
 		expect(mockBetterAuth).toHaveBeenCalledWith(
 			expect.objectContaining({ secret }),
@@ -164,7 +164,7 @@ describe('authPlugin', () => {
 
 		new Elysia()
 			.decorate('db', mockDb)
-			.use(authPlugin(createTestConfig(), createMockEnv()) as any);
+			.use(authPlugin(createTestConfig(), createMockEnv()));
 
 		expect(mockBetterAuth).toHaveBeenCalledWith(
 			expect.objectContaining({
@@ -179,7 +179,7 @@ describe('authPlugin', () => {
 
 		new Elysia()
 			.decorate('db', mockDb)
-			.use(authPlugin(createTestConfig(), createMockEnv()) as any);
+			.use(authPlugin(createTestConfig(), createMockEnv()));
 
 		expect(mockDrizzleAdapter).toHaveBeenCalledWith(
 			mockDb,
@@ -188,5 +188,34 @@ describe('authPlugin', () => {
 				usePlural: true,
 			}),
 		);
+	});
+
+	describe('plugins', () => {
+		const getCalledPlugins = () =>
+			(
+				mockBetterAuth.mock.calls as unknown as Array<[{ plugins: unknown[] }]>
+			)[0]?.[0]?.plugins ?? [];
+
+		it('should pass user-provided plugins to betterAuth', () => {
+			const userPlugin = { id: 'my-plugin' };
+			const config = createTestConfig({
+				auth: {
+					...createTestConfig().auth,
+					plugins: [userPlugin],
+				},
+			});
+
+			new Elysia().decorate('db', {}).use(authPlugin(config, createMockEnv()));
+
+			expect(getCalledPlugins()).toContain(userPlugin);
+		});
+
+		it('should pass undefined when no plugins provided', () => {
+			new Elysia()
+				.decorate('db', {})
+				.use(authPlugin(createTestConfig(), createMockEnv()));
+
+			expect(getCalledPlugins()).toEqual([]);
+		});
 	});
 });

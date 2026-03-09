@@ -1,0 +1,5 @@
+@layer tokens {
+	:root {
+		--font-sans: 'Plus Jakarta Sans', system-ui, sans-serif;
+	}
+}

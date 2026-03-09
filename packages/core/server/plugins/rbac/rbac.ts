@@ -50,6 +50,7 @@ export const rbacPlugin = (config: GlazeInternalConfig) =>
 			`${config.apiPrefix}/entitlements`,
 			(ctx) => {
 				const user = (ctx as unknown as { user: { role: string } }).user;
+				// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
 				const entitlements = ENTITLEMENTS[user.role as Role] ?? [];
 				return { entitlements: [...entitlements] };
 			},

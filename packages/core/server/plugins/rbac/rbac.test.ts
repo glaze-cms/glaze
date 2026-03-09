@@ -18,13 +18,26 @@ function buildApp(getSession: () => Promise<FakeSession | null>) {
 	return new Elysia()
 		.decorate('auth', makeAuth(getSession))
 		.use(rbacPlugin(mockConfig))
-		.get('/test/writer', () => ({ ok: true }), glazeHook({ requireRole: 'writer' }))
-		.get('/test/editor', () => ({ ok: true }), glazeHook({ requireRole: 'editor' }))
-		.get('/test/admin', () => ({ ok: true }), glazeHook({ requireRole: 'admin' }));
+		.get(
+			'/test/writer',
+			() => ({ ok: true }),
+			glazeHook({ requireRole: 'writer' }),
+		)
+		.get(
+			'/test/editor',
+			() => ({ ok: true }),
+			glazeHook({ requireRole: 'editor' }),
+		)
+		.get(
+			'/test/admin',
+			() => ({ ok: true }),
+			glazeHook({ requireRole: 'admin' }),
+		);
 }
 
 const noSession = () => Promise.resolve(null);
-const session = (role: string) => () => Promise.resolve({ user: { role }, session: {} });
+const session = (role: string) => () =>
+	Promise.resolve({ user: { role }, session: {} });
 
 // ─── requireRole macro ─────────────────────────────────────────────────────────
 
@@ -95,7 +108,9 @@ describe('requireRole macro', () => {
 describe('GET /api/entitlements', () => {
 	it('returns 401 when unauthenticated', async () => {
 		const app = buildApp(noSession);
-		const res = await app.handle(new Request('http://localhost/api/entitlements'));
+		const res = await app.handle(
+			new Request('http://localhost/api/entitlements'),
+		);
 		expect(res.status).toBe(401);
 	});
 
@@ -106,7 +121,9 @@ describe('GET /api/entitlements', () => {
 		['admin' as const],
 	])('returns the correct entitlements for %s', async (role) => {
 		const app = buildApp(session(role));
-		const res = await app.handle(new Request('http://localhost/api/entitlements'));
+		const res = await app.handle(
+			new Request('http://localhost/api/entitlements'),
+		);
 		expect(res.status).toBe(200);
 
 		const body = (await res.json()) as { entitlements: string[] };

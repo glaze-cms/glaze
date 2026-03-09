@@ -7,6 +7,9 @@
 		"dev": "vite",
 		"build": "tsc -b && vite build",
 		"lint": "eslint .",
+		"lint:fix": "eslint . --fix",
+		"format": "prettier --check .",
+		"format:fix": "prettier --write .",
 		"preview": "vite preview",
 		"prepublishOnly": "bun run build"
 	},
@@ -14,6 +17,8 @@
 		"dist"
 	],
 	"dependencies": {
+		"@tanstack/react-router": "latest",
+		"better-auth": "catalog:auth",
 		"react": "catalog:react",
 		"react-dom": "catalog:react"
 	},
@@ -30,7 +35,9 @@
 		"globals": "latest",
 		"typescript": "catalog:development",
 		"typescript-eslint": "catalog:development",
-		"vite": "npm:rolldown-vite@latest"
+		"vite": "npm:rolldown-vite@latest",
+		"vite-tsconfig-paths": "latest",
+		"@tanstack/router-plugin": "latest"
 	},
 	"overrides": {
 		"vite": "npm:rolldown-vite@latest"
