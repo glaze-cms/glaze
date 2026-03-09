@@ -1,11 +1,11 @@
 import { Outlet, createFileRoute, redirect } from '@tanstack/react-router';
 
-import { authClient } from '@/lib/auth';
+import { getAuthClient } from '@/lib/auth';
 import { getConfig } from '@/lib/config';
 
 export const Route = createFileRoute('/_authenticated')({
 	beforeLoad: async ({ location }) => {
-		const { data: session } = await authClient.getSession();
+		const { data: session } = await getAuthClient().getSession();
 
 		if (!session) {
 			throw redirect({
@@ -14,12 +14,12 @@ export const Route = createFileRoute('/_authenticated')({
 			});
 		}
 
-		const { entitlements } = await fetch(
-			`${getConfig().apiPrefix}/entitlements`,
-		).then((r) => r.json() as Promise<{ entitlements: string[] }>);
+		const { apiPrefix } = getConfig();
 
-		console.log('User session:', session);
-		console.log('User entitlements:', entitlements);
+		const { entitlements } = await fetch(`${apiPrefix}/entitlements`).then(
+			(r) => r.json() as Promise<{ entitlements: string[] }>,
+		);
+
 		return { session, entitlements };
 	},
 	component: () => <Outlet />,

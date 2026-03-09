@@ -1,6 +1,6 @@
 import { createFileRoute, redirect, useRouter } from '@tanstack/react-router';
 import { useState, type SubmitEvent, type SubmitEventHandler } from 'react';
-import { authClient } from '@/lib/auth';
+import { getAuthClient } from '@/lib/auth';
 
 type LoginSearch = { redirect?: string };
 
@@ -9,7 +9,7 @@ export const Route = createFileRoute('/login')({
 		redirect: typeof search.redirect === 'string' ? search.redirect : undefined,
 	}),
 	beforeLoad: async () => {
-		const { data: session } = await authClient.getSession();
+		const { data: session } = await getAuthClient().getSession();
 		if (session) throw redirect({ to: '/' });
 	},
 	component: LoginComponent,
@@ -28,7 +28,7 @@ function LoginComponent() {
 		setPending(true);
 		setError(null);
 
-		const { error: signInError } = await authClient.signIn.email({
+		const { error: signInError } = await getAuthClient().signIn.email({
 			email,
 			password,
 		});

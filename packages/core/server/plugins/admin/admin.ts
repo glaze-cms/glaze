@@ -124,7 +124,7 @@ export const adminPlugin = (config: GlazeInternalConfig) => {
 	const needsViteFallback = isDevProxy && adminPrefix !== '/admin';
 
 	// Public config endpoint — consumed by the admin SPA on startup to learn
-	// server-side settings (e.g. apiPrefix) without baking them into the build.
+	// server-side settings (e.g. apiPrefix) without hardcoding them into the frontend build
 	app.get(`${adminPrefix}/config`, () => ({ apiPrefix: config.apiPrefix }));
 
 	// Register primary admin routes for the configured prefix
