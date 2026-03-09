@@ -17,7 +17,6 @@
 		"dist"
 	],
 	"dependencies": {
-		"@tanstack/router-plugin": "latest",
 		"@tanstack/react-router": "latest",
 		"better-auth": "catalog:auth",
 		"react": "catalog:react",
@@ -37,7 +36,8 @@
 		"typescript": "catalog:development",
 		"typescript-eslint": "catalog:development",
 		"vite": "npm:rolldown-vite@latest",
-		"vite-tsconfig-paths": "latest"
+		"vite-tsconfig-paths": "latest",
+		"@tanstack/router-plugin": "latest"
 	},
 	"overrides": {
 		"vite": "npm:rolldown-vite@latest"

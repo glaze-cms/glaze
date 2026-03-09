@@ -105,6 +105,7 @@ async function handleAdmin({ request, path, adminPrefix }: HandleAdminParams) {
  * Elysia plugin that registers admin dashboard routes.
  *
  * Registers:
+ * - `GET {adminPrefix}/config` — public endpoint returning server config for the admin SPA
  * - Routes at `{adminPrefix}/*` and `{adminPrefix}` for the configured prefix
  * - Fallback routes at `/admin/*` and `/admin` when using Vite dev proxy with custom prefix
  *
@@ -121,6 +122,10 @@ export const adminPlugin = (config: GlazeInternalConfig) => {
 	// In dev with a custom admin prefix, we need to fallback to /admin for Vite assets
 	const isDevProxy = process.env.GLAZE_INTERNAL__ADMIN_PROXY === 'true';
 	const needsViteFallback = isDevProxy && adminPrefix !== '/admin';
+
+	// Public config endpoint — consumed by the admin SPA on startup to learn
+	// server-side settings (e.g. apiPrefix) without baking them into the build.
+	app.get(`${adminPrefix}/config`, () => ({ apiPrefix: config.apiPrefix }));
 
 	// Register primary admin routes for the configured prefix
 	app
