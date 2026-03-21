@@ -16,9 +16,19 @@ export const Route = createFileRoute('/_authenticated')({
 
 		const { apiPrefix } = getConfig();
 
-		const { entitlements } = await fetch(`${apiPrefix}/entitlements`).then(
-			(r) => r.json() as Promise<{ entitlements: string[] }>,
-		);
+		const entitlementsRes = await fetch(`${apiPrefix}/entitlements`);
+
+		if (entitlementsRes.status === 401) {
+			throw redirect({ to: '/login', search: { redirect: location.href } });
+		}
+
+		if (!entitlementsRes.ok) {
+			throw new Error(`Failed to load entitlements: ${entitlementsRes.status}`);
+		}
+
+		const { entitlements } = (await entitlementsRes.json()) as {
+			entitlements: string[];
+		};
 
 		return { session, entitlements };
 	},

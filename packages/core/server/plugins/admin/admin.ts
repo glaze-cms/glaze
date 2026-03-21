@@ -99,11 +99,36 @@ async function handleAdmin({ request, path, adminPrefix }: HandleAdminParams) {
 }
 
 /**
+ * Proxies a request directly to the Vite dev server at localhost:5173.
+ * Used for Vite-internal paths (runtime client, HMR, source files) that Vite
+ * injects as root-absolute URLs into the served HTML.
+ */
+async function proxyToVite(request: Request, path: string) {
+	const viteUrl = new URL(request.url);
+	const target = `http://localhost:5173${path}${viteUrl.search}`;
+
+	try {
+		return await fetch(target, {
+			method: request.method,
+			headers: request.headers,
+			body: request.body,
+		});
+	} catch {
+		return new Response('Vite Dev Server Not Ready. Is it running on port 5173?', {
+			status: 502,
+		});
+	}
+}
+
+/**
  * Elysia plugin that registers admin dashboard routes.
  *
  * Registers:
  * - `GET {adminPrefix}/config` — public endpoint returning server config for the admin SPA
  * - Routes at `{adminPrefix}/*` and `{adminPrefix}` for the configured prefix
+ * - When `GLAZE_INTERNAL__ADMIN_PROXY=true`, also proxies Vite-internal paths
+ *   (`/@vite/*`, `/@react-refresh`, `/@fs/*`, `/@id/*`, `/src/*`) so the browser
+ *   can reach the Vite dev server runtime through the core server.
  *
  * @param config - The Glaze internal configuration
  * @returns An Elysia plugin with all admin routes registered
@@ -126,6 +151,20 @@ export const adminPlugin = (config: GlazeInternalConfig) => {
 		.all(adminPrefix, ({ request, path }) =>
 			handleAdmin({ request, path, adminPrefix }),
 		);
+
+	// In dev proxy mode, Vite injects its runtime scripts (/@vite/client, /@react-refresh,
+	// /src/main.tsx, etc.) as root-absolute URLs. The browser resolves these against the
+	// core server's origin, so we must forward them to Vite.
+	if (process.env.GLAZE_INTERNAL__ADMIN_PROXY === 'true') {
+		app
+			.all('/@vite/*', ({ request, path }) => proxyToVite(request, path))
+			.all('/@react-refresh', ({ request, path }) => proxyToVite(request, path))
+			.all('/@fs/*', ({ request, path }) => proxyToVite(request, path))
+			.all('/@id/*', ({ request, path }) => proxyToVite(request, path))
+			.all('/src/*', ({ request, path }) => proxyToVite(request, path))
+			.all('/gen/*', ({ request, path }) => proxyToVite(request, path))
+			.all('/node_modules/.vite/*', ({ request, path }) => proxyToVite(request, path));
+	}
 
 	return app;
 };
