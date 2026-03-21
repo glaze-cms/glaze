@@ -44,16 +44,20 @@ function LoginComponent() {
 
 	return (
 		<form onSubmit={handleSubmit as SubmitEventHandler<HTMLFormElement>}>
+			<label htmlFor="email">Email</label>
 			<input
+				id="email"
 				type="email"
 				value={email}
 				onChange={(e) => {
 					setEmail(e.target.value);
 				}}
-				placeholder="Email"
+				placeholder="you@example.com"
 				required
 			/>
+			<label htmlFor="password">Password</label>
 			<input
+				id="password"
 				type="password"
 				value={password}
 				onChange={(e) => {
@@ -62,7 +66,7 @@ function LoginComponent() {
 				placeholder="Password"
 				required
 			/>
-			{error && <p>{error}</p>}
+			{error && <p role="alert">{error}</p>}
 			<button type="submit" disabled={pending}>
 				{pending ? 'Signing in…' : 'Sign in'}
 			</button>

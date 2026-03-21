@@ -17,10 +17,12 @@ interface KeyCombo {
  * useKeyCombo({ key: 'b', meta: true, ctrl: true }, () => setIsOpen(v => !v));
  */
 export function useKeyCombo(combo: KeyCombo, callback: () => void) {
+	const { key, meta, ctrl } = combo;
+
 	useEffect(() => {
 		function handleKeyDown(e: KeyboardEvent) {
-			if (e.key !== combo.key) return;
-			if ((combo.meta || combo.ctrl) && !(e.metaKey || e.ctrlKey)) return;
+			if (e.key !== key) return;
+			if ((meta || ctrl) && !(e.metaKey || e.ctrlKey)) return;
 			e.preventDefault();
 			callback();
 		}
@@ -28,5 +30,5 @@ export function useKeyCombo(combo: KeyCombo, callback: () => void) {
 		return () => {
 			window.removeEventListener('keydown', handleKeyDown);
 		};
-	}, [combo, callback]);
+	}, [key, meta, ctrl, callback]);
 }
