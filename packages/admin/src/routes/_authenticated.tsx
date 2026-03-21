@@ -7,10 +7,12 @@ export const Route = createFileRoute('/_authenticated')({
 	beforeLoad: async ({ location }) => {
 		const { data: session } = await getAuthClient().getSession();
 
+		const returnPath = location.pathname + location.searchStr + location.hash;
+
 		if (!session) {
 			throw redirect({
 				to: '/login',
-				search: { redirect: location.href },
+				search: { redirect: returnPath },
 			});
 		}
 
@@ -19,7 +21,7 @@ export const Route = createFileRoute('/_authenticated')({
 		const entitlementsRes = await fetch(`${apiPrefix}/entitlements`);
 
 		if (entitlementsRes.status === 401) {
-			throw redirect({ to: '/login', search: { redirect: location.href } });
+			throw redirect({ to: '/login', search: { redirect: returnPath } });
 		}
 
 		if (!entitlementsRes.ok) {

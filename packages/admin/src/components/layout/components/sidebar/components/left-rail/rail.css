@@ -41,7 +41,7 @@
 			width: 100%;
 			height: 84px;
 
-			icon {
+			.icon {
 				width: 1em;
 				height: 1em;
 			}

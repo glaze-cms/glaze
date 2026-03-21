@@ -24,13 +24,13 @@ export const rateLimitPlugin = (
 	 * - Use LRU cache for short-term or Redis for distributed/persistent storage
 	 */
 
-	const isProduction =
+	const isNonLocal =
 		env.NODE_ENV !== 'development' && env.NODE_ENV !== 'local';
 
 	if (!rateLimitConfig.enabled) {
-		if (isProduction && logger) {
+		if (isNonLocal && logger) {
 			logger.warn(
-				'Rate limiting is not enabled in production. This may expose your application to DDoS attacks.',
+				'Rate limiting is not enabled. This may expose your application to DDoS attacks.',
 			);
 		}
 		return app;

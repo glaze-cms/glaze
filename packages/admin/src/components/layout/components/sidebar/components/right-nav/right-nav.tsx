@@ -29,15 +29,18 @@ export function RightNav({ isOpen, onClose }: RightNavProps) {
 		<animated.nav className="right-nav" style={spring}>
 			<div className="top">
 				<Tooltip label="Close" shortcut="⌘B" side="bottom">
-					<PanelClose
-						className="close-icon"
+					<button
+						type="button"
+						className="close-button"
 						aria-label="Close Panel"
 						onClick={onClose}
-					/>
+					>
+						<PanelClose aria-hidden="true" />
+					</button>
 				</Tooltip>
 				<Input className="right-nav-input" LeftIcon={<MagnifyingGlass />} />
 			</div>
-			<div className="separator" aria-hidden></div>
+			<div className="separator" aria-hidden="true"></div>
 			<div className="bottom">HOLA</div>
 		</animated.nav>
 	);

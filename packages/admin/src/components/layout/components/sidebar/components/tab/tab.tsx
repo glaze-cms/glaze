@@ -20,13 +20,15 @@ export function DashboardLayoutSidebarTab({ isOpen, onOpen }: TabProps) {
 
 	return (
 		<Tooltip label="Toggle" shortcut="⌘B" disabled={isOpen}>
-			<animated.div
+			<animated.button
+				type="button"
 				className="dashboard-layout-sidebar-tab flex-col flex-center"
 				style={spring}
+				aria-label="Open sidebar"
 				onClick={isOpen ? undefined : onOpen}
 			>
-				<PanelOpenIcon />
-			</animated.div>
+				<PanelOpenIcon aria-hidden="true" />
+			</animated.button>
 		</Tooltip>
 	);
 }

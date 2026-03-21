@@ -19,12 +19,10 @@ interface KeyCombo {
 export function useKeyCombo(combo: KeyCombo, callback: () => void) {
 	useEffect(() => {
 		function handleKeyDown(e: KeyboardEvent) {
-			const modifierMatch =
-				(combo.meta ?? combo.ctrl) && (e.metaKey || e.ctrlKey);
-			if (modifierMatch && e.key === combo.key) {
-				e.preventDefault();
-				callback();
-			}
+			if (e.key !== combo.key) return;
+			if ((combo.meta || combo.ctrl) && !(e.metaKey || e.ctrlKey)) return;
+			e.preventDefault();
+			callback();
 		}
 		window.addEventListener('keydown', handleKeyDown);
 		return () => {
