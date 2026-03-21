@@ -21,8 +21,6 @@ jobs:
       - name: Wake up Registry
         run: |
           echo "Waking up registry..."
-          # Extract domain from auth URL if needed, or just hit the base
-          # Assuming the URL is secret, we try to curl it
           for i in {1..10}; do
             # -I head request, -L follow redirects, -f fail on error
             if curl -s -I -f -L "$GLAZE_REGISTRY_URL" > /dev/null; then
@@ -39,43 +37,36 @@ jobs:
 
       - name: Publish @glaze packages
         run: |
-          # Publish in dependency order: create-glaze-app → shared → logger → config → convergence → admin → core → cms
-          echo "Publishing create-glaze-app..."
-          cd packages/create-glaze-app
-          bun publish --non-interactive || echo "Skipping create-glaze-app (likely already published)"
-          cd ../..
+          # Captures output and only silently skips on "already exists" errors.
+          # Any other failure exits non-zero and fails the job.
+          publish() {
+            local pkg=$1
+            local output
+            output=$(bun publish --non-interactive 2>&1)
+            local code=$?
 
-          echo "Publishing @glaze/shared..."
-          cd packages/shared
-          bun publish --non-interactive || echo "Skipping shared (likely already published)"
-          cd ../..
+            if [ $code -eq 0 ]; then
+              echo "✅ Published $pkg"
+              return 0
+            fi
 
-          echo "Publishing @glaze/logger..."
-          cd packages/logger
-          bun publish --non-interactive || echo "Skipping logger (likely already published)"
-          cd ../..
+            # Registries phrase this differently — match the common variants
+            if echo "$output" | grep -qiE "already exists|cannot publish over|previously published|already been published"; then
+              echo "⏭️  $pkg already published at this version, skipping"
+              return 0
+            fi
 
-          echo "Publishing @glaze/config..."
-          cd packages/config
-          bun publish --non-interactive || echo "Skipping config (likely already published)"
-          cd ../..
+            echo "❌ Failed to publish $pkg:"
+            echo "$output"
+            exit 1
+          }
 
-          echo "Publishing @glaze/convergence..."
-          cd packages/convergence
-          bun publish --non-interactive || echo "Skipping convergence (likely already published)"
-          cd ../..
-
-          echo "Publishing @glaze/admin..."
-          cd packages/admin
-          bun publish --non-interactive || echo "Skipping admin (likely already published)"
-          cd ../..
-
-          echo "Publishing @glaze/core..."
-          cd packages/core
-          bun publish --non-interactive || echo "Skipping core (likely already published)"
-          cd ../..
-
-          echo "Publishing @glaze/cms..."
-          cd packages/cms
-          bun publish --non-interactive || echo "Skipping cms (likely already published)"
-          cd ../..
+          # Publish in dependency order
+          cd packages/create-glaze-app && publish create-glaze-app && cd ../..
+          cd packages/shared         && publish @glaze/shared      && cd ../..
+          cd packages/logger         && publish @glaze/logger       && cd ../..
+          cd packages/config         && publish @glaze/config       && cd ../..
+          cd packages/convergence    && publish @glaze/convergence  && cd ../..
+          cd packages/admin          && publish @glaze/admin        && cd ../..
+          cd packages/core           && publish @glaze/core         && cd ../..
+          cd packages/cms            && publish @glaze/cms          && cd ../..
