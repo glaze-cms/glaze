@@ -24,18 +24,15 @@ export const rateLimitPlugin = (
 	 * - Use LRU cache for short-term or Redis for distributed/persistent storage
 	 */
 
-	// Environment-aware default: permissive in dev, restrictive in prod
-	const shouldBePermissive =
-		env.NODE_ENV === 'development' || env.NODE_ENV === 'local';
-
-	// Warn if production is running without explicit rate limiting
-	if (!shouldBePermissive && !rateLimitConfig.enabled && logger) {
-		logger.warn(
-			'Rate limiting is not enabled in production. This may expose your application to DDoS attacks.',
-		);
-	}
+	const isProduction =
+		env.NODE_ENV !== 'development' && env.NODE_ENV !== 'local';
 
 	if (!rateLimitConfig.enabled) {
+		if (isProduction && logger) {
+			logger.warn(
+				'Rate limiting is not enabled in production. This may expose your application to DDoS attacks.',
+			);
+		}
 		return app;
 	}
 

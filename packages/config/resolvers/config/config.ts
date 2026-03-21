@@ -16,7 +16,11 @@ import type { GlazeEnv } from '../../env';
  * Creates a fresh default configuration object.
  * @returns A default configuration object with all default values set
  */
-function createDefaultConfig(): Omit<GlazeInternalConfig, 'auth' | 'sync'> {
+function createDefaultConfig(
+	nodeEnv: GlazeEnv['NODE_ENV'],
+): Omit<GlazeInternalConfig, 'auth' | 'sync'> {
+	const isDev = nodeEnv === 'development' || nodeEnv === 'local';
+
 	return {
 		apiPrefix: DEFAULT_API_PREFIX,
 		adminPrefix: DEFAULT_ADMIN_PREFIX,
@@ -32,7 +36,7 @@ function createDefaultConfig(): Omit<GlazeInternalConfig, 'auth' | 'sync'> {
 				allowedHeaders: [...DEFAULT_CORS_ALLOWED_HEADERS],
 			},
 			rateLimit: {
-				enabled: true,
+				enabled: !isDev,
 				max: 60, // 60 requests
 				duration: 60000, // 1 minute
 			},
@@ -78,15 +82,15 @@ export function resolveConfig(userConfig: GlazeConfig): GlazeInternalConfig {
 				: undefined,
 	};
 
+	const nodeEnv =
+		(process.env.NODE_ENV as GlazeEnv['NODE_ENV'] | undefined) ?? 'development';
+
 	const mergedConfig = deepMerge(
-		createDefaultConfig(),
+		createDefaultConfig(nodeEnv),
 		normalizedConfig as Partial<GlazeInternalConfig>,
 	);
 
 	const apiPrefix = mergedConfig.apiPrefix;
-
-	const nodeEnv =
-		(process.env.NODE_ENV as GlazeEnv['NODE_ENV'] | undefined) ?? 'development';
 
 	return {
 		...mergedConfig,

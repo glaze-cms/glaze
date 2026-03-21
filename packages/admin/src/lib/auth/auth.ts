@@ -6,10 +6,8 @@ type AuthClient = ReturnType<typeof createAuthClient>;
 let client: AuthClient | null = null;
 
 export function getAuthClient(): AuthClient {
-	if (!client) {
-		client = createAuthClient({
-			baseURL: `${window.location.origin}${getConfig().apiPrefix}/auth`,
-		});
-	}
+	client ??= createAuthClient({
+		baseURL: `${window.location.origin}${getConfig().apiPrefix}/auth`,
+	});
 	return client;
 }

@@ -1,0 +1,18 @@
+@layer components {
+	.sidebar {
+		position: relative;
+		z-index: 1;
+		height: 100%;
+
+		.sidebar-clip {
+			position: absolute;
+			inset: 0;
+			overflow: hidden;
+			pointer-events: none;
+
+			> * {
+				pointer-events: auto;
+			}
+		}
+	}
+}

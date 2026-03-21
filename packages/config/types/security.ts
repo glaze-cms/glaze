@@ -30,7 +30,7 @@ export interface SecurityConfig {
 	rateLimit?: {
 		/**
 		 * Whether rate limiting is enabled.
-		 * @default true
+		 * @default false in development/local, true in production
 		 */
 		enabled?: boolean;
 
@@ -86,7 +86,7 @@ export interface ResolvedSecurityConfig {
 	rateLimit: {
 		/**
 		 * Whether rate limiting is enabled.
-		 * @default true
+		 * @default false in development/local, true in production
 		 */
 		enabled: boolean;
 

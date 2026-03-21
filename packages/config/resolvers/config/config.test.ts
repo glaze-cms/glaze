@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'bun:test';
+import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
 import { resolveConfig } from './config';
 import type { GlazeConfig } from '../../types';
 import {
@@ -218,6 +218,64 @@ describe('resolveConfig', () => {
 			expect(result.security.cors.methods).not.toEqual([
 				...DEFAULT_CORS_METHODS,
 			]);
+		});
+	});
+
+	describe('rate limit env-aware defaults', () => {
+		let originalNodeEnv: string | undefined;
+
+		beforeEach(() => {
+			originalNodeEnv = process.env.NODE_ENV;
+		});
+
+		afterEach(() => {
+			process.env.NODE_ENV = originalNodeEnv;
+		});
+
+		it('should default rateLimit.enabled to false in development', () => {
+			process.env.NODE_ENV = 'development';
+
+			const result = resolveConfig({ schema: mockSchema });
+
+			expect(result.security.rateLimit.enabled).toBe(false);
+		});
+
+		it('should default rateLimit.enabled to false in local', () => {
+			process.env.NODE_ENV = 'local';
+
+			const result = resolveConfig({ schema: mockSchema });
+
+			expect(result.security.rateLimit.enabled).toBe(false);
+		});
+
+		it('should default rateLimit.enabled to true in production', () => {
+			process.env.NODE_ENV = 'production';
+
+			const result = resolveConfig({ schema: mockSchema });
+
+			expect(result.security.rateLimit.enabled).toBe(true);
+		});
+
+		it('should respect explicit enabled: true in development', () => {
+			process.env.NODE_ENV = 'development';
+
+			const result = resolveConfig({
+				schema: mockSchema,
+				security: { rateLimit: { enabled: true } },
+			});
+
+			expect(result.security.rateLimit.enabled).toBe(true);
+		});
+
+		it('should respect explicit enabled: false in production', () => {
+			process.env.NODE_ENV = 'production';
+
+			const result = resolveConfig({
+				schema: mockSchema,
+				security: { rateLimit: { enabled: false } },
+			});
+
+			expect(result.security.rateLimit.enabled).toBe(false);
 		});
 	});
 
