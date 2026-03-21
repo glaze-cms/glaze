@@ -1,6 +1,6 @@
 {
 	"name": "create-glaze-app",
-	"version": "0.0.29",
+	"version": "0.0.30",
 	"type": "module",
 	"license": "MIT",
 	"description": "The rapid-scaffolding CLI for Glaze CMS",
