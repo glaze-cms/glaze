@@ -1,0 +1,9 @@
+@layer components {
+	.dashboard-container {
+		position: relative;
+		display: flex;
+		height: 100%;
+		overflow: hidden;
+		background-color: var(--color-background);
+	}
+}

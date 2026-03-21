@@ -1,0 +1,11 @@
+@layer base {
+	#root {
+		height: 100%;
+		isolation: isolate;
+	}
+
+	body {
+		min-height: 100%;
+		font-family: var(--font-sans);
+	}
+}

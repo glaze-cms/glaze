@@ -6,7 +6,10 @@
 	"scripts": {
 		"dev": "vite",
 		"build": "tsc -b && vite build",
-		"lint": "eslint .",
+		"lint": "eslint . && stylelint \"src/**/*.css\"",
+		"lint:fix": "eslint . --fix && stylelint \"src/**/*.css\" --fix",
+		"format": "prettier --check .",
+		"format:fix": "prettier --write .",
 		"preview": "vite preview",
 		"prepublishOnly": "bun run build"
 	},
@@ -14,11 +17,20 @@
 		"dist"
 	],
 	"dependencies": {
+		"@base-ui/react": "^1.3.0",
+		"@react-spring/web": "latest",
+		"@tanstack/react-router": "latest",
+		"better-auth": "catalog:auth",
+		"classnames": "^2.5.1",
 		"react": "catalog:react",
 		"react-dom": "catalog:react"
 	},
 	"devDependencies": {
+		"@babel/core": "latest",
 		"@eslint/js": "catalog:development",
+		"@rolldown/plugin-babel": "latest",
+		"@tanstack/router-plugin": "latest",
+		"@types/babel__core": "latest",
 		"@types/node": "latest",
 		"@types/react": "catalog:react",
 		"@types/react-dom": "catalog:react",
@@ -30,7 +42,8 @@
 		"globals": "latest",
 		"typescript": "catalog:development",
 		"typescript-eslint": "catalog:development",
-		"vite": "npm:rolldown-vite@latest"
+		"vite": "latest",
+		"vite-plugin-svgr": "latest"
 	},
 	"overrides": {
 		"vite": "npm:rolldown-vite@latest"

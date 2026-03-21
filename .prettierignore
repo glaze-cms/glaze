@@ -1,0 +1,3 @@
+# Generated files — do not format
+packages/admin/gen/**
+packages/admin/.tanstack/**

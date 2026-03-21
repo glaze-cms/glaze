@@ -25,5 +25,8 @@ build/
 # Glaze generated files
 .glaze/
 
+# TanStack Router tmp dir
+.tanstack/
+
 # LLMs
 CLAUDE.md

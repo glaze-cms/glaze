@@ -1,0 +1,1 @@
+export { DashboardLayoutSidebarTab } from './tab';

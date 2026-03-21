@@ -51,10 +51,7 @@ async function handleAdmin({ request, path, adminPrefix }: HandleAdminParams) {
 
 		if (process.env.GLAZE_INTERNAL__ADMIN_PROXY === 'true') {
 			const viteUrl = new URL(request.url);
-			// Vite dev server is configured with base: '/admin/', so we need to
-			// translate the custom admin prefix to '/admin' when proxying
-			const vitePath = path.replace(adminPrefix, '/admin');
-			const target = `http://localhost:5173${vitePath}${viteUrl.search}`;
+			const target = `http://localhost:5173${path}${viteUrl.search}`;
 
 			try {
 				return await fetch(target, {
@@ -102,11 +99,36 @@ async function handleAdmin({ request, path, adminPrefix }: HandleAdminParams) {
 }
 
 /**
+ * Proxies a request directly to the Vite dev server at localhost:5173.
+ * Used for Vite-internal paths (runtime client, HMR, source files) that Vite
+ * injects as root-absolute URLs into the served HTML.
+ */
+async function proxyToVite(request: Request, path: string) {
+	const viteUrl = new URL(request.url);
+	const target = `http://localhost:5173${path}${viteUrl.search}`;
+
+	try {
+		return await fetch(target, {
+			method: request.method,
+			headers: request.headers,
+			body: request.body,
+		});
+	} catch {
+		return new Response('Vite Dev Server Not Ready. Is it running on port 5173?', {
+			status: 502,
+		});
+	}
+}
+
+/**
  * Elysia plugin that registers admin dashboard routes.
  *
  * Registers:
+ * - `GET {adminPrefix}/config` — public endpoint returning server config for the admin SPA
  * - Routes at `{adminPrefix}/*` and `{adminPrefix}` for the configured prefix
- * - Fallback routes at `/admin/*` and `/admin` when using Vite dev proxy with custom prefix
+ * - When `GLAZE_INTERNAL__ADMIN_PROXY=true`, also proxies Vite-internal paths
+ *   (`/@vite/*`, `/@react-refresh`, `/@fs/*`, `/@id/*`, `/src/*`) so the browser
+ *   can reach the Vite dev server runtime through the core server.
  *
  * @param config - The Glaze internal configuration
  * @returns An Elysia plugin with all admin routes registered
@@ -117,10 +139,9 @@ export const adminPlugin = (config: GlazeInternalConfig) => {
 	const app = new Elysia({ name: '@glaze/admin' });
 	const adminRoute = `${adminPrefix}/*`;
 
-	// Determine if we need Vite fallback routes
-	// In dev with a custom admin prefix, we need to fallback to /admin for Vite assets
-	const isDevProxy = process.env.GLAZE_INTERNAL__ADMIN_PROXY === 'true';
-	const needsViteFallback = isDevProxy && adminPrefix !== '/admin';
+	// Public config endpoint — consumed by the admin SPA on startup to learn
+	// server-side settings (e.g. apiPrefix) without hardcoding them into the frontend build
+	app.get(`${adminPrefix}/config`, () => ({ apiPrefix: config.apiPrefix, adminPrefix }));
 
 	// Register primary admin routes for the configured prefix
 	app
@@ -131,18 +152,18 @@ export const adminPlugin = (config: GlazeInternalConfig) => {
 			handleAdmin({ request, path, adminPrefix }),
 		);
 
-	// Register fallback routes for Vite dev server assets when using custom prefix
-	// These only handle asset requests (not the admin UI root) to avoid exposing
-	// /admin when a custom prefix is configured
-	if (needsViteFallback) {
-		app.all('/admin/*', ({ request, path }) => {
-			// Don't serve the admin UI at /admin when a custom prefix is configured
-			// Only proxy actual asset requests
-			if (path === '/admin' || path === '/admin/') {
-				return new Response('Not found', { status: 404 });
-			}
-			return handleAdmin({ request, path, adminPrefix: '/admin' });
-		});
+	// In dev proxy mode, Vite injects its runtime scripts (/@vite/client, /@react-refresh,
+	// /src/main.tsx, etc.) as root-absolute URLs. The browser resolves these against the
+	// core server's origin, so we must forward them to Vite.
+	if (process.env.GLAZE_INTERNAL__ADMIN_PROXY === 'true') {
+		app
+			.all('/@vite/*', ({ request, path }) => proxyToVite(request, path))
+			.all('/@react-refresh', ({ request, path }) => proxyToVite(request, path))
+			.all('/@fs/*', ({ request, path }) => proxyToVite(request, path))
+			.all('/@id/*', ({ request, path }) => proxyToVite(request, path))
+			.all('/src/*', ({ request, path }) => proxyToVite(request, path))
+			.all('/gen/*', ({ request, path }) => proxyToVite(request, path))
+			.all('/node_modules/.vite/*', ({ request, path }) => proxyToVite(request, path));
 	}
 
 	return app;

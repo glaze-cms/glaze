@@ -2,6 +2,7 @@
 	"name": "glaze-cms",
 	"private": true,
 	"description": "Glaze CMS - A Bun native CMS",
+	"type": "module",
 	"scripts": {
 		"dev": "bun --elide-lines 0 --filter '*' dev",
 		"dev:docker": "bun --filter '*' dev",
@@ -20,6 +21,7 @@
 	],
 	"catalogs": {
 		"auth": {
+			"@better-auth/drizzle-adapter": "latest",
 			"better-auth": "latest"
 		},
 		"development": {
@@ -31,6 +33,8 @@
 			"eslint-import-resolver-typescript": "latest",
 			"typescript-eslint": "latest",
 			"prettier": "latest",
+			"stylelint": "latest",
+			"stylelint-config-recess-order": "latest",
 			"typescript": "latest"
 		},
 		"drizzle": {
@@ -64,6 +68,8 @@
 		"eslint-import-resolver-typescript": "catalog:development",
 		"eslint-plugin-import": "catalog:development",
 		"prettier": "catalog:development",
+		"stylelint": "catalog:development",
+		"stylelint-config-recess-order": "catalog:development",
 		"typescript": "catalog:development",
 		"typescript-eslint": "catalog:development"
 	}

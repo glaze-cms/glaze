@@ -119,49 +119,80 @@ describe('rateLimitPlugin', () => {
 	});
 
 	describe('environment-based defaults', () => {
-		it('should create plugin in development mode', () => {
+		it('should skip middleware in development when enabled is false (default)', async () => {
 			const mockEnv = createMockEnv('development');
 
-			const plugin = rateLimitPlugin(
-				{
-					rateLimit: createDefaultRateLimitConfig(),
-					cors: { methods: [], allowedHeaders: [] },
-				},
-				mockEnv,
-				createMockLogger(),
-			);
+			const app = new Elysia()
+				.use(
+					rateLimitPlugin(
+						{
+							rateLimit: { enabled: false, max: 60, duration: 60000 },
+							cors: { methods: [], allowedHeaders: [] },
+						},
+						mockEnv,
+					),
+				)
+				.get('/test', () => 'ok');
 
-			expect(plugin).toBeDefined();
+			const response = await app.handle(new Request('http://localhost/test'));
+			expect(response.headers.has('RateLimit-Limit')).toBe(false);
 		});
 
-		it('should create plugin in production mode', () => {
-			const mockEnv = createMockEnv('production');
+		it('should apply middleware in development when enabled is explicitly true', async () => {
+			const mockEnv = createMockEnv('development');
 
-			const plugin = rateLimitPlugin(
-				{
-					rateLimit: createDefaultRateLimitConfig(),
-					cors: { methods: [], allowedHeaders: [] },
-				},
-				mockEnv,
-				createMockLogger(),
-			);
+			const app = new Elysia()
+				.use(
+					rateLimitPlugin(
+						{
+							rateLimit: { enabled: true, max: 60, duration: 60000 },
+							cors: { methods: [], allowedHeaders: [] },
+						},
+						mockEnv,
+					),
+				)
+				.get('/test', () => 'ok');
 
-			expect(plugin).toBeDefined();
+			const response = await app.handle(new Request('http://localhost/test'));
+			expect(response.headers.has('RateLimit-Limit')).toBe(true);
 		});
 
-		it('should create plugin in local mode', () => {
+		it('should skip middleware in local when enabled is false (default)', async () => {
 			const mockEnv = createMockEnv('local');
 
-			const plugin = rateLimitPlugin(
-				{
-					rateLimit: createDefaultRateLimitConfig(),
-					cors: { methods: [], allowedHeaders: [] },
-				},
-				mockEnv,
-				createMockLogger(),
-			);
+			const app = new Elysia()
+				.use(
+					rateLimitPlugin(
+						{
+							rateLimit: { enabled: false, max: 60, duration: 60000 },
+							cors: { methods: [], allowedHeaders: [] },
+						},
+						mockEnv,
+					),
+				)
+				.get('/test', () => 'ok');
 
-			expect(plugin).toBeDefined();
+			const response = await app.handle(new Request('http://localhost/test'));
+			expect(response.headers.has('RateLimit-Limit')).toBe(false);
+		});
+
+		it('should apply middleware in production when enabled is true (default)', async () => {
+			const mockEnv = createMockEnv('production');
+
+			const app = new Elysia()
+				.use(
+					rateLimitPlugin(
+						{
+							rateLimit: { enabled: true, max: 60, duration: 60000 },
+							cors: { methods: [], allowedHeaders: [] },
+						},
+						mockEnv,
+					),
+				)
+				.get('/test', () => 'ok');
+
+			const response = await app.handle(new Request('http://localhost/test'));
+			expect(response.headers.has('RateLimit-Limit')).toBe(true);
 		});
 	});
 
@@ -194,46 +225,6 @@ describe('rateLimitPlugin', () => {
 			);
 
 			expect(plugin).toBeDefined();
-		});
-
-		it('should not register middleware when disabled', async () => {
-			const mockEnv = createMockEnv('development');
-
-			const app = new Elysia()
-				.use(
-					rateLimitPlugin(
-						{
-							rateLimit: { enabled: false, max: 60, duration: 60000 },
-							cors: { methods: [], allowedHeaders: [] },
-						},
-						mockEnv,
-					),
-				)
-				.get('/test', () => 'ok');
-
-			const response = await app.handle(new Request('http://localhost/test'));
-
-			expect(response.headers.has('RateLimit-Limit')).toBe(false);
-		});
-
-		it('should register middleware when enabled', async () => {
-			const mockEnv = createMockEnv('development');
-
-			const app = new Elysia()
-				.use(
-					rateLimitPlugin(
-						{
-							rateLimit: { enabled: true, max: 60, duration: 60000 },
-							cors: { methods: [], allowedHeaders: [] },
-						},
-						mockEnv,
-					),
-				)
-				.get('/test', () => 'ok');
-
-			const response = await app.handle(new Request('http://localhost/test'));
-
-			expect(response.headers.has('RateLimit-Limit')).toBe(true);
 		});
 
 		it('should handle custom generator function', () => {

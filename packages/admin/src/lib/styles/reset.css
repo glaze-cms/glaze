@@ -1,0 +1,48 @@
+@layer reset {
+	:root {
+		box-sizing: border-box;
+		font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+		font-weight: 400;
+
+		font-synthesis: none;
+		line-height: 1.5;
+		text-rendering: optimizeLegibility;
+		-webkit-font-smoothing: antialiased;
+		-moz-osx-font-smoothing: grayscale;
+	}
+
+	html,
+	body {
+		height: 100%;
+		padding: 0;
+		margin: 0;
+	}
+
+	h1,
+	h2,
+	h3,
+	h4,
+	h5,
+	h6 {
+		margin: 0;
+		text-wrap: balance;
+	}
+
+	ul,
+	li {
+		padding: 0;
+		margin: 0;
+		list-style: none;
+	}
+
+	p,
+	li,
+	figcaption {
+		text-wrap: pretty;
+	}
+
+	a {
+		color: inherit;
+		text-decoration: none;
+	}
+}

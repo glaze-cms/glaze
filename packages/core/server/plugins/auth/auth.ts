@@ -42,6 +42,8 @@ export const authPlugin =
 			secret: env.GLAZE_AUTH_SECRET,
 			emailAndPassword: resolvedAuth.emailAndPassword,
 			emailVerification: resolvedAuth.emailVerification,
+			session: resolvedAuth.session,
+			plugins: resolvedAuth.plugins,
 			rateLimit: {
 				enabled: false,
 			},

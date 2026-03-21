@@ -1,15 +1,13 @@
-import { describe, it, expect } from 'bun:test';
-import { resolveConfig } from '.';
-import { authResolver } from './auth';
-import type { GlazeConfig } from '../types';
-import type { AuthConfig } from '../types/auth';
+import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
+import { resolveConfig } from './config';
+import type { GlazeConfig } from '../../types';
 import {
 	DEFAULT_API_PREFIX,
 	DEFAULT_ADMIN_PREFIX,
 	DEFAULT_HEALTH_CHECK_PATH,
 	DEFAULT_CORS_METHODS,
 	DEFAULT_CORS_ALLOWED_HEADERS,
-} from '../consts/defaults';
+} from '../../consts/defaults';
 
 const mockSchema = {};
 
@@ -223,6 +221,64 @@ describe('resolveConfig', () => {
 		});
 	});
 
+	describe('rate limit env-aware defaults', () => {
+		let originalNodeEnv: string | undefined;
+
+		beforeEach(() => {
+			originalNodeEnv = process.env.NODE_ENV;
+		});
+
+		afterEach(() => {
+			process.env.NODE_ENV = originalNodeEnv;
+		});
+
+		it('should default rateLimit.enabled to false in development', () => {
+			process.env.NODE_ENV = 'development';
+
+			const result = resolveConfig({ schema: mockSchema });
+
+			expect(result.security.rateLimit.enabled).toBe(false);
+		});
+
+		it('should default rateLimit.enabled to false in local', () => {
+			process.env.NODE_ENV = 'local';
+
+			const result = resolveConfig({ schema: mockSchema });
+
+			expect(result.security.rateLimit.enabled).toBe(false);
+		});
+
+		it('should default rateLimit.enabled to true in production', () => {
+			process.env.NODE_ENV = 'production';
+
+			const result = resolveConfig({ schema: mockSchema });
+
+			expect(result.security.rateLimit.enabled).toBe(true);
+		});
+
+		it('should respect explicit enabled: true in development', () => {
+			process.env.NODE_ENV = 'development';
+
+			const result = resolveConfig({
+				schema: mockSchema,
+				security: { rateLimit: { enabled: true } },
+			});
+
+			expect(result.security.rateLimit.enabled).toBe(true);
+		});
+
+		it('should respect explicit enabled: false in production', () => {
+			process.env.NODE_ENV = 'production';
+
+			const result = resolveConfig({
+				schema: mockSchema,
+				security: { rateLimit: { enabled: false } },
+			});
+
+			expect(result.security.rateLimit.enabled).toBe(false);
+		});
+	});
+
 	describe('path validation', () => {
 		it('should throw error when apiPrefix does not start with "/"', () => {
 			const config: GlazeConfig = {
@@ -288,87 +344,6 @@ describe('resolveConfig', () => {
 			const result = resolveConfig(config);
 
 			expect(result.adminPrefix).toBe('/admin');
-		});
-	});
-
-	describe('auth resolver', () => {
-		it('should create correct basePath from apiPrefix', () => {
-			const result = authResolver('/api', undefined);
-
-			expect(result.basePath).toBe('/api/auth');
-		});
-
-		it('should create correct basePath with trailing slash removed from apiPrefix', () => {
-			const result = authResolver('/api/', undefined);
-
-			expect(result.basePath).toBe('/api/auth');
-		});
-
-		it('should have publicAuthEnabled true by default', () => {
-			const result = authResolver('/api', undefined);
-
-			expect(result.publicAuthEnabled).toBe(true);
-		});
-
-		it('should set publicAuthEnabled to false when auth is disabled', () => {
-			const authConfig: AuthConfig = { enabled: false };
-			const result = authResolver('/api', authConfig);
-
-			expect(result.publicAuthEnabled).toBe(false);
-		});
-
-		it('should have default appName', () => {
-			const result = authResolver('/api', undefined);
-
-			expect(result.appName).toBe('Glaze CMS');
-		});
-
-		it('should have emailAndPassword enabled by default', () => {
-			const result = authResolver('/api', undefined);
-
-			expect(result.emailAndPassword?.enabled).toBe(true);
-		});
-
-		it('should merge user emailAndPassword config when auth is enabled', () => {
-			const customConfig = { requireEmailVerification: true };
-			const authConfig = {
-				enabled: true as const,
-				emailAndPassword: customConfig,
-			};
-			const result = authResolver('/api', authConfig);
-
-			expect(result.emailAndPassword).toMatchObject({
-				enabled: true,
-				requireEmailVerification: true,
-			});
-		});
-
-		it('should not include emailAndPassword options when auth is disabled', () => {
-			const authConfig: AuthConfig = {
-				enabled: false,
-			};
-			const result = authResolver('/api', authConfig);
-
-			// Only enabled: true is set, no user options are merged
-			expect(result.emailAndPassword).toEqual({ enabled: true });
-		});
-
-		it('should pass through emailVerification when auth is enabled', () => {
-			const authConfig: AuthConfig = {
-				enabled: true,
-				emailVerification: {
-					sendOnSignUp: true,
-				},
-			};
-			const result = authResolver('/api', authConfig);
-
-			expect(result.emailVerification).toEqual({ sendOnSignUp: true });
-		});
-
-		it('should not include emailVerification when auth is not configured', () => {
-			const result = authResolver('/api', undefined);
-
-			expect(result.emailVerification).toBeUndefined();
 		});
 	});
 });
