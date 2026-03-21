@@ -1,5 +1,6 @@
 type GlazeConfig = {
 	apiPrefix: string;
+	adminPrefix: string;
 };
 
 let cached: GlazeConfig | null = null;
@@ -12,5 +13,5 @@ export async function loadConfig(): Promise<GlazeConfig> {
 }
 
 export function getConfig(): GlazeConfig {
-	return cached ?? { apiPrefix: '/api' };
+	return cached ?? { apiPrefix: '/api', adminPrefix: '/admin' };
 }

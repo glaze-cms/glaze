@@ -3,13 +3,13 @@ import { RouterProvider, createRouter } from '@tanstack/react-router';
 import { routeTree } from 'gen/tree.ts';
 
 import '@/lib/styles/app.css';
-import { loadConfig } from '@/lib/config';
+import { getConfig, loadConfig } from '@/lib/config';
 
 await loadConfig();
 
 const router = createRouter({
 	routeTree,
-	basepath: '/admin',
+	basepath: getConfig().adminPrefix,
 	defaultPreload: 'intent',
 	scrollRestoration: true,
 });

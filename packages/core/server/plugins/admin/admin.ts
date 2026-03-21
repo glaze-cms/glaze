@@ -51,10 +51,7 @@ async function handleAdmin({ request, path, adminPrefix }: HandleAdminParams) {
 
 		if (process.env.GLAZE_INTERNAL__ADMIN_PROXY === 'true') {
 			const viteUrl = new URL(request.url);
-			// Vite dev server is configured with base: '/admin/', so we need to
-			// translate the custom admin prefix to '/admin' when proxying
-			const vitePath = path.replace(adminPrefix, '/admin');
-			const target = `http://localhost:5173${vitePath}${viteUrl.search}`;
+			const target = `http://localhost:5173${path}${viteUrl.search}`;
 
 			try {
 				return await fetch(target, {
@@ -107,7 +104,6 @@ async function handleAdmin({ request, path, adminPrefix }: HandleAdminParams) {
  * Registers:
  * - `GET {adminPrefix}/config` — public endpoint returning server config for the admin SPA
  * - Routes at `{adminPrefix}/*` and `{adminPrefix}` for the configured prefix
- * - Fallback routes at `/admin/*` and `/admin` when using Vite dev proxy with custom prefix
  *
  * @param config - The Glaze internal configuration
  * @returns An Elysia plugin with all admin routes registered
@@ -118,14 +114,9 @@ export const adminPlugin = (config: GlazeInternalConfig) => {
 	const app = new Elysia({ name: '@glaze/admin' });
 	const adminRoute = `${adminPrefix}/*`;
 
-	// Determine if we need Vite fallback routes
-	// In dev with a custom admin prefix, we need to fallback to /admin for Vite assets
-	const isDevProxy = process.env.GLAZE_INTERNAL__ADMIN_PROXY === 'true';
-	const needsViteFallback = isDevProxy && adminPrefix !== '/admin';
-
 	// Public config endpoint — consumed by the admin SPA on startup to learn
 	// server-side settings (e.g. apiPrefix) without hardcoding them into the frontend build
-	app.get(`${adminPrefix}/config`, () => ({ apiPrefix: config.apiPrefix }));
+	app.get(`${adminPrefix}/config`, () => ({ apiPrefix: config.apiPrefix, adminPrefix }));
 
 	// Register primary admin routes for the configured prefix
 	app
@@ -135,20 +126,6 @@ export const adminPlugin = (config: GlazeInternalConfig) => {
 		.all(adminPrefix, ({ request, path }) =>
 			handleAdmin({ request, path, adminPrefix }),
 		);
-
-	// Register fallback routes for Vite dev server assets when using custom prefix
-	// These only handle asset requests (not the admin UI root) to avoid exposing
-	// /admin when a custom prefix is configured
-	if (needsViteFallback) {
-		app.all('/admin/*', ({ request, path }) => {
-			// Don't serve the admin UI at /admin when a custom prefix is configured
-			// Only proxy actual asset requests
-			if (path === '/admin' || path === '/admin/') {
-				return new Response('Not found', { status: 404 });
-			}
-			return handleAdmin({ request, path, adminPrefix: '/admin' });
-		});
-	}
 
 	return app;
 };
