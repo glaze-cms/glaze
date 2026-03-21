@@ -7,5 +7,5 @@ export const Route = createFileRoute('/_authenticated/')({
 });
 
 function HomeComponent() {
-	return <DashboardLayout></DashboardLayout>;
+	return <DashboardLayout>{null}</DashboardLayout>;
 }

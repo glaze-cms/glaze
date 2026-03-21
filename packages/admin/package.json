@@ -2,10 +2,13 @@
 	"name": "@glaze/admin",
 	"version": "0.0.3",
 	"type": "module",
-	"main": "./dist/index.html",
+	"main": "./dist/index.js",
+	"exports": {
+		".": "./dist/index.js"
+	},
 	"scripts": {
 		"dev": "vite",
-		"build": "tsc -b && vite build",
+		"build": "tsc -b && vite build && bun build src/index.ts --outdir dist --target bun",
 		"lint": "eslint . && stylelint \"src/**/*.css\"",
 		"lint:fix": "eslint . --fix && stylelint \"src/**/*.css\" --fix",
 		"format": "prettier --check .",
@@ -43,7 +46,8 @@
 		"typescript": "catalog:development",
 		"typescript-eslint": "catalog:development",
 		"vite": "latest",
-		"vite-plugin-svgr": "latest"
+		"vite-plugin-svgr": "latest",
+		"vite-tsconfig-paths": "latest"
 	},
 	"overrides": {
 		"vite": "npm:rolldown-vite@latest"

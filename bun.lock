@@ -20,7 +20,7 @@
     },
     "packages/admin": {
       "name": "@glaze/admin",
-      "version": "0.0.2",
+      "version": "0.0.3",
       "dependencies": {
         "@base-ui/react": "^1.3.0",
         "@react-spring/web": "latest",
@@ -49,18 +49,19 @@
         "typescript-eslint": "catalog:development",
         "vite": "latest",
         "vite-plugin-svgr": "latest",
+        "vite-tsconfig-paths": "latest",
       },
     },
     "packages/cms": {
       "name": "@glaze/cms",
-      "version": "0.0.2",
+      "version": "0.0.3",
       "dependencies": {
         "@glaze/core": "workspace:*",
       },
     },
     "packages/config": {
       "name": "@glaze/config",
-      "version": "0.0.2",
+      "version": "0.0.3",
       "dependencies": {
         "@elysiajs/cors": "catalog:elysia",
         "@glaze/logger": "workspace:*",
@@ -75,7 +76,7 @@
     },
     "packages/convergence": {
       "name": "@glaze/convergence",
-      "version": "0.0.2",
+      "version": "0.0.3",
       "dependencies": {
         "@clack/prompts": "catalog:system",
         "@glaze/config": "workspace:*",
@@ -93,7 +94,7 @@
     },
     "packages/core": {
       "name": "@glaze/core",
-      "version": "0.0.2",
+      "version": "0.0.3",
       "dependencies": {
         "@better-auth/drizzle-adapter": "catalog:auth",
         "@elysiajs/cors": "catalog:elysia",
@@ -120,7 +121,7 @@
     },
     "packages/create-glaze-app": {
       "name": "create-glaze-app",
-      "version": "0.0.29",
+      "version": "0.0.30",
       "bin": {
         "create-glaze-app": "./index.ts",
       },
@@ -144,7 +145,7 @@
     },
     "packages/logger": {
       "name": "@glaze/logger",
-      "version": "0.0.2",
+      "version": "0.0.3",
       "dependencies": {
         "pino": "latest",
         "pino-pretty": "latest",
@@ -156,7 +157,7 @@
     },
     "packages/shared": {
       "name": "@glaze/shared",
-      "version": "0.0.2",
+      "version": "0.0.3",
       "devDependencies": {
         "@types/bun": "latest",
         "typescript": "latest",
@@ -1067,6 +1068,8 @@
 
     "globjoin": ["globjoin@0.1.4", "", {}, "sha512-xYfnw62CKG8nLkZBfWbhWwDw02CHty86jfPcc2cr3ZfeuK9ysoVPPEUxf21bAD/rWAgk52SuBrLJlefNy8mvFg=="],
 
+    "globrex": ["globrex@0.1.2", "", {}, "sha512-uHJgbwAMwNFf5mLst7IWLNg14x1CkeqglJb/K3doi4dw6q2IvAAmM/Y81kevy83wP+Sst+nutFTYOGg3d1lsxg=="],
+
     "gopd": ["gopd@1.2.0", "", {}, "sha512-ZUKRh6/kUFoAiTAtTYPZJ3hw9wNxx+BIBOijnlG9PnrJsCcSjs1wyyD6vJpaYtgnzDrKYRSqf3OO6Rfa93xsRg=="],
 
     "graceful-fs": ["graceful-fs@4.2.11", "", {}, "sha512-RbJ5/jmFcNNCcDV5o9eTnBLJ/HszWV0P73bc+Ff4nS/rJj+YaS6IGyiOL0VoBYX+l1Wrl3k63h/KrH+nhJ0XvQ=="],
@@ -1655,6 +1658,8 @@
 
     "ts-api-utils": ["ts-api-utils@2.4.0", "", { "peerDependencies": { "typescript": ">=4.8.4" } }, "sha512-3TaVTaAv2gTiMB35i3FiGJaRfwb3Pyn/j3m/bfAvGe8FB7CF6u+LMYqYlDh7reQf7UNvoTvdfAqHGmPGOSsPmA=="],
 
+    "tsconfck": ["tsconfck@3.1.6", "", { "peerDependencies": { "typescript": "^5.0.0" }, "optionalPeers": ["typescript"], "bin": { "tsconfck": "bin/tsconfck.js" } }, "sha512-ks6Vjr/jEw0P1gmOVwutM3B7fWxoWBL2KRDb1JfqGVawBmO5UsvmWOQFGHBPl5yxYz4eERr19E6L7NMv+Fej4w=="],
+
     "tsconfig-paths": ["tsconfig-paths@3.15.0", "", { "dependencies": { "@types/json5": "^0.0.29", "json5": "^1.0.2", "minimist": "^1.2.6", "strip-bom": "^3.0.0" } }, "sha512-2Ac2RgzDe/cn48GvOe3M+o82pEFewD3UPbyoUHHdKasHwJKjds4fLXWf/Ux5kATBKN20oaFGu+jbElp1pos0mg=="],
 
     "tslib": ["tslib@2.8.1", "", {}, "sha512-oJFu94HQb+KVduSUQL7wnpmqnfmLsOA/nAh6b6EH0wCEoK0/mPeXU6c3wKDV83MkOuHPRHtSXKKU99IBazS/2w=="],
@@ -1704,6 +1709,8 @@
     "vite": ["vite@8.0.1", "", { "dependencies": { "lightningcss": "^1.32.0", "picomatch": "^4.0.3", "postcss": "^8.5.8", "rolldown": "1.0.0-rc.10", "tinyglobby": "^0.2.15" }, "optionalDependencies": { "fsevents": "~2.3.3" }, "peerDependencies": { "@types/node": "^20.19.0 || >=22.12.0", "@vitejs/devtools": "^0.1.0", "esbuild": "^0.27.0", "jiti": ">=1.21.0", "less": "^4.0.0", "sass": "^1.70.0", "sass-embedded": "^1.70.0", "stylus": ">=0.54.8", "sugarss": "^5.0.0", "terser": "^5.16.0", "tsx": "^4.8.1", "yaml": "^2.4.2" }, "optionalPeers": ["@types/node", "@vitejs/devtools", "esbuild", "jiti", "less", "sass", "sass-embedded", "stylus", "sugarss", "terser", "tsx", "yaml"], "bin": { "vite": "bin/vite.js" } }, "sha512-wt+Z2qIhfFt85uiyRt5LPU4oVEJBXj8hZNWKeqFG4gRG/0RaRGJ7njQCwzFVjO+v4+Ipmf5CY7VdmZRAYYBPHw=="],
 
     "vite-plugin-svgr": ["vite-plugin-svgr@4.5.0", "", { "dependencies": { "@rollup/pluginutils": "^5.2.0", "@svgr/core": "^8.1.0", "@svgr/plugin-jsx": "^8.1.0" }, "peerDependencies": { "vite": ">=2.6.0" } }, "sha512-W+uoSpmVkSmNOGPSsDCWVW/DDAyv+9fap9AZXBvWiQqrboJ08j2vh0tFxTD/LjwqwAd3yYSVJgm54S/1GhbdnA=="],
+
+    "vite-tsconfig-paths": ["vite-tsconfig-paths@6.1.1", "", { "dependencies": { "debug": "^4.1.1", "globrex": "^0.1.2", "tsconfck": "^3.0.3" }, "peerDependencies": { "vite": "*" } }, "sha512-2cihq7zliibCCZ8P9cKJrQBkfgdvcFkOOc3Y02o3GWUDLgqjWsZudaoiuOwO/gzTzy17cS5F7ZPo4bsnS4DGkg=="],
 
     "webidl-conversions": ["webidl-conversions@7.0.0", "", {}, "sha512-VwddBukDzu71offAQR975unBIGqfKZpM+8ZX6ySk8nYhVoo5CYaZyzt3YBvYtRtO+aoGlqxPg/B87NGVZ/fu6g=="],
 
