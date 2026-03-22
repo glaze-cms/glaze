@@ -51,7 +51,7 @@ jobs:
             fi
 
             # Registries phrase this differently — match the common variants
-            if echo "$output" | grep -qiE "already exists|cannot publish over|previously published|already been published"; then
+            if echo "$output" | grep -qiE "already exists|cannot publish over|previously published|already been published|already present|409"; then
               echo "⏭️  $pkg already published at this version, skipping"
               return 0
             fi
