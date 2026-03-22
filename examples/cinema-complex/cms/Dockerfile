@@ -19,6 +19,7 @@ RUN bun install --frozen-lockfile
 FROM installer AS builder
 
 COPY index.ts drizzle.config.ts ./
+COPY schema/ ./schema/
 RUN bun run build
 
 # ---- Runtime stage ----
