@@ -1,5 +1,15 @@
 import { glaze } from '@glaze/cms';
 
-glaze();
+import * as schema from './schema/index.ts';
 
-console.log('Cinema Complex Admin Panel Initialized');
+glaze({
+	config: {
+		schema,
+		sync: {
+			workflow: 'solo',
+			solo: {
+				destructive: 'apply',
+			},
+		},
+	},
+});
