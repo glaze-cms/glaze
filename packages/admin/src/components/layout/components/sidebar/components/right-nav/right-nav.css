@@ -25,10 +25,10 @@
 				display: flex;
 				padding: 1rem;
 				margin: -1rem;
+				color: inherit;
+				cursor: pointer;
 				background: none;
 				border: none;
-				cursor: pointer;
-				color: inherit;
 			}
 		}
 

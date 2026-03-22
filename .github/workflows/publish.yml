@@ -62,7 +62,7 @@ jobs:
           }
 
           # Publish in dependency order
-          cd packages/create-glaze-app && publish create-glaze-app && cd ../..
+          cd packages/create-glaze-app && publish @glaze/create-glaze-app && cd ../..
           cd packages/shared         && publish @glaze/shared      && cd ../..
           cd packages/logger         && publish @glaze/logger       && cd ../..
           cd packages/config         && publish @glaze/config       && cd ../..

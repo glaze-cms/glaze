@@ -1,5 +1,5 @@
 {
-	"name": "create-glaze-app",
+	"name": "@glaze/create-glaze-app",
 	"version": "0.0.31",
 	"type": "module",
 	"license": "MIT",
