@@ -1,5 +1,8 @@
 import { animated, useSpring } from '@react-spring/web';
 
+/* Icons */
+import PlusIcon from '@assets/svg/plus.svg?react';
+
 /* Styles */
 import './right-nav.css';
 
@@ -10,6 +13,7 @@ import MagnifyingGlass from '@assets/svg/magnifying-glass.svg?react';
 /* Components */
 import { Tooltip } from '@/components/tooltip';
 import { Input } from '@/components/input';
+import { Button } from '@/components/button';
 
 interface RightNavProps {
 	isOpen: boolean;
@@ -41,7 +45,14 @@ export function RightNav({ isOpen, onClose }: RightNavProps) {
 				<Input className="right-nav-input" LeftIcon={<MagnifyingGlass />} />
 			</div>
 			<div className="separator" aria-hidden="true"></div>
-			<div className="bottom">HOLA</div>
+			<Button
+				color="primary"
+				LeftIcon={<PlusIcon />}
+				size="small"
+				isRounded={false}
+			>
+				New structure
+			</Button>
 		</animated.nav>
 	);
 }
