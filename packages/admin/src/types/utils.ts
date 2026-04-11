@@ -1,1 +1,1 @@
-export type WithClassName<T> = T & { className?: string };
+export type WithClassName<T = unknown> = T & { className?: string };

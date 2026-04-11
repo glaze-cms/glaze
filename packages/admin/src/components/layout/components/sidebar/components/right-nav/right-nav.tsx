@@ -2,6 +2,7 @@ import { animated, useSpring } from '@react-spring/web';
 
 /* Icons */
 import PlusIcon from '@assets/svg/plus.svg?react';
+import MultipleIcon from '@assets/svg/multiple.svg?react';
 
 /* Styles */
 import './right-nav.css';
@@ -14,6 +15,7 @@ import MagnifyingGlass from '@assets/svg/magnifying-glass.svg?react';
 import { Tooltip } from '@/components/tooltip';
 import { Input } from '@/components/input';
 import { Button } from '@/components/button';
+import { Collapsible } from '@/components/collapsible';
 
 interface RightNavProps {
 	isOpen: boolean;
@@ -44,15 +46,66 @@ export function RightNav({ isOpen, onClose }: RightNavProps) {
 				</Tooltip>
 				<Input className="right-nav-input" LeftIcon={<MagnifyingGlass />} />
 			</div>
-			<div className="separator" aria-hidden="true"></div>
-			<Button
-				color="primary"
-				LeftIcon={<PlusIcon />}
-				size="small"
-				isRounded={false}
-			>
-				New structure
-			</Button>
+
+			<div className="separator" aria-hidden="true" />
+
+			<div className="bottom">
+				<Button
+					color="primary"
+					LeftIcon={<PlusIcon />}
+					size="small"
+					isRounded={false}
+				>
+					New structure
+				</Button>
+
+				{/* Multiple */}
+				<div>
+					<Collapsible
+						trigger={{
+							Icon: <MultipleIcon />,
+							title: 'Multiple',
+						}}
+						panel={{
+							elements: [
+								{
+									label: 'Authors',
+									onClick: () => {},
+								},
+								{
+									label: 'Categories',
+									onClick: () => {},
+									isActive: true,
+								},
+								{
+									label: 'Posts',
+									onClick: () => {},
+								},
+							],
+						}}
+					/>
+
+					{/* Single */}
+					<Collapsible
+						trigger={{
+							Icon: <MultipleIcon />,
+							title: 'Single',
+						}}
+						panel={{
+							elements: [
+								{
+									label: 'Home',
+									onClick: () => {},
+								},
+								{
+									label: 'Settings',
+									onClick: () => {},
+								},
+							],
+						}}
+					/>
+				</div>
+			</div>
 		</animated.nav>
 	);
 }

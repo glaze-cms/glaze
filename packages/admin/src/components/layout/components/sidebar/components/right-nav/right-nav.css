@@ -53,5 +53,11 @@
 			margin-block: 20px;
 			background-color: #e9e3e4;
 		}
+
+		.bottom {
+			display: flex;
+			flex-direction: column;
+			gap: 1.25rem;
+		}
 	}
 }

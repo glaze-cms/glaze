@@ -1,7 +1,12 @@
 import { animated, useSpring } from '@react-spring/web';
+
+/* Assets */
 import PanelOpenIcon from '@assets/svg/panel-open.svg?react';
 
+/* Components */
 import { Tooltip } from '@/components/tooltip';
+
+/* Styles */
 import './tab.css';
 
 interface TabProps {
