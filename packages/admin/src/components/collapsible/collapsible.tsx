@@ -8,7 +8,7 @@ import ChevronIcon from '@assets/svg/chevron.svg?react';
 import './collapsible.css';
 
 /* Types */
-import type { CSSProperties, ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import type { WithClassName } from '@/types';
 
 interface CollapsibleProps extends WithClassName {
@@ -45,16 +45,17 @@ export function Collapsible({
 				keepMounted
 				className={classNames('panel', panelClassName)}
 			>
-				{elements.map((element, index) => (
-					<button
-						key={index}
-						style={{ '--i': index } as CSSProperties}
-						onClick={element.onClick}
-						className={classNames('element', { active: element.isActive })}
-					>
-						{element.label}
-					</button>
-				))}
+				<div className="panel-inner">
+					{elements.map((element, index) => (
+						<button
+							key={index}
+							onClick={element.onClick}
+							className={classNames('element', { active: element.isActive })}
+						>
+							{element.label}
+						</button>
+					))}
+				</div>
 			</BaseCollapsible.Panel>
 		</BaseCollapsible.Root>
 	);

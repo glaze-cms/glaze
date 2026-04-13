@@ -3,6 +3,7 @@ import { animated, useSpring } from '@react-spring/web';
 /* Icons */
 import PlusIcon from '@assets/svg/plus.svg?react';
 import MultipleIcon from '@assets/svg/multiple.svg?react';
+import SingleIcon from '@assets/svg/single.svg?react';
 
 /* Styles */
 import './right-nav.css';
@@ -88,7 +89,7 @@ export function RightNav({ isOpen, onClose }: RightNavProps) {
 					{/* Single */}
 					<Collapsible
 						trigger={{
-							Icon: <MultipleIcon />,
+							Icon: <SingleIcon />,
 							title: 'Single',
 						}}
 						panel={{
@@ -99,6 +100,11 @@ export function RightNav({ isOpen, onClose }: RightNavProps) {
 								},
 								{
 									label: 'Settings',
+									isActive: true,
+									onClick: () => {},
+								},
+								{
+									label: 'Posts',
 									onClick: () => {},
 								},
 							],
