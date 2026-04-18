@@ -57,7 +57,7 @@ export function RightNav({ isOpen, onClose }: RightNavProps) {
 					size="small"
 					isRounded={false}
 				>
-					New structure
+					New schema
 				</Button>
 
 				{/* Multiple */}

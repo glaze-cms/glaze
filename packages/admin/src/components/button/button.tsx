@@ -15,7 +15,7 @@ interface ButtonProps extends WithClassName<
 	LeftIcon?: ReactElement;
 	RightIcon?: ReactElement;
 	isRounded?: boolean;
-	size?: 'small' | 'medium' | 'large' | 'default';
+	size?: 'mini' | 'small' | 'large' | 'default';
 	variant?: 'ghost' | 'outlined' | 'contained';
 }
 
