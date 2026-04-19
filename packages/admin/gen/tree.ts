@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './../src/routes/__root'
 import { Route as LoginRouteImport } from './../src/routes/login'
 import { Route as AuthenticatedRouteImport } from './../src/routes/_authenticated'
 import { Route as AuthenticatedIndexRouteImport } from './../src/routes/_authenticated/index'
+import { Route as AuthenticatedSchemasRouteImport } from './../src/routes/_authenticated/schemas'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -27,27 +28,40 @@ const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedSchemasRoute = AuthenticatedSchemasRouteImport.update({
+  id: '/schemas',
+  path: '/schemas',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedIndexRoute
   '/login': typeof LoginRoute
+  '/schemas': typeof AuthenticatedSchemasRoute
 }
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
+  '/schemas': typeof AuthenticatedSchemasRoute
   '/': typeof AuthenticatedIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/login': typeof LoginRoute
+  '/_authenticated/schemas': typeof AuthenticatedSchemasRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/login'
+  fullPaths: '/' | '/login' | '/schemas'
   fileRoutesByTo: FileRoutesByTo
-  to: '/login' | '/'
-  id: '__root__' | '/_authenticated' | '/login' | '/_authenticated/'
+  to: '/login' | '/schemas' | '/'
+  id:
+    | '__root__'
+    | '/_authenticated'
+    | '/login'
+    | '/_authenticated/schemas'
+    | '/_authenticated/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -78,14 +92,23 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedIndexRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/schemas': {
+      id: '/_authenticated/schemas'
+      path: '/schemas'
+      fullPath: '/schemas'
+      preLoaderRoute: typeof AuthenticatedSchemasRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
   }
 }
 
 interface AuthenticatedRouteChildren {
+  AuthenticatedSchemasRoute: typeof AuthenticatedSchemasRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
+  AuthenticatedSchemasRoute: AuthenticatedSchemasRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
 }
 

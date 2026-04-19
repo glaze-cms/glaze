@@ -38,6 +38,7 @@
 	p,
 	li,
 	figcaption {
+		margin: 0;
 		text-wrap: pretty;
 	}
 

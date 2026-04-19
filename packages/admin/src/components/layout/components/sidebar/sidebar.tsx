@@ -28,7 +28,7 @@ const bottomItems: LeftRailItem[] = [
 ];
 
 export function DashboardLayoutSidebar() {
-	const [isOpen, setIsOpen] = useState(true);
+	const [isOpen, setIsOpen] = useState(false);
 
 	// Handlers
 	const handleTabOpen = () => {

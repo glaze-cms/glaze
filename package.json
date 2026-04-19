@@ -35,7 +35,7 @@
 			"prettier": "latest",
 			"stylelint": "latest",
 			"stylelint-config-recess-order": "latest",
-			"typescript": "latest"
+			"typescript": "^5"
 		},
 		"drizzle": {
 			"drizzle-kit": "beta",

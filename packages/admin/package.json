@@ -14,7 +14,8 @@
 		"format": "prettier --check .",
 		"format:fix": "prettier --write .",
 		"preview": "vite preview",
-		"prepublishOnly": "bun run build"
+		"prepublishOnly": "bun run build",
+		"typesafe-i18n": "typesafe-i18n"
 	},
 	"files": [
 		"dist"
@@ -26,7 +27,8 @@
 		"better-auth": "catalog:auth",
 		"classnames": "^2.5.1",
 		"react": "catalog:react",
-		"react-dom": "catalog:react"
+		"react-dom": "catalog:react",
+		"typesafe-i18n": "^5.27.1"
 	},
 	"devDependencies": {
 		"@babel/core": "latest",

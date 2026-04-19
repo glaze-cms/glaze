@@ -10,7 +10,7 @@ export const Route = createFileRoute('/login')({
 	}),
 	beforeLoad: async () => {
 		const { data: session } = await getAuthClient().getSession();
-		if (session) throw redirect({ to: '/' });
+		if (session) throw redirect({ to: '/schemas' });
 	},
 	component: LoginComponent,
 });
@@ -39,7 +39,7 @@ function LoginComponent() {
 			return;
 		}
 
-		await router.navigate({ to: redirectTo ?? '/' });
+		await router.navigate({ to: redirectTo ?? '/schemas' });
 	}
 
 	return (

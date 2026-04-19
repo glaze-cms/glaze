@@ -1,11 +1,7 @@
-import { createFileRoute } from '@tanstack/react-router';
-
-import { DashboardLayout } from '@/components/layout';
+import { createFileRoute, redirect } from '@tanstack/react-router';
 
 export const Route = createFileRoute('/_authenticated/')({
-	component: HomeComponent,
+	beforeLoad: () => {
+		throw redirect({ to: '/schemas', replace: true });
+	},
 });
-
-function HomeComponent() {
-	return <DashboardLayout>{null}</DashboardLayout>;
-}
