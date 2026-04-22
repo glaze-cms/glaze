@@ -22,7 +22,7 @@
 				display: flex;
 				align-items: center;
 				justify-content: center;
-				width: calc(100% - 87px);
+				width: 100%;
 				min-height: 100%;
 				padding-block-start: 1.5rem;
 				padding-inline: 3rem;

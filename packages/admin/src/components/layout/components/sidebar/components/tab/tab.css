@@ -2,7 +2,7 @@
 	.dashboard-layout-sidebar-tab {
 		position: absolute;
 		top: 12rem;
-		left: 87px;
+		left: var(--left-rail-width);
 		width: 2rem;
 		height: 84px;
 		background-color: var(--color-warm-200);

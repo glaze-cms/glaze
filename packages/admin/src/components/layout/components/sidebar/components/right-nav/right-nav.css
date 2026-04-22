@@ -2,7 +2,7 @@
 	.right-nav {
 		position: absolute;
 		top: 0;
-		left: 87px;
+		left: var(--left-rail-width);
 
 		width: 223px;
 		height: 100%;

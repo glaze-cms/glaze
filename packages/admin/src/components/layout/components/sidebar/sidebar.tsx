@@ -18,7 +18,7 @@ import { DashboardLayoutSidebarTab as Tab } from './components/tab';
 import { RightNav } from './components/right-nav';
 
 const topItems: LeftRailItem[] = [
-	{ label: 'Schemas', to: '/', icon: Block },
+	{ label: 'Schemas', to: '/schemas', icon: Block },
 	{ label: 'Content', to: '/content', icon: Notepad },
 	{ label: 'Settings', to: '/settings', icon: Nut },
 ];

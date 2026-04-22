@@ -1,19 +1,25 @@
 import ReactDOM from 'react-dom/client';
+
+/* TanStack Router */
 import { RouterProvider, createRouter } from '@tanstack/react-router';
 import { routeTree } from 'gen/tree.ts';
-import TypesafeI18n from '@/i18n/i18n-react';
 
-/* Styes */
+/* i18n */
+import TypesafeI18n from '@/i18n/i18n-react';
+import { detectLocale } from '@/i18n/i18n-util';
+import { loadAllLocales } from '@/i18n/i18n-util.sync';
+import {
+	localStorageDetector,
+	navigatorDetector,
+} from 'typesafe-i18n/detectors';
+
+/* Styles */
 import '@/lib/styles/app.css';
 
 /* Config */
 import { getConfig, loadConfig } from '@/lib/config';
-await loadConfig();
 
-/* i18n */
-import { detectLocale } from '@/i18n/i18n-util';
-import { loadAllLocales } from '@/i18n/i18n-util.sync';
-import { localStorageDetector, navigatorDetector } from 'typesafe-i18n/detectors';
+await loadConfig();
 loadAllLocales();
 
 const locale = detectLocale(localStorageDetector, navigatorDetector);
