@@ -7,7 +7,7 @@ import { routeTree } from 'gen/tree.ts';
 /* i18n */
 import TypesafeI18n from '@/i18n/i18n-react';
 import { detectLocale } from '@/i18n/i18n-util';
-import { loadAllLocales } from '@/i18n/i18n-util.sync';
+import { loadLocaleAsync } from '@/i18n/i18n-util.async';
 import {
 	localStorageDetector,
 	navigatorDetector,
@@ -20,9 +20,9 @@ import '@/lib/styles/app.css';
 import { getConfig, loadConfig } from '@/lib/config';
 
 await loadConfig();
-loadAllLocales();
 
 const locale = detectLocale(localStorageDetector, navigatorDetector);
+await loadLocaleAsync(locale);
 
 const router = createRouter({
 	routeTree,
