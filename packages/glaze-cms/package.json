@@ -1,0 +1,49 @@
+{
+	"name": "glaze-cms",
+	"version": "0.0.0",
+	"description": "The Bun-native headless CMS framework.",
+	"license": "MIT",
+	"files": [
+		"dist",
+		"index.ts",
+		"types/**/*.ts",
+		"config/**/*.ts",
+		"runtime/**/*.ts",
+		"dialect/**/*.ts",
+		"logger/**/*.ts",
+		"shared/**/*.ts",
+		"!**/*.test.ts",
+		"!harness/**"
+	],
+	"type": "module",
+	"main": "./index.ts",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"default": "./index.ts"
+		},
+		"./types": {
+			"types": "./dist/types/index.d.ts",
+			"default": "./types/index.ts"
+		},
+		"./config": {
+			"types": "./dist/config/index.d.ts",
+			"default": "./config/index.ts"
+		}
+	},
+	"scripts": {
+		"typecheck": "tsc --noEmit"
+	},
+	"dependencies": {
+		"better-sqlite3": "latest",
+		"drizzle-orm": "latest",
+		"pino": "latest",
+		"pino-pretty": "latest",
+		"postgres": "latest"
+	},
+	"devDependencies": {
+		"@testcontainers/postgresql": "latest",
+		"@types/better-sqlite3": "latest"
+	}
+}

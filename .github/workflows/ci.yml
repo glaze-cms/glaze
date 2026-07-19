@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Cancel superseded runs on the same ref — fast feedback, no wasted minutes.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # The gate (CLAUDE.md §6) on Bun. Docker is available on ubuntu runners by
+  # default, so the matrix suite runs the FULL matrix here — Postgres (via
+  # Testcontainers) and SQLite — with no skips.
+  gate-bun:
+    name: Gate (Bun)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Typecheck (TypeScript 7)
+        run: bun run typecheck
+
+      - name: Lint (oxlint --type-aware)
+        run: bun run lint
+
+      - name: Format check (oxfmt)
+        run: bun run format
+
+      - name: Test (matrix suite — full matrix, Docker available)
+        run: bun test
+
+  # DEFERRED (Slice 2+): the runtime dimension of the matrix is a CI job, not an
+  # in-process loop. This job re-runs the same specs under the Node runner to
+  # prove the runtime seam (Bun.file/spawn vs node:fs/child_process). Stubbed
+  # until the Node test runner path lands.
+  #
+  # gate-node:
+  #   name: Gate (Node)
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - uses: actions/setup-node@v4
+  #       with:
+  #         node-version: 22
+  #     - run: npm ci
+  #     - run: npm run test:node

@@ -1,11 +1,13 @@
 {
+	"editor.defaultFormatter": "oxc.oxc-vscode",
 	"editor.formatOnSave": true,
-	"eslint.useFlatConfig": true,
+	"editor.formatOnSaveMode": "file",
 	"editor.codeActionsOnSave": {
-		"source.fixAll.eslint": "always",
-		"source.fixAll.ruff": "always",
-		"source.fixAll.stylelint": "always"
+		"source.format.oxc": "always"
 	},
+	"oxc.enable.oxfmt": true,
+	"oxc.fmt.experimental": true,
+	"oxc.typeAware": true,
 	"files.watcherExclude": {
 		"**/routeTree.gen.ts": true
 	},
@@ -15,20 +17,10 @@
 	"files.readonlyInclude": {
 		"**/routeTree.gen.ts": true
 	},
-
-	"editor.defaultFormatter": "oxc.oxc-vscode",
 	"material-icon-theme.activeIconPack": "nest",
-	"material-icon-theme.files.associations": {
-		"wrangler.dev.jsonc": "wrangler",
-		"drizzle.config.data.ts": "drizzle",
-		"drizzle.config.auth.dev.ts": "drizzle",
-		"drizzle.config.auth.ts": "drizzle",
-		"drizzle.config.data.dev.ts": "drizzle"
-	},
 	"material-icon-theme.folders.associations": {
 		"cms": "home",
 		"features": "ui",
-		"livestore": "database",
 		"convergence": "ci",
 		"logger": "log",
 		"_authenticated": "secure"
