@@ -121,13 +121,36 @@ test('gives up as unresolved past the round bound', async () => {
 	if (outcome.status === 'unresolved') expect(outcome.decisions).toHaveLength(1);
 });
 
-test('throws when a resolution does not match the decision kind', async () => {
+test('returns an invalid_hints error when a resolution does not match the decision kind', async () => {
 	const { compute } = scripted([RENAME, OK]);
-	let threw = false;
-	try {
-		await resolveWithDecisions(compute, () => ({ action: 'confirm' })); // invalid for rename_or_create
-	} catch {
-		threw = true;
+	const outcome = await resolveWithDecisions(compute, () => ({ action: 'confirm' })); // invalid for rename_or_create
+
+	expect(outcome.status).toBe('error');
+	if (outcome.status === 'error') expect(outcome.code).toBe('invalid_hints');
+});
+
+test('contains a throwing resolver as an internal error, never an unhandled rejection', async () => {
+	const { compute } = scripted([DATA_LOSS, OK]);
+	const outcome = await resolveWithDecisions(compute, () => {
+		throw new Error('resolver blew up');
+	});
+
+	expect(outcome.status).toBe('error');
+	if (outcome.status === 'error') {
+		expect(outcome.code).toBe('internal');
+		expect(outcome.detail).toBe('resolver blew up');
 	}
-	expect(threw).toBe(true);
+});
+
+test('issues a final compute after the last round — no off-by-one', async () => {
+	// Two decision rounds then ok, with maxRounds exactly 2. The old loop stopped short and reported
+	// `unresolved`; the fixed loop issues the terminal compute and succeeds.
+	const { compute } = scripted([RENAME, RENAME, OK]);
+	const outcome = await resolveWithDecisions(
+		compute,
+		() => ({ action: 'rename', from: ['public', 'users', 'nickname'] }),
+		{ maxRounds: 2 },
+	);
+
+	expect(outcome.status).toBe('ok');
 });

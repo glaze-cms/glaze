@@ -15,12 +15,15 @@ export const CONVERGENCE_ERROR_CODES = [
 	'config_not_found',
 	'schema_not_found',
 	'missing_params',
+	'ambiguous_params',
 	'connection_error',
 	'driver_error',
+	'packages_missing',
 	'query_error',
 	'unsupported_change',
 	'invalid_hints',
 	'check_failed',
+	'migrations_outdated',
 	'orm_version',
 	'internal',
 	'unknown',
@@ -50,8 +53,11 @@ export type SchemaDecision =
 			readonly type: 'confirm_data_loss';
 			readonly entityKind: string;
 			readonly entity: readonly string[];
-			/** Why confirmation is required. */
-			readonly reason: DataLossReason;
+			/**
+			 * Why confirmation is required. `'unknown'` when drizzle sent a reason Glaze doesn't
+			 * recognize (a future rc) — surfaced honestly, never relabeled as a known reason.
+			 */
+			readonly reason: DataLossReason | 'unknown';
 			/** For `type_change`, the old and new SQL types. */
 			readonly reasonDetails?: { readonly from: string; readonly to: string };
 	  };
@@ -66,6 +72,8 @@ export type OperationResult =
 			readonly statements: readonly string[];
 			/** The written migration path, when the operation wrote one (generate). */
 			readonly migrationPath?: string;
+			/** Advisory "this is destructive" warnings drizzle emitted (export/explain); shown in the preview. */
+			readonly warnings?: readonly string[];
 	  }
 	| {
 			/** The schema already matches; nothing to do. */
@@ -83,4 +91,10 @@ export type OperationResult =
 			readonly rawCode: string;
 			/** A non-i18n diagnostic (drizzle's error message) for logs. */
 			readonly detail?: string;
+			/**
+			 * The error's remaining fields verbatim (everything except `code`), so nothing load-bearing
+			 * is lost — e.g. `query_error`'s `sql`/`params`, or `check_error`'s `kind`/`branches` (the
+			 * team-conflict substrate). The UI/logs read `code` first, `meta` for detail.
+			 */
+			readonly meta?: Readonly<Record<string, unknown>>;
 	  };

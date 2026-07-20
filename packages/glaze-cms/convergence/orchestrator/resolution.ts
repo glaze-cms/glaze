@@ -3,6 +3,9 @@
  * needs a decision, asks the injected {@link Resolver} and re-computes with the accumulated hints —
  * until drizzle returns a terminal result, a human rejects, or a safety bound is hit. Pure over its
  * two injected seams (`compute`, `resolve`), so it is fully testable without drizzle or a database.
+ *
+ * Every failure is a typed {@link ResolvedOutcome}, never a thrown exception: a bad resolution or a
+ * failing `compute`/`resolve` becomes an `error` result, so nothing escapes the promise contract.
  */
 
 import { decodeEnvelope } from '../envelope/index.ts';
@@ -18,16 +21,24 @@ import type {
 
 /** Options for {@link resolveWithDecisions}. */
 export interface ResolveOptions {
-	/** Safety bound on re-invocations, so an unresolvable loop terminates. Defaults to 10. */
+	/** Maximum decision rounds before giving up as `unresolved`, so a stuck loop terminates. Defaults to 10. */
 	readonly maxRounds?: number;
 }
 
+/** The result of resolving one round's decisions. */
+type CollectResult =
+	| { readonly kind: 'ok' }
+	| { readonly kind: 'rejected'; readonly decision: SchemaDecision }
+	| { readonly kind: 'invalid'; readonly decision: SchemaDecision; readonly action: string };
+
 /**
- * Drives the compute → decide → re-compute loop until it terminates.
+ * Drives the compute → decide → re-compute loop until it terminates. After the final round of
+ * resolutions, a further `compute` is always issued (so a resolution that takes exactly `maxRounds`
+ * rounds still gets its terminal result).
  *
  * @param compute - Injected: produces a drizzle envelope for the accumulated hints.
  * @param resolve - Injected: how a human resolves each surfaced decision.
- * @param options - Optional safety bound.
+ * @param options - Optional decision-round bound.
  * @returns The resolved outcome (ok / no_changes / rejected / unresolved / error).
  */
 export async function resolveWithDecisions(
@@ -39,86 +50,95 @@ export async function resolveWithDecisions(
 	const hints: Hint[] = [];
 	let lastDecisions: readonly SchemaDecision[] = [];
 
-	for (let round = 0; round < maxRounds; round++) {
-		// Sequential by design: each round depends on the previous round's resolutions.
-		// oxlint-disable-next-line no-await-in-loop
-		const result = decodeEnvelope(await compute(hints));
+	try {
+		for (let round = 0; round <= maxRounds; round++) {
+			// Sequential by design: each round depends on the previous round's resolutions. A defensive
+			// copy is passed so a `compute` that reads its argument lazily can't observe later mutations.
+			// oxlint-disable-next-line no-await-in-loop
+			const result = decodeEnvelope(await compute([...hints]));
 
-		if (result.status !== 'needs_decision') {
-			return toTerminalOutcome(result);
+			if (result.status !== 'needs_decision') return result;
+
+			// Defensive: the decoder fails closed on undecodable decisions, so this should not occur —
+			// but never spin on an empty decision set.
+			if (result.decisions.length === 0) {
+				return {
+					status: 'error',
+					code: 'invalid_hints',
+					rawCode: '',
+					detail: 'no decodable decisions to resolve',
+				};
+			}
+
+			lastDecisions = result.decisions;
+			if (round === maxRounds) return { status: 'unresolved', decisions: lastDecisions };
+
+			// oxlint-disable-next-line no-await-in-loop
+			const collected = await collectHints(result.decisions, resolve, hints);
+			if (collected.kind === 'rejected')
+				return { status: 'rejected', decision: collected.decision };
+			if (collected.kind === 'invalid') {
+				return {
+					status: 'error',
+					code: 'invalid_hints',
+					rawCode: '',
+					detail: `'${collected.action}' cannot resolve a ${collected.decision.type} decision`,
+				};
+			}
 		}
 
-		lastDecisions = result.decisions;
-		// oxlint-disable-next-line no-await-in-loop
-		const rejection = await collectHints(result.decisions, resolve, hints);
-		if (rejection !== null) return { status: 'rejected', decision: rejection };
+		return { status: 'unresolved', decisions: lastDecisions };
+	} catch (error) {
+		// A failing `compute` (drizzle/infra) or `resolve` (e.g. a dropped connection) is contained.
+		return {
+			status: 'error',
+			code: 'internal',
+			rawCode: '',
+			detail: error instanceof Error ? error.message : String(error),
+		};
 	}
-
-	return { status: 'unresolved', decisions: lastDecisions };
 }
 
 /**
- * Resolves every decision in a round, appending the resulting hints. Returns the first decision a
- * human rejected, or `null` when all were resolved.
+ * Resolves every decision in a round, appending the resulting hints. Reports the first decision that
+ * a human rejected or that a resolution could not answer; otherwise `ok`.
  *
  * @param decisions - The decisions to resolve this round.
  * @param resolve - The injected resolver.
  * @param hints - The accumulating hints array (mutated in place).
- * @returns The rejected decision, or `null` if none.
+ * @returns How the round resolved.
  */
 async function collectHints(
 	decisions: readonly SchemaDecision[],
 	resolve: Resolver,
 	hints: Hint[],
-): Promise<SchemaDecision | null> {
+): Promise<CollectResult> {
 	for (const decision of decisions) {
 		// oxlint-disable-next-line no-await-in-loop
 		const resolution = await resolve(decision);
-		if (resolution.action === 'reject') return decision;
-		hints.push(toHint(decision, resolution));
+		if (resolution.action === 'reject') return { kind: 'rejected', decision };
+
+		const hint = toHint(decision, resolution);
+		if (hint === null) return { kind: 'invalid', decision, action: resolution.action };
+		hints.push(hint);
 	}
-	return null;
+	return { kind: 'ok' };
 }
 
 /**
- * Maps a drizzle terminal envelope result to a {@link ResolvedOutcome}.
- *
- * @param result - A decoded, non-`needs_decision` operation result.
- * @returns The matching outcome.
- */
-function toTerminalOutcome(
-	result: Exclude<ReturnType<typeof decodeEnvelope>, { status: 'needs_decision' }>,
-): ResolvedOutcome {
-	switch (result.status) {
-		case 'ok':
-			return result.migrationPath === undefined
-				? { status: 'ok', statements: result.statements }
-				: { status: 'ok', statements: result.statements, migrationPath: result.migrationPath };
-		case 'no_changes':
-			return { status: 'no_changes' };
-		case 'error':
-			return result.detail === undefined
-				? { status: 'error', code: result.code, rawCode: result.rawCode }
-				: { status: 'error', code: result.code, rawCode: result.rawCode, detail: result.detail };
-		default: {
-			const unexpected: never = result;
-			throw new Error(`Unexpected terminal status: ${JSON.stringify(unexpected)}`);
-		}
-	}
-}
-
-/**
- * Builds the drizzle {@link Hint} for a resolved decision. The resolution's action must match the
- * decision kind (`rename`/`create` for `rename_or_create`; `confirm` for `confirm_data_loss`).
+ * Builds the drizzle {@link Hint} for a resolved decision, or `null` when the resolution's action
+ * does not match the decision kind (`rename`/`create` for `rename_or_create`; `confirm` for
+ * `confirm_data_loss`). The caller turns a `null` into a typed `invalid_hints` outcome.
  *
  * @param decision - The decision being resolved.
  * @param resolution - The human's answer (never `reject` — handled earlier).
- * @returns The hint to send back to drizzle.
- * @throws {Error} If the resolution action does not match the decision kind.
+ * @returns The hint, or `null` on a mismatch.
  */
-function toHint(decision: SchemaDecision, resolution: DecisionResolution): Hint {
+function toHint(decision: SchemaDecision, resolution: DecisionResolution): Hint | null {
 	if (decision.type === 'rename_or_create') {
 		if (resolution.action === 'rename') {
+			// from = the deleted entity the human chose; to = the new entity. Empirically verified against
+			// drizzle rc.4 (RENAME COLUMN <from> TO <to>); see docs/research/drizzle-kit-rc-1.0-sdk.md §3.
 			return {
 				type: 'rename',
 				kind: decision.entityKind,
@@ -129,13 +149,11 @@ function toHint(decision: SchemaDecision, resolution: DecisionResolution): Hint 
 		if (resolution.action === 'create') {
 			return { type: 'create', kind: decision.entityKind, entity: decision.entity };
 		}
-		throw new Error(
-			`rename_or_create needs a 'rename' or 'create' resolution, got '${resolution.action}'`,
-		);
+		return null;
 	}
 
 	if (resolution.action === 'confirm') {
 		return { type: 'confirm_data_loss', kind: decision.entityKind, entity: decision.entity };
 	}
-	throw new Error(`confirm_data_loss needs a 'confirm' resolution, got '${resolution.action}'`);
+	return null;
 }

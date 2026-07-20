@@ -4,7 +4,7 @@
  * drizzle and the database are real, never mocked. See `docs/convergence-design.md`.
  */
 
-import type { ConvergenceErrorCode, SchemaDecision } from '../envelope/index.ts';
+import type { OperationResult, SchemaDecision } from '../envelope/index.ts';
 
 /**
  * A reply Glaze sends back to drizzle to resolve one decision. Mirrors drizzle's `Hint` shape (see
@@ -57,21 +57,12 @@ export type Resolver = (
 export type EnvelopeCompute = (hints: readonly Hint[]) => Promise<unknown>;
 
 /**
- * The outcome of the resolution loop — drizzle's result once every decision has been resolved, plus
- * the two human-driven terminal states (`rejected`, `unresolved`).
+ * The outcome of the resolution loop — drizzle's terminal result once every decision has been
+ * resolved (`ok` / `no_changes` / `error`, carrying `warnings`/`meta`/`detail` verbatim), plus the
+ * two human-driven terminal states: `rejected` (a human declined) and `unresolved` (the decision
+ * budget was exhausted).
  */
 export type ResolvedOutcome =
-	| {
-			readonly status: 'ok';
-			readonly statements: readonly string[];
-			readonly migrationPath?: string;
-	  }
-	| { readonly status: 'no_changes' }
+	| Exclude<OperationResult, { status: 'needs_decision' }>
 	| { readonly status: 'rejected'; readonly decision: SchemaDecision }
-	| { readonly status: 'unresolved'; readonly decisions: readonly SchemaDecision[] }
-	| {
-			readonly status: 'error';
-			readonly code: ConvergenceErrorCode;
-			readonly rawCode: string;
-			readonly detail?: string;
-	  };
+	| { readonly status: 'unresolved'; readonly decisions: readonly SchemaDecision[] };

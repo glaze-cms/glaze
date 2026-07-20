@@ -103,12 +103,17 @@ test('decodes a type_change decision with from/to details', () => {
 	});
 });
 
-test('maps a known error code and preserves the raw code', () => {
+test('maps a known error code, preserves the raw code, and keeps meta (sql/params)', () => {
 	const result = decodeEnvelope({
 		status: 'error',
 		error: { code: 'query_error', sql: 'ALTER TABLE ...', params: [] },
 	});
-	expect(result).toEqual({ status: 'error', code: 'query_error', rawCode: 'query_error' });
+	expect(result).toEqual({
+		status: 'error',
+		code: 'query_error',
+		rawCode: 'query_error',
+		meta: { sql: 'ALTER TABLE ...', params: [] },
+	});
 });
 
 test('maps a config error code and keeps the message as detail', () => {
@@ -137,18 +142,86 @@ test('returns an error result for garbage input', () => {
 	}
 });
 
-test('skips unparseable decisions but keeps the valid ones', () => {
+test('fails closed to invalid_hints when any decision is undecodable', () => {
 	const result = decodeEnvelope({
 		status: 'missing_hints',
 		unresolved: [
 			{ type: 'confirm_data_loss', kind: 'table', entity: ['public', 't'], reason: 'non_empty' },
-			{ garbage: true },
-			{ type: 'unknown_type', kind: 'x', entity: [] },
+			{ type: 'unknown_future_type', kind: 'column', entity: ['public', 't', 'c'] },
+		],
+	});
+	expect(result.status).toBe('error');
+	if (result.status === 'error') expect(result.code).toBe('invalid_hints');
+});
+
+test('fails closed when unresolved is not an array', () => {
+	const result = decodeEnvelope({ status: 'missing_hints', unresolved: { nope: true } });
+	expect(result.status).toBe('error');
+	if (result.status === 'error') expect(result.code).toBe('invalid_hints');
+});
+
+test('preserves export warnings on an ok result', () => {
+	const result = decodeEnvelope({
+		status: 'ok',
+		dialect: 'postgresql',
+		statements: ['ALTER TABLE "users" DROP COLUMN "nickname";'],
+		warnings: ['column "nickname" will be dropped and its data lost'],
+	});
+	expect(result).toEqual({
+		status: 'ok',
+		statements: ['ALTER TABLE "users" DROP COLUMN "nickname";'],
+		warnings: ['column "nickname" will be dropped and its data lost'],
+	});
+});
+
+test('preserves check_error conflict branches in meta', () => {
+	const result = decodeEnvelope({
+		status: 'error',
+		error: {
+			code: 'check_error',
+			kind: 'conflicts',
+			conflicts: 1,
+			details: [{ parentId: 'p', branches: [{ leafId: 'a' }, { leafId: 'b' }] }],
+		},
+	});
+	expect(result.status).toBe('error');
+	if (result.status === 'error') {
+		expect(result.code).toBe('check_failed');
+		expect(result.meta?.kind).toBe('conflicts');
+	}
+});
+
+test('surfaces an unknown data-loss reason honestly, not relabeled', () => {
+	const result = decodeEnvelope({
+		status: 'missing_hints',
+		unresolved: [
+			{
+				type: 'confirm_data_loss',
+				kind: 'column',
+				entity: ['public', 't', 'c'],
+				reason: 'narrowing_precision',
+			},
 		],
 	});
 	expect(result.status).toBe('needs_decision');
 	if (result.status === 'needs_decision') {
-		expect(result.decisions).toHaveLength(1);
-		expect(result.decisions[0]?.type).toBe('confirm_data_loss');
+		const decision = result.decisions[0];
+		expect(decision?.type).toBe('confirm_data_loss');
+		if (decision?.type === 'confirm_data_loss') expect(decision.reason).toBe('unknown');
 	}
+});
+
+test('maps the corrected error codes', () => {
+	const packages = decodeEnvelope({
+		status: 'error',
+		error: { code: 'required_packages_error', packages: ['pg'] },
+	});
+	const ambiguous = decodeEnvelope({ status: 'error', error: { code: 'ambiguous_params_error' } });
+	const outdated = decodeEnvelope({
+		status: 'error',
+		error: { code: 'migrations_outdated_error' },
+	});
+	if (packages.status === 'error') expect(packages.code).toBe('packages_missing');
+	if (ambiguous.status === 'error') expect(ambiguous.code).toBe('ambiguous_params');
+	if (outdated.status === 'error') expect(outdated.code).toBe('migrations_outdated');
 });
