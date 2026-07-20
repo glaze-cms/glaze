@@ -1,6 +1,5 @@
-import { expect } from 'bun:test';
-
 import { matrixTest } from './matrix.ts';
+import { expect } from './test-api.ts';
 
 matrixTest('provisions a working database and round-trips a row', async ({ db }) => {
 	const selected = await db.raw('select 1 as one');

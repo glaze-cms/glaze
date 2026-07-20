@@ -40,18 +40,26 @@ jobs:
       - name: Test (matrix suite — full matrix, Docker available)
         run: bun test
 
-  # DEFERRED (Slice 2+): the runtime dimension of the matrix is a CI job, not an
-  # in-process loop. This job re-runs the same specs under the Node runner to
-  # prove the runtime seam (Bun.file/spawn vs node:fs/child_process). Stubbed
-  # until the Node test runner path lands.
-  #
-  # gate-node:
-  #   name: Gate (Node)
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - uses: actions/setup-node@v4
-  #       with:
-  #         node-version: 22
-  #     - run: npm ci
-  #     - run: npm run test:node
+  # The runtime dimension of the matrix: the SAME specs run under Node via `node --test`
+  # (Node's native TypeScript + test runner), exercising the Node side of the runtime seam —
+  # node:fs/child_process and, crucially, the better-sqlite3 SQLite driver that cannot load on
+  # Bun. Deps are installed with Bun (same lockfile + native builds); only the test runner is Node.
+  gate-node:
+    name: Gate (Node)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Test (Node runtime — full matrix under node --test)
+        run: bun run test:node

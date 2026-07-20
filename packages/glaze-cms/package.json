@@ -8,6 +8,7 @@
 		"index.ts",
 		"types/**/*.ts",
 		"config/**/*.ts",
+		"convergence/**/*.ts",
 		"runtime/**/*.ts",
 		"dialect/**/*.ts",
 		"logger/**/*.ts",

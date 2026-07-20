@@ -1,18 +1,11 @@
 import { resolveRuntime } from '../runtime/index.ts';
 
-import type { CreateDatabaseOptions, DatabaseHandle, DialectAdapter } from './types.ts';
-
-/**
- * Reports whether a statement returns rows (SELECT/PRAGMA/WITH), so {@link DatabaseHandle.raw}
- * can pick the right SQLite API (querying vs. executing).
- *
- * @param sql - The SQL statement.
- * @returns `true` when the statement yields rows.
- */
-function isQueryStatement(sql: string): boolean {
-	const head = sql.trimStart().toLowerCase();
-	return head.startsWith('select') || head.startsWith('pragma') || head.startsWith('with');
-}
+import type {
+	CreateDatabaseOptions,
+	DatabaseHandle,
+	DialectAdapter,
+	RawExecutor,
+} from './types.ts';
 
 /**
  * Opens a SQLite database using Bun's native `bun:sqlite` driver.
@@ -25,11 +18,33 @@ async function createBunSqlite(path: string): Promise<DatabaseHandle> {
 	const client = new Database(path);
 	const db = drizzle(client);
 
+	// Route by whether the prepared statement returns rows (empty `columnNames` ⇒ a writer), not by
+	// keyword — a write PRAGMA or CTE looks like a query but must run, not be `.all()`-ed.
+	const runRaw: RawExecutor = (sql) => {
+		const statement = client.query(sql);
+		const rows = statement.columnNames.length > 0 ? statement.all() : (statement.run(), []);
+		return Promise.resolve(rows as Array<Record<string, unknown>>);
+	};
+
 	return {
 		db,
-		raw(sql: string) {
-			const rows = isQueryStatement(sql) ? client.query(sql).all() : (client.run(sql), []);
-			return Promise.resolve(rows as Array<Record<string, unknown>>);
+		raw: runRaw,
+		// SQLite is single-connection here, so BEGIN/COMMIT/ROLLBACK on the same handle is the
+		// transaction. A failed statement does not auto-rollback in SQLite, so rollback is explicit.
+		async transaction<T>(fn: (tx: RawExecutor) => Promise<T>): Promise<T> {
+			client.run('BEGIN');
+			try {
+				const result = await fn(runRaw);
+				client.run('COMMIT');
+				return result;
+			} catch (error) {
+				try {
+					client.run('ROLLBACK');
+				} catch {
+					// Preserve and rethrow the original error; a rollback failure must not mask it.
+				}
+				throw error;
+			}
 		},
 		close() {
 			client.close();
@@ -39,7 +54,7 @@ async function createBunSqlite(path: string): Promise<DatabaseHandle> {
 }
 
 /**
- * Opens a SQLite database using the Node `2` driver.
+ * Opens a SQLite database using the Node `better-sqlite3` driver.
  * @param path - The SQLite file path.
  * @returns A live database handle.
  */
@@ -49,11 +64,31 @@ async function createNodeSqlite(path: string): Promise<DatabaseHandle> {
 	const client = new Database(path);
 	const db = drizzle(client);
 
+	// `better-sqlite3` throws on `.all()` for a non-returning statement, so route by the prepared
+	// statement's `reader` flag rather than by keyword (a write PRAGMA/CTE is not a reader).
+	const runRaw: RawExecutor = (sql) => {
+		const statement = client.prepare(sql);
+		const rows = statement.reader ? statement.all() : (statement.run(), []);
+		return Promise.resolve(rows as Array<Record<string, unknown>>);
+	};
+
 	return {
 		db,
-		raw(sql: string) {
-			const rows = isQueryStatement(sql) ? client.prepare(sql).all() : (client.exec(sql), []);
-			return Promise.resolve(rows as Array<Record<string, unknown>>);
+		raw: runRaw,
+		async transaction<T>(fn: (tx: RawExecutor) => Promise<T>): Promise<T> {
+			client.exec('BEGIN');
+			try {
+				const result = await fn(runRaw);
+				client.exec('COMMIT');
+				return result;
+			} catch (error) {
+				try {
+					client.exec('ROLLBACK');
+				} catch {
+					// Preserve and rethrow the original error; a rollback failure must not mask it.
+				}
+				throw error;
+			}
 		},
 		close() {
 			client.close();

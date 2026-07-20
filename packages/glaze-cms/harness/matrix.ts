@@ -1,8 +1,7 @@
-import { test } from 'bun:test';
-
 import { createLogger } from '../logger/index.ts';
 import { isDockerAvailable, provisionDatabase } from './provisioner.ts';
 import { DIALECTS } from './targets.ts';
+import { test } from './test-api.ts';
 
 import type { DatabaseHandle, Dialect } from '../dialect/index.ts';
 import type { Logger } from '../logger/index.ts';

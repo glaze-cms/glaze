@@ -8,6 +8,15 @@ export interface CreateDatabaseOptions {
 }
 
 /**
+ * Runs a raw SQL statement and returns the result rows. Used for `raw` and, bound to a single
+ * connection, inside {@link DatabaseHandle.transaction}.
+ *
+ * @param sql - The SQL text to execute.
+ * @returns The rows produced by the statement.
+ */
+export type RawExecutor = (sql: string) => Promise<Array<Record<string, unknown>>>;
+
+/**
  * A live database connection produced by a {@link DialectAdapter}.
  *
  * `db` is the Drizzle instance feature code uses; `raw` is a thin escape hatch the test
@@ -24,6 +33,17 @@ export interface DatabaseHandle<TDb = unknown> {
 	 * @returns The rows produced by the statement.
 	 */
 	raw(sql: string): Promise<Array<Record<string, unknown>>>;
+	/**
+	 * Runs `fn` inside a single database transaction on **one reserved connection** — essential
+	 * because `postgres.js` pools connections, so raw `BEGIN`/`COMMIT` could otherwise land on
+	 * different connections and silently break atomicity. Commits when `fn` resolves; rolls back and
+	 * re-throws if `fn` (or any statement it runs) throws.
+	 *
+	 * @typeParam T - The value `fn` produces.
+	 * @param fn - Receives a transaction-bound executor; all its statements share one connection.
+	 * @returns Whatever `fn` returns, after commit.
+	 */
+	transaction<T>(fn: (tx: RawExecutor) => Promise<T>): Promise<T>;
 	/**
 	 * Closes the underlying connection and releases its resources.
 	 * @returns Resolves once the connection is closed.

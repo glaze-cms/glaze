@@ -4,7 +4,6 @@ export type { Dialect } from '../dialect/types.ts';
 
 /**
  * Which collaboration workflow the project runs. Expanded during the convergence step
- * (gated behind the drizzle-kit RC deep dive) — kept minimal here.
  */
 export type WorkflowMode = 'solo' | 'team';
 

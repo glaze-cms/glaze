@@ -3,7 +3,13 @@ import { sqliteDialect } from './sqlite.ts';
 
 import type { Dialect, DialectAdapter } from './types.ts';
 
-export type { CreateDatabaseOptions, DatabaseHandle, Dialect, DialectAdapter } from './types.ts';
+export type {
+	CreateDatabaseOptions,
+	DatabaseHandle,
+	Dialect,
+	DialectAdapter,
+	RawExecutor,
+} from './types.ts';
 
 /** Registry of dialect adapters, keyed by dialect. */
 const ADAPTERS: Record<Dialect, DialectAdapter> = {
