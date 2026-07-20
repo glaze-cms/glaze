@@ -16,7 +16,7 @@ async function createBunSqlite(path: string): Promise<DatabaseHandle> {
 	const { Database } = await import('bun:sqlite');
 	const { drizzle } = await import('drizzle-orm/bun-sqlite');
 	const client = new Database(path);
-	const db = drizzle(client);
+	const db = drizzle({ client });
 
 	// Route by whether the prepared statement returns rows (empty `columnNames` ⇒ a writer), not by
 	// keyword — a write PRAGMA or CTE looks like a query but must run, not be `.all()`-ed.
@@ -62,7 +62,7 @@ async function createNodeSqlite(path: string): Promise<DatabaseHandle> {
 	const { default: Database } = await import('better-sqlite3');
 	const { drizzle } = await import('drizzle-orm/better-sqlite3');
 	const client = new Database(path);
-	const db = drizzle(client);
+	const db = drizzle({ client });
 
 	// `better-sqlite3` throws on `.all()` for a non-returning statement, so route by the prepared
 	// statement's `reader` flag rather than by keyword (a write PRAGMA/CTE is not a reader).

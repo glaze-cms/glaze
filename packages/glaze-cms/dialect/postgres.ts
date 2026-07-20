@@ -16,7 +16,7 @@ import type {
  */
 async function createDatabase(options: CreateDatabaseOptions): Promise<DatabaseHandle> {
 	const client = postgres(options.connection);
-	const db = drizzle(client);
+	const db = drizzle({ client });
 
 	return {
 		db,
