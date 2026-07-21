@@ -1,0 +1,66 @@
+/**
+ * The composition root: assembles the Glaze Elysia app from the resolved context. Reads top-down like
+ * a table of contents — decorate the context, then register the core chain (security headers →
+ * content-API CORS → health → root manifest) and wire graceful shutdown. The returned app is the
+ * chainable instance users attach their own routes to; startup/listen is driven by the entry point.
+ */
+
+import { Elysia } from 'elysia';
+
+import { createHealthCheck } from '../health/index.ts';
+import { stop } from '../lifecycle/index.ts';
+import { createCorsPlugin, createSecurityHeaders } from '../security/index.ts';
+import { selectAdapter } from './adapter.ts';
+
+import type { ResolvedGlazeOptions } from '../options/index.ts';
+import type { GlazeApp, GlazeContext } from './context.ts';
+
+/** The discovery manifest returned by `GET /`: the server's name and where its surfaces are mounted. */
+interface GlazeManifest {
+	/** The framework name. */
+	readonly name: string;
+	/** The content/API mount prefix. */
+	readonly apiPrefix: string;
+	/** The admin app mount prefix. */
+	readonly adminPrefix: string;
+	/** The health route path, or `null` when the health check is disabled. */
+	readonly healthPath: string | null;
+}
+
+/**
+ * Builds the Glaze app: the decorated Elysia instance with the core chain and graceful shutdown wired.
+ *
+ * @param context - The resolved Glaze context (db, config, options, logger, runtime).
+ * @returns The composed Glaze app, ready to `listen`.
+ */
+export function createGlazeApp(context: GlazeContext): GlazeApp {
+	const { options } = context;
+
+	// Include `adapter` only on Node — `exactOptionalPropertyTypes` forbids `adapter: undefined`, and
+	// omitting it selects Elysia's default (Bun) adapter.
+	const adapter = selectAdapter(context.runtime.name);
+	const app = new Elysia(adapter ? { adapter } : {})
+		.decorate(context)
+		.use(createSecurityHeaders(options.security.headers))
+		.group(options.prefixes.api, (api) => api.use(createCorsPlugin(options.security.cors)))
+		.use(createHealthCheck(options.health))
+		.get('/', () => buildManifest(options))
+		.onStop(() => stop(context));
+
+	return app as unknown as GlazeApp;
+}
+
+/**
+ * Builds the discovery manifest served at `GET /`.
+ *
+ * @param options - The resolved options.
+ * @returns The manifest describing the server's mount points.
+ */
+function buildManifest(options: ResolvedGlazeOptions): GlazeManifest {
+	return {
+		name: 'glaze',
+		apiPrefix: options.prefixes.api,
+		adminPrefix: options.prefixes.admin,
+		healthPath: options.health.enabled ? options.health.path : null,
+	};
+}

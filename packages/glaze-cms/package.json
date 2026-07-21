@@ -9,16 +9,29 @@
 		"types/**/*.ts",
 		"config/**/*.ts",
 		"convergence/**/*.ts",
+		"lib/**/*.ts",
+		"server/**/*.ts",
 		"runtime/**/*.ts",
 		"dialect/**/*.ts",
 		"logger/**/*.ts",
-		"shared/**/*.ts",
 		"!**/*.test.ts",
 		"!harness/**"
 	],
 	"type": "module",
 	"main": "./index.ts",
 	"types": "./dist/index.d.ts",
+	"imports": {
+		"#config": "./config/index.ts",
+		"#consts": "./lib/consts/index.ts",
+		"#convergence": "./convergence/index.ts",
+		"#dialect": "./dialect/index.ts",
+		"#harness": "./harness/index.ts",
+		"#logger": "./logger/index.ts",
+		"#runtime": "./runtime/index.ts",
+		"#server": "./server/index.ts",
+		"#types": "./lib/types/index.ts",
+		"#utils": "./lib/utils/index.ts"
+	},
 	"exports": {
 		".": {
 			"types": "./dist/index.d.ts",
@@ -31,15 +44,22 @@
 		"./config": {
 			"types": "./dist/config/index.d.ts",
 			"default": "./config/index.ts"
+		},
+		"./server": {
+			"types": "./dist/server/index.d.ts",
+			"default": "./server/index.ts"
 		}
 	},
 	"scripts": {
 		"typecheck": "tsc --noEmit"
 	},
 	"dependencies": {
+		"@elysiajs/cors": "latest",
+		"@elysiajs/node": "latest",
 		"better-sqlite3": "latest",
 		"drizzle-kit": "1.0.0-rc.4",
 		"drizzle-orm": "1.0.0-rc.4",
+		"elysia": "latest",
 		"pino": "latest",
 		"pino-pretty": "latest",
 		"postgres": "latest"

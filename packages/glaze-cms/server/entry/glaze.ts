@@ -1,0 +1,64 @@
+/**
+ * The `glaze()` entry point — the one call that boots the Glaze server. Loads the tooling config from
+ * `glaze.config.ts`, resolves runtime options, opens the database (dialect seam), composes the app,
+ * verifies the database is reachable, and starts listening. Returns the app so callers may attach
+ * their own routes/plugins — but ignoring the return is fine: `glaze({…})` alone runs the server.
+ */
+
+import { loadConfig, resolveConfig } from '#config';
+import { resolveDialect } from '#dialect';
+import { createLogger } from '#logger';
+import { resolveRuntime } from '#runtime';
+
+import { createGlazeApp } from '../app/index.ts';
+import { start } from '../lifecycle/index.ts';
+import { resolveOptions } from '../options/index.ts';
+import { reservedPrefixes, snapshotRoutes, warnReservedCollisions } from '../reserved/index.ts';
+
+import type { Logger } from '#logger';
+import type { GlazeApp, GlazeContext } from '../app/index.ts';
+import type { GlazeOptions, ResolvedGlazeOptions } from '../options/index.ts';
+
+/**
+ * Boots the Glaze server: compose the app, verify the database is reachable, and listen.
+ *
+ * @param options - Runtime options (port/security/prefixes/health/logger). All optional.
+ * @returns The running Glaze app (chainable — attach your own routes, or ignore it).
+ */
+export async function glaze(options: GlazeOptions = {}): Promise<GlazeApp> {
+	const resolvedOptions = resolveOptions(options);
+	const logger = createLogger(resolvedOptions.logger);
+	const config = resolveConfig(await loadConfig());
+	const runtime = resolveRuntime();
+	const db = await resolveDialect(config.dialect).createDatabase({ connection: config.connection });
+
+	const context: GlazeContext = { db, config, options: resolvedOptions, logger, runtime };
+	const app = createGlazeApp(context);
+	const coreRoutes = snapshotRoutes(app);
+
+	await start(context);
+	app.listen(resolvedOptions.port);
+	scheduleReservedWarning(app, coreRoutes, resolvedOptions, logger);
+
+	return app;
+}
+
+/**
+ * Schedules a best-effort, dev-only warning about user routes under a reserved prefix, deferred past
+ * the current tick so routes the caller adds synchronously after `glaze()` resolves are seen.
+ *
+ * @param app - The running app.
+ * @param coreRoutes - The route snapshot taken right after Glaze registered its core routes.
+ * @param options - The resolved options (source of the reserved prefixes).
+ * @param logger - The logger to warn through.
+ */
+function scheduleReservedWarning(
+	app: GlazeApp,
+	coreRoutes: ReadonlySet<string>,
+	options: ResolvedGlazeOptions,
+	logger: Logger,
+): void {
+	setTimeout(() => {
+		warnReservedCollisions(app, coreRoutes, reservedPrefixes(options), logger);
+	}, 0);
+}
