@@ -6,4 +6,9 @@ dist
 .env.*
 !.env.example
 coverage
+
+# Convergence working state (solo/prototyping) + integration-test temp fixtures
+.glaze
+.tmp-*
+
 CLAUDE.md

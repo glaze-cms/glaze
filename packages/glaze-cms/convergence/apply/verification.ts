@@ -101,9 +101,11 @@ export function findUnexpectedLosses(
 		const afterCount = after.get(survivingName);
 
 		if (afterCount === undefined) {
-			losses.push({ table, before: beforeCount, after: 0 });
+			// A vanished table only loses data if it had rows; dropping an empty table is not a loss.
+			if (beforeCount > 0) losses.push({ table, before: beforeCount, after: 0, vanished: true });
 		} else if (afterCount < beforeCount) {
-			losses.push({ table, before: beforeCount, after: afterCount });
+			// The table still exists but shrank — a truncation/bad rebuild, never a confirmable drop.
+			losses.push({ table, before: beforeCount, after: afterCount, vanished: false });
 		}
 	}
 

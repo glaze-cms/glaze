@@ -120,3 +120,41 @@ high-level `push`/`pull` (the only thing that hardcodes `better-sqlite3`) is avo
 2. **Team+audit pending lifecycle** — the pending-request ledger table, async approve/reject,
    integrity hash, notification. Contained extension.
 3. **WebSocket** — optional team real-time sync. Deferred; polling is the fallback.
+
+## Known gaps (adversarially reviewed, deferred — 2026-07-20)
+
+The `converge()` facade passed a §8 review (1 implementer : 2 parallel reviewers). Fixed on the spot:
+surviving-vs-vanished loss (a **surviving** table that lost rows is `unexpected_data_loss`, never
+confirmable/exempted — only a **vanished** table is a confirmable drop); the `gate: audit` snapshot
+desync (audit now rolls the migration back — no durable pending ledger exists yet); apply-failure
+fidelity (preserve the failing statement + distinguish `verification_error` as internal); a
+concurrent-`out` fail-closed guard; non-`ok` migration sweep; and the `hintsFile` temp-file leak.
+
+Explicitly out of scope for now (each has a follow-up task):
+
+- **Count-preserving loss is invisible.** The oracle only sees row counts, so a **column drop**, a
+  type coercion/narrowing, or a SQLite rebuild `INSERT…SELECT` that lands values in the wrong columns
+  commits as `applied` with data gone. Fix = wire **layer-1** into the facade (diff → `UnsafeChange`
+  descriptors, incl. a `drop_column`-on-populated check) + a future per-column checksum. **Highest
+  follow-up.** Until then the facade's guarantee is: *catches net row-count loss and table drops; does
+  not catch column-level or count-preserving corruption.*
+- **`confirm_data_loss` runs through the `resolve` seam, not `confirmLoss`.** drizzle's own
+  schema-derivable data-loss decisions (`type_change`, `table_recreate`) arrive as `missing_hints`
+  and must be answered by `resolve` (`action: 'confirm' | 'reject'`), while the oracle's row-loss uses
+  `confirmLoss`. A caller whose `resolve` doesn't handle confirm decisions turns a safe type-change
+  into `invalid_hints`. Document the seam contract; consider unifying the two confirm channels at the
+  API/UI layer.
+- **Internal-namespace scope (settled, wire-when-auth-lands).** The oracle counts only `public`-schema
+  tables (Postgres) — which is **correct by design**: Glaze internals live in their own namespaces, so
+  they must *not* be counted as user data. Namespaces: PG `public` = user content, `glaze_auth` = Better
+  Auth, `glaze` = other internals; SQLite (no schemas) = `zz__glaze` table prefix (sorts internals last).
+  The oracle's "user tables" scope should consume this **via the dialect seam** (exclude the `glaze`
+  schemas / `zz__glaze` prefix) rather than hardcoding `public`. Residual, documented gap: a user placing
+  *their own* content in a custom PG schema (advanced usage). Build-time check: drizzle-kit `schemaFilter`
+  must include the glaze schemas (defaults to `["public"]`).
+- **Rename name-folding.** `information_schema` returns folded names; the rename tuples from drizzle
+  are verbatim — a mixed-case *quoted* table rename can be a false `data_loss` block. (Unquoted /
+  lowercased names — the common case — match fine.)
+- **`__drizzle_migrations` is not written by converge's apply.** Harmless within converge (it diffs
+  against the snapshot), but a double-apply hazard if `drizzle-kit migrate` ever runs the same DB.
+  Handle when the team/persist path lands, alongside a lock serializing convergence on a shared `out`.

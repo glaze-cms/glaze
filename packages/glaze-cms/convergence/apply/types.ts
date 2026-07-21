@@ -42,6 +42,13 @@ export interface UnexpectedRowLoss {
 	readonly before: number;
 	/** The row count after the migration (`0` if the table disappeared). */
 	readonly after: number;
+	/**
+	 * Whether the table **vanished** entirely (absent after the migration) rather than **survived**
+	 * but lost rows. Only a vanished table is a legitimate drop an operator can confirm; a surviving
+	 * table whose count dropped is never a confirmable "drop" — it signals a truncation or a bad
+	 * rebuild, and must never be exempted from the check.
+	 */
+	readonly vanished: boolean;
 }
 
 /**

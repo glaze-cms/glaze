@@ -1,5 +1,5 @@
-import { expect, matrixTest } from '../../harness/index.ts';
-import { applyMigration } from './index.ts';
+import { expect, matrixTest, test } from '../../harness/index.ts';
+import { applyMigration, findUnexpectedLosses } from './index.ts';
 
 matrixTest('applies schema DDL atomically and preserves rows', async ({ db, dialect }) => {
 	await db.raw('create table t (id integer primary key, name text)');
@@ -180,3 +180,34 @@ matrixTest(
 		expect(columnExists).toBe(false);
 	},
 );
+
+test('findUnexpectedLosses flags a vanished table as vanished (a confirmable drop)', () => {
+	const before = new Map([['posts', 100]]);
+	const after = new Map<string, number>();
+
+	const losses = findUnexpectedLosses(before, after, new Set(), []);
+
+	expect(losses).toHaveLength(1);
+	expect(losses[0]?.vanished).toBe(true);
+	expect(losses[0]?.after).toBe(0);
+});
+
+test('findUnexpectedLosses flags a surviving-but-shrunk table as NOT vanished', () => {
+	// A table that still exists after the migration but lost rows — a truncation/bad rebuild that
+	// must never be exempted via a "drop" confirmation.
+	const before = new Map([['posts', 100]]);
+	const after = new Map([['posts', 0]]);
+
+	const losses = findUnexpectedLosses(before, after, new Set(), []);
+
+	expect(losses).toHaveLength(1);
+	expect(losses[0]?.vanished).toBe(false);
+	expect(losses[0]?.after).toBe(0);
+});
+
+test('findUnexpectedLosses ignores a vanished empty table (dropping empty is not a loss)', () => {
+	const before = new Map([['posts', 0]]);
+	const after = new Map<string, number>();
+
+	expect(findUnexpectedLosses(before, after, new Set(), [])).toHaveLength(0);
+});

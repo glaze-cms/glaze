@@ -4,7 +4,7 @@ export {
 	decodeEnvelope,
 	toConvergenceErrorCode,
 } from './envelope/index.ts';
-export { resolveWithDecisions } from './orchestrator/index.ts';
+export { converge, createGenerateCompute, resolveWithDecisions } from './orchestrator/index.ts';
 export {
 	checkColumnLengthOverflow,
 	checkNotNullColumnOnNonEmpty,
@@ -27,9 +27,12 @@ export type {
 	SchemaDecision,
 } from './envelope/index.ts';
 export type {
+	ConvergeOptions,
+	ConvergeResult,
 	DecisionResolution,
 	EnvelopeCompute,
 	Hint,
+	LossResolver,
 	ResolvedOutcome,
 	Resolver,
 } from './orchestrator/index.ts';
