@@ -1,4 +1,5 @@
 export {
+	checkColumnHasData,
 	checkColumnLengthOverflow,
 	checkNotNullColumnOnNonEmpty,
 	checkNotNullOnExistingNulls,

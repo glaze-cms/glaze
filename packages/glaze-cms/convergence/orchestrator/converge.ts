@@ -3,10 +3,14 @@
  * pieces built so far — `drizzle generate` (compute) → the decode + resolution loop → the layer-2
  * apply oracle — behind injected human seams, so it is fully testable before any API/UI exists.
  *
- * Two decision channels, because `generate` is file-only and cannot see data:
+ * Three decision channels, because `generate` is file-only and cannot see data:
  * - **Structural** (rename vs create) come from drizzle's `missing_hints` → the injected `resolve`.
- * - **Data-loss** (dropping a populated table) is only visible once applied, so the apply oracle
- *   detects it. A table that **vanished** is surfaced to the injected `confirmLoss` and, once
+ * - **Silent, count-preserving loss** — a dropped column that still holds data is invisible to the
+ *   row-count oracle, so a **layer-1 pre-flight** diffs the snapshots and probes the live DB. A
+ *   populated column drop is surfaced to the injected `confirmDrop` (proceed only if confirmed); a
+ *   change the DB would itself reject (e.g. `NOT NULL` over existing nulls) is a hard block.
+ * - **Table-level loss** (dropping a populated table) is only visible once applied, so the layer-2
+ *   apply oracle detects it. A table that **vanished** is surfaced to `confirmLoss` and, once
  *   confirmed, exempted on re-apply. A table that **survived but lost rows** is never confirmable —
  *   it is returned as `unexpected_data_loss` (a truncation / bad-rebuild signal) and never exempted.
  *
@@ -24,11 +28,13 @@ import { join } from 'node:path';
 
 import { applyMigration } from '../apply/index.ts';
 import { createGenerateCompute } from './generate.ts';
+import { runPreflight } from './preflight.ts';
 import { resolveWithDecisions } from './resolution.ts';
 
 import type { DatabaseHandle, Dialect } from '../../dialect/index.ts';
 import type { ApplyResult, TableRename, UnexpectedRowLoss } from '../apply/index.ts';
 import type { ConvergenceErrorCode, SchemaDecision } from '../envelope/index.ts';
+import type { DataLossFinding } from '../safety/index.ts';
 import type { ResolvedOutcome, Resolver } from './types.ts';
 
 /** An apply failure that is not the confirmable data-loss case. */
@@ -39,6 +45,12 @@ type ApplyFailure = Exclude<
 
 /** Confirms (`true`) or declines (`false`) an intended data loss the apply oracle detected. */
 export type LossResolver = (loss: UnexpectedRowLoss) => boolean | Promise<boolean>;
+
+/**
+ * Confirms (`true`) or declines (`false`) a destructive-but-valid change layer-1 pre-flight flagged
+ * — currently a populated column drop. The finding carries the table, column, and affected row count.
+ */
+export type DropConfirmer = (finding: DataLossFinding) => boolean | Promise<boolean>;
 
 /** Options for {@link converge}. */
 export interface ConvergeOptions {
@@ -54,6 +66,8 @@ export interface ConvergeOptions {
 	readonly resolve: Resolver;
 	/** Confirms intended data loss (a populated table drop). Absent ⇒ any data loss is declined. */
 	readonly confirmLoss?: LossResolver;
+	/** Confirms a destructive-but-valid layer-1 change (a populated column drop). Absent ⇒ declined (blocked). */
+	readonly confirmDrop?: DropConfirmer;
 	/** `auto` (default) applies when safe; `audit` returns `pending` without applying. */
 	readonly gate?: 'auto' | 'audit';
 }
@@ -65,6 +79,7 @@ export type ConvergeResult =
 	| { readonly status: 'rejected'; readonly decision: SchemaDecision }
 	| { readonly status: 'data_loss_declined'; readonly losses: readonly UnexpectedRowLoss[] }
 	| { readonly status: 'unexpected_data_loss'; readonly losses: readonly UnexpectedRowLoss[] }
+	| { readonly status: 'unsafe_change'; readonly findings: readonly DataLossFinding[] }
 	| { readonly status: 'pending'; readonly statements: readonly string[] }
 	| { readonly status: 'error'; readonly code: ConvergenceErrorCode; readonly detail?: string };
 
@@ -82,7 +97,7 @@ interface CapturedRename {
  * @returns What happened — applied, nothing to do, a rejected/declined decision, pending, or an error.
  */
 export async function converge(options: ConvergeOptions): Promise<ConvergeResult> {
-	const { db, dialect, schema, out, resolve, confirmLoss, gate = 'auto' } = options;
+	const { db, dialect, schema, out, resolve, confirmLoss, confirmDrop, gate = 'auto' } = options;
 
 	const renames: CapturedRename[] = [];
 	const recordingResolve: Resolver = async (decision) => {
@@ -126,16 +141,80 @@ export async function converge(options: ConvergeOptions): Promise<ConvergeResult
 		return { status: 'pending', statements };
 	}
 
-	const renamedTables = deriveRenamedTables(renames);
-	const result = await applyWithLossConfirmation(
+	const result = await guardAndApply({
 		db,
 		dialect,
 		statements,
-		renamedTables,
+		renamedTables: deriveRenamedTables(renames),
+		migrationDir,
+		out,
 		confirmLoss,
-	);
+		confirmDrop,
+	});
 	if (result.status !== 'applied') rmSync(migrationDir, { recursive: true, force: true });
 	return result;
+}
+
+/** Everything {@link guardAndApply} needs to pre-flight and apply one freshly-generated migration. */
+interface GuardAndApplyArgs {
+	readonly db: DatabaseHandle;
+	readonly dialect: Dialect;
+	readonly statements: readonly string[];
+	readonly renamedTables: readonly TableRename[];
+	readonly migrationDir: string;
+	readonly out: string;
+	readonly confirmLoss: LossResolver | undefined;
+	readonly confirmDrop: DropConfirmer | undefined;
+}
+
+/**
+ * Runs layer-1 pre-flight, then the layer-2 apply oracle. Pre-flight catches the count-preserving loss
+ * the oracle cannot see (a populated column drop): a blocking finding (the DB would reject the change)
+ * stops here as `unsafe_change`; a confirmable finding (a valid but destructive drop) proceeds only
+ * once every one is confirmed. This does not roll the snapshot back — the caller does on non-`applied`.
+ *
+ * @param args - The database, dialect, migration, output dir, and injected confirm seams.
+ * @returns The converge result.
+ */
+async function guardAndApply(args: GuardAndApplyArgs): Promise<ConvergeResult> {
+	const { db, dialect, statements, renamedTables, migrationDir, out, confirmLoss, confirmDrop } =
+		args;
+
+	const preflight = await runPreflight((sql) => db.raw(sql), dialect, migrationDir, out);
+	if (preflight.status === 'error') {
+		return { status: 'error', code: 'internal', detail: preflight.detail };
+	}
+	if (
+		preflight.status === 'unsafe' &&
+		!(await allDropsConfirmed(preflight.findings, confirmDrop))
+	) {
+		return { status: 'unsafe_change', findings: preflight.findings };
+	}
+
+	return applyWithLossConfirmation(db, dialect, statements, renamedTables, confirmLoss);
+}
+
+/**
+ * Decides whether pre-flight findings clear the way to apply. Only a `column_has_data` finding (a
+ * valid-but-destructive column drop) is confirmable; every other code is a hard block the DB would
+ * reject, so a single one fails the whole batch. Each confirmable finding must be individually
+ * confirmed; an absent confirmer declines.
+ *
+ * @param findings - The layer-1 pre-flight findings.
+ * @param confirmDrop - The injected drop confirmer; absent ⇒ decline.
+ * @returns `true` only when every finding is a confirmed column drop.
+ */
+async function allDropsConfirmed(
+	findings: readonly DataLossFinding[],
+	confirmDrop: DropConfirmer | undefined,
+): Promise<boolean> {
+	for (const finding of findings) {
+		if (finding.code !== 'column_has_data') return false;
+		// oxlint-disable-next-line no-await-in-loop
+		const confirmed = confirmDrop ? await confirmDrop(finding) : false;
+		if (!confirmed) return false;
+	}
+	return true;
 }
 
 /**

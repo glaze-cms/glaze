@@ -6,6 +6,7 @@ export {
 } from './envelope/index.ts';
 export { converge, createGenerateCompute, resolveWithDecisions } from './orchestrator/index.ts';
 export {
+	checkColumnHasData,
 	checkColumnLengthOverflow,
 	checkNotNullColumnOnNonEmpty,
 	checkNotNullOnExistingNulls,
@@ -30,6 +31,7 @@ export type {
 	ConvergeOptions,
 	ConvergeResult,
 	DecisionResolution,
+	DropConfirmer,
 	EnvelopeCompute,
 	Hint,
 	LossResolver,

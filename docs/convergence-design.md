@@ -130,14 +130,23 @@ desync (audit now rolls the migration back — no durable pending ledger exists 
 fidelity (preserve the failing statement + distinguish `verification_error` as internal); a
 concurrent-`out` fail-closed guard; non-`ok` migration sweep; and the `hintsFile` temp-file leak.
 
-Explicitly out of scope for now (each has a follow-up task):
+**Layer-1 pre-flight is now wired in (2026-07-20).** `converge()` diffs the new snapshot's `ddl`
+columns against its parent's, derives `UnsafeChange` descriptors (`drop_column`, `set_not_null`,
+`narrow_column`, `add_not_null_column`), and probes the live DB via `detectDataLoss` **before** apply.
+A **populated column drop** (`column_has_data`) — the headline count-preserving loss the row-count
+oracle can't see — is surfaced to the injected `confirmDrop` seam: confirmed ⇒ applies; declined/absent
+⇒ `unsafe_change` (snapshot rolled back, data intact). A change the DB would itself reject
+(`not_null_existing_nulls`, `unique_duplicates`, `column_length_overflow`, `could_not_verify`) is a
+hard block. In non-interactive contexts confirmation is absent, so destructive changes block rather
+than guess (see `glaze-convergence-interactive-resolution`; the TTY/UI confirmer is #20).
 
-- **Count-preserving loss is invisible.** The oracle only sees row counts, so a **column drop**, a
-  type coercion/narrowing, or a SQLite rebuild `INSERT…SELECT` that lands values in the wrong columns
-  commits as `applied` with data gone. Fix = wire **layer-1** into the facade (diff → `UnsafeChange`
-  descriptors, incl. a `drop_column`-on-populated check) + a future per-column checksum. **Highest
-  follow-up.** Until then the facade's guarantee is: *catches net row-count loss and table drops; does
-  not catch column-level or count-preserving corruption.*
+Still out of scope for now (each has a follow-up task):
+
+- **Remaining count-preserving corruption.** Layer-1 closes the column-drop hole; a **type
+  coercion/rewrite** or a SQLite rebuild `INSERT…SELECT` that lands values in the **wrong columns**
+  still preserves row count and slips past both layers. Fix = a future **per-column checksum** in the
+  oracle. Current guarantee: _catches net row-count loss, table drops, and populated column drops;
+  does not catch value-level corruption within a preserved column count._
 - **`confirm_data_loss` runs through the `resolve` seam, not `confirmLoss`.** drizzle's own
   schema-derivable data-loss decisions (`type_change`, `table_recreate`) arrive as `missing_hints`
   and must be answered by `resolve` (`action: 'confirm' | 'reject'`), while the oracle's row-loss uses
@@ -146,14 +155,14 @@ Explicitly out of scope for now (each has a follow-up task):
   API/UI layer.
 - **Internal-namespace scope (settled, wire-when-auth-lands).** The oracle counts only `public`-schema
   tables (Postgres) — which is **correct by design**: Glaze internals live in their own namespaces, so
-  they must *not* be counted as user data. Namespaces: PG `public` = user content, `glaze_auth` = Better
+  they must _not_ be counted as user data. Namespaces: PG `public` = user content, `glaze_auth` = Better
   Auth, `glaze` = other internals; SQLite (no schemas) = `zz__glaze` table prefix (sorts internals last).
   The oracle's "user tables" scope should consume this **via the dialect seam** (exclude the `glaze`
   schemas / `zz__glaze` prefix) rather than hardcoding `public`. Residual, documented gap: a user placing
-  *their own* content in a custom PG schema (advanced usage). Build-time check: drizzle-kit `schemaFilter`
+  _their own_ content in a custom PG schema (advanced usage). Build-time check: drizzle-kit `schemaFilter`
   must include the glaze schemas (defaults to `["public"]`).
 - **Rename name-folding.** `information_schema` returns folded names; the rename tuples from drizzle
-  are verbatim — a mixed-case *quoted* table rename can be a false `data_loss` block. (Unquoted /
+  are verbatim — a mixed-case _quoted_ table rename can be a false `data_loss` block. (Unquoted /
   lowercased names — the common case — match fine.)
 - **`__drizzle_migrations` is not written by converge's apply.** Harmless within converge (it diffs
   against the snapshot), but a double-apply hazard if `drizzle-kit migrate` ever runs the same DB.

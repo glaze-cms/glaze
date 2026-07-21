@@ -33,6 +33,8 @@ export type QueryExecutor = (sql: string) => Promise<Array<Record<string, unknow
  * - `not_null_column_non_empty` — a new `NOT NULL` column without a default on a non-empty table.
  * - `unique_duplicates` — a new `UNIQUE` constraint but duplicate values already exist.
  * - `column_length_overflow` — a column's length is narrowed below values that already exist.
+ * - `column_has_data` — a column being dropped still holds data (a silent, count-preserving loss the
+ *   row-count oracle cannot see — the reason layer-1 must gate it before apply).
  * - `could_not_verify` — the gate could not determine safety; treat as unsafe (fail closed).
  */
 export const DATA_LOSS_CODES = [
@@ -40,6 +42,7 @@ export const DATA_LOSS_CODES = [
 	'not_null_column_non_empty',
 	'unique_duplicates',
 	'column_length_overflow',
+	'column_has_data',
 	'could_not_verify',
 ] as const;
 
@@ -91,6 +94,17 @@ export type UnsafeChange =
 			readonly column: string;
 			/** The new maximum length. Must be a non-negative integer. */
 			readonly maxLength: number;
+	  }
+	| {
+			/**
+			 * `ALTER TABLE … DROP COLUMN` — the column and all its values are destroyed. Unlike the other
+			 * kinds (which the DB *rejects* when data conflicts), a drop *succeeds silently* and preserves
+			 * the table's row count, so the layer-2 row-count oracle cannot see it. The probe measures
+			 * whether the column holds any data ({@link checkColumnHasData}).
+			 */
+			readonly kind: 'drop_column';
+			readonly table: string;
+			readonly column: string;
 	  };
 
 /**

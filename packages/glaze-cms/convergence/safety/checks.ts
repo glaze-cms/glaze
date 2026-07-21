@@ -20,6 +20,8 @@ type AddNotNullColumnChange = Extract<UnsafeChange, { kind: 'add_not_null_column
 type AddUniqueChange = Extract<UnsafeChange, { kind: 'add_unique' }>;
 /** A `narrow_column` change, narrowed. */
 type NarrowColumnChange = Extract<UnsafeChange, { kind: 'narrow_column' }>;
+/** A `drop_column` change, narrowed. */
+type DropColumnChange = Extract<UnsafeChange, { kind: 'drop_column' }>;
 
 /**
  * Detects rows that already hold NULL in a column about to gain `NOT NULL`. Such a change is emitted
@@ -133,4 +135,29 @@ export async function checkColumnLengthOverflow(
 	if (overflowCount === 0) return null;
 
 	return { change, code: 'column_length_overflow', affectedRows: overflowCount };
+}
+
+/**
+ * Detects whether a column about to be dropped still holds data. A `DROP COLUMN` succeeds silently
+ * and does not change the table's row count, so the layer-2 oracle cannot see the loss — this is the
+ * pre-flight gate for it. Counts only non-NULL values: dropping an empty table, or a column that is
+ * entirely NULL, destroys nothing and is safe.
+ *
+ * @param query - The dialect-agnostic query executor.
+ * @param change - The `drop_column` change to probe.
+ * @returns A finding when the column holds non-NULL values, otherwise `null`.
+ */
+export async function checkColumnHasData(
+	query: QueryExecutor,
+	change: DropColumnChange,
+): Promise<DataLossFinding | null> {
+	const table = quoteIdentifier(change.table);
+	const column = quoteIdentifier(change.column);
+
+	const rows = await query(`SELECT COUNT(${column}) AS c FROM ${table}`);
+	const populatedRows = readCount(rows);
+
+	if (populatedRows === 0) return null;
+
+	return { change, code: 'column_has_data', affectedRows: populatedRows };
 }

@@ -52,7 +52,7 @@ async function convergeSchema(
 	out: string,
 	name: string,
 	tables: Record<string, readonly string[]>,
-	extra: { confirmLoss?: () => boolean; gate?: 'auto' | 'audit' } = {},
+	extra: { confirmLoss?: () => boolean; confirmDrop?: () => boolean; gate?: 'auto' | 'audit' } = {},
 ) {
 	const schema = join(dir, `${name}.ts`);
 	writeFileSync(schema, schemaModule(dialect, tables));
@@ -117,6 +117,67 @@ matrixTest(
 			const applied = await convergeSchema(db, dialect, p.dir, p.out, 'b', { widgets: ['id'] });
 			expect(applied.status).toBe('applied');
 			expect(await tableExists(db, 'widgets')).toBe(true);
+		} finally {
+			p.cleanup();
+		}
+	},
+);
+
+matrixTest(
+	'converge blocks a populated column drop, then applies it once confirmed',
+	async ({ db, dialect }) => {
+		const p = tempProject();
+		try {
+			const setup = await convergeSchema(db, dialect, p.dir, p.out, 'a', {
+				people: ['id', 'email'],
+			});
+			expect(setup.status).toBe('applied');
+			await db.raw("insert into people (id, email) values (1, 'a@b.c')");
+
+			// No confirmer ⇒ the drop of a populated column is blocked; the column and its data survive.
+			const blocked = await convergeSchema(db, dialect, p.dir, p.out, 'b', { people: ['id'] });
+			expect(blocked.status).toBe('unsafe_change');
+			expect(await db.raw('select email from people')).toHaveLength(1);
+
+			// Confirming applies the drop: the row survives, the column is gone.
+			const applied = await convergeSchema(
+				db,
+				dialect,
+				p.dir,
+				p.out,
+				'c',
+				{ people: ['id'] },
+				{ confirmDrop: () => true },
+			);
+			expect(applied.status).toBe('applied');
+			expect(await db.raw('select id from people')).toHaveLength(1);
+			expect(await tableExists(db, 'people')).toBe(true);
+
+			let emailExists = true;
+			try {
+				await db.raw('select email from people');
+			} catch {
+				emailExists = false;
+			}
+			expect(emailExists).toBe(false);
+		} finally {
+			p.cleanup();
+		}
+	},
+);
+
+matrixTest(
+	'converge applies a drop of a column with no data without a confirmer',
+	async ({ db, dialect }) => {
+		const p = tempProject();
+		try {
+			await convergeSchema(db, dialect, p.dir, p.out, 'a', { widgets: ['id', 'note'] });
+			// A row exists but `note` stays NULL, so dropping it destroys nothing → no confirmation needed.
+			await db.raw('insert into widgets (id) values (1)');
+
+			const applied = await convergeSchema(db, dialect, p.dir, p.out, 'b', { widgets: ['id'] });
+			expect(applied.status).toBe('applied');
+			expect(await db.raw('select id from widgets')).toHaveLength(1);
 		} finally {
 			p.cleanup();
 		}

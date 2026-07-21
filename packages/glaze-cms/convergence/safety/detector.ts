@@ -11,6 +11,7 @@
  */
 
 import {
+	checkColumnHasData,
 	checkColumnLengthOverflow,
 	checkNotNullColumnOnNonEmpty,
 	checkNotNullOnExistingNulls,
@@ -54,6 +55,9 @@ async function detectChange(
 				// Column length is only enforced on Postgres; SQLite ignores it, so narrowing is safe.
 				if (dialect !== 'postgres') return null;
 				return await checkColumnLengthOverflow(query, change);
+			case 'drop_column':
+				// Dialect-agnostic: a drop destroys the column's data on both Postgres and SQLite.
+				return await checkColumnHasData(query, change);
 			default: {
 				const unexpected: never = change;
 				throw new Error(`Unknown change kind: ${JSON.stringify(unexpected)}`);
