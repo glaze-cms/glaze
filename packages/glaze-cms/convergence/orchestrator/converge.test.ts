@@ -250,3 +250,46 @@ matrixTest(
 		}
 	},
 );
+
+matrixTest(
+	'converge returns a typed error (not an unhandled rejection) when a confirmer throws',
+	async ({ db, dialect }) => {
+		const p = tempProject();
+		try {
+			await convergeSchema(db, dialect, p.dir, p.out, 'a', { people: ['id', 'bio'] });
+			await db.raw("insert into people (id, bio) values (1, 'hi')");
+
+			// A confirmer that throws (e.g. a dropped socket to the admin UI) must become a typed error
+			// with the migration swept — never a leaked snapshot sitting ahead of the DB.
+			const errored = await convergeSchema(
+				db,
+				dialect,
+				p.dir,
+				p.out,
+				'b',
+				{ people: ['id'] },
+				{
+					confirmDrop: () => {
+						throw new Error('confirmer boom');
+					},
+				},
+			);
+			expect(errored.status).toBe('error');
+			expect(await db.raw('select bio from people')).toHaveLength(1);
+
+			// The snapshot was rolled back, so a subsequent converge still sees — and can apply — the drop.
+			const applied = await convergeSchema(
+				db,
+				dialect,
+				p.dir,
+				p.out,
+				'c',
+				{ people: ['id'] },
+				{ confirmDrop: () => true },
+			);
+			expect(applied.status).toBe('applied');
+		} finally {
+			p.cleanup();
+		}
+	},
+);

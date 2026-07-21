@@ -45,6 +45,17 @@ interface Snapshot {
 	readonly columns: readonly SnapshotColumn[];
 }
 
+/**
+ * A column drizzle renamed on a surviving table (from a resolved rename decision). Its data carries
+ * from `from` to `to`, so the differ must treat it as a rename — never a `drop_column` of `from` or a
+ * new-column risk on `to`. Matched on `(table, name)` since a rename stays within one table.
+ */
+export interface ColumnRename {
+	readonly table: string;
+	readonly from: string;
+	readonly to: string;
+}
+
 /** The outcome of {@link runPreflight}. */
 export type PreflightResult =
 	| { readonly status: 'safe' }
@@ -59,6 +70,7 @@ export type PreflightResult =
  * @param dialect - The target dialect; gates dialect-specific probes.
  * @param migrationDir - The new migration's directory (holds the just-written `snapshot.json`).
  * @param out - The migration output directory (searched for the parent snapshot).
+ * @param renamedColumns - Columns drizzle renamed (from resolved decisions), so the differ skips them.
  * @returns `safe` when no probe objects, `unsafe` with findings, or `error` when a snapshot is unreadable.
  */
 export async function runPreflight(
@@ -66,6 +78,7 @@ export async function runPreflight(
 	dialect: Dialect,
 	migrationDir: string,
 	out: string,
+	renamedColumns: readonly ColumnRename[] = [],
 ): Promise<PreflightResult> {
 	const next = readSnapshot(migrationDir);
 	if (next === null) return { status: 'error', detail: 'could not read the generated snapshot' };
@@ -73,7 +86,7 @@ export async function runPreflight(
 	const parent = resolveParentColumns(next, out);
 	if (parent.status === 'error') return parent;
 
-	const changes = deriveUnsafeChanges(parent.columns, next.columns);
+	const changes = deriveUnsafeChanges(parent.columns, next.columns, renamedColumns);
 	if (changes.length === 0) return { status: 'safe' };
 
 	const findings = await detectDataLoss(query, dialect, changes);
@@ -93,6 +106,15 @@ function resolveParentColumns(
 	next: Snapshot,
 	out: string,
 ): { status: 'ok'; columns: readonly SnapshotColumn[] } | { status: 'error'; detail: string } {
+	if (next.prevIds.length > 1) {
+		// A merge snapshot has several parents; diffing against only one would miss a drop introduced on
+		// another branch (fail-open). Merges are the deferred team-conflict path — fail closed until then.
+		return {
+			status: 'error',
+			detail: 'merge snapshot (multiple parents) is not yet supported by pre-flight',
+		};
+	}
+
 	const parentId = next.prevIds[0];
 	if (parentId === undefined || parentId === ZERO_SNAPSHOT_ID) {
 		return { status: 'ok', columns: [] };
@@ -110,30 +132,37 @@ function resolveParentColumns(
  * Diffs a parent snapshot's columns against the next snapshot's and derives the {@link UnsafeChange}
  * descriptors the safety probes understand. Columns are keyed by `(schema, table, name)`.
  *
- * - present → absent, **table still exists** ⇒ `drop_column` (a table drop is the oracle's job, so a
- *   column whose whole table vanished is skipped here).
+ * - present → absent, **table still exists**, **not a rename** ⇒ `drop_column` (a table drop is the
+ *   oracle's job; a renamed column carries its data, so both are skipped here).
  * - `NOT NULL` gained on an existing column ⇒ `set_not_null`.
- * - a `varchar(n)` type narrowed to a smaller `n` ⇒ `narrow_column`.
- * - a new `NOT NULL` column ⇒ `add_not_null_column` (a nullable add is always safe).
+ * - a string column narrowed to a smaller max length (incl. `text → varchar(n)`) ⇒ `narrow_column`.
+ * - a new `NOT NULL` column on an existing table, **not a rename target** ⇒ `add_not_null_column`.
  *
  * @param parent - The parent snapshot's columns (empty for a first migration).
  * @param next - The new snapshot's columns.
+ * @param renamedColumns - Columns drizzle renamed (from resolved decisions); excluded from drop/add.
  * @returns The unsafe-change descriptors to probe; empty when nothing needs vetting.
  */
 export function deriveUnsafeChanges(
 	parent: readonly SnapshotColumn[],
 	next: readonly SnapshotColumn[],
+	renamedColumns: readonly ColumnRename[] = [],
 ): UnsafeChange[] {
 	const nextByKey = new Map(next.map((column) => [columnKey(column), column]));
 	const parentKeys = new Set(parent.map((column) => columnKey(column)));
 	const parentTables = new Set(parent.map((column) => tableKey(column)));
 	const survivingTables = new Set(next.map((column) => tableKey(column)));
+	const renamedFrom = new Set(renamedColumns.map((rename) => renameKey(rename.table, rename.from)));
+	const renamedTo = new Set(renamedColumns.map((rename) => renameKey(rename.table, rename.to)));
 	const changes: UnsafeChange[] = [];
 
 	for (const before of parent) {
 		const after = nextByKey.get(columnKey(before));
 
 		if (after === undefined) {
+			// A renamed column is not dropped — drizzle carries its data across via RENAME COLUMN — so
+			// skip it rather than re-deriving a spurious `drop_column`.
+			if (renamedFrom.has(renameKey(before.table, before.name))) continue;
 			// A column drop only matters while its table survives; a whole-table drop is the oracle's job.
 			if (survivingTables.has(tableKey(before))) {
 				changes.push({ kind: 'drop_column', table: before.table, column: before.name });
@@ -145,14 +174,15 @@ export function deriveUnsafeChanges(
 			changes.push({ kind: 'set_not_null', table: after.table, column: after.name });
 		}
 
-		const beforeLength = varcharLength(before.type);
-		const afterLength = varcharLength(after.type);
-		if (beforeLength !== null && afterLength !== null && afterLength < beforeLength) {
+		const beforeMax = stringMaxLength(before.type);
+		const afterMax = stringMaxLength(after.type);
+		// When this holds, `afterMax` is finite (Infinity is never `<` anything), so it is a valid cap.
+		if (beforeMax !== null && afterMax !== null && afterMax < beforeMax) {
 			changes.push({
 				kind: 'narrow_column',
 				table: after.table,
 				column: after.name,
-				maxLength: afterLength,
+				maxLength: afterMax,
 			});
 		}
 	}
@@ -161,7 +191,9 @@ export function deriveUnsafeChanges(
 		// A new NOT NULL column only risks loss on a table that already existed (and may hold rows). A
 		// brand-new table is created empty, so its columns — NOT NULL `id` included — lose nothing.
 		const isNewColumn = !parentKeys.has(columnKey(after));
-		if (isNewColumn && after.notNull && parentTables.has(tableKey(after))) {
+		// A rename target is not a new column — its data carried over from the old name.
+		const isRenameTarget = renamedTo.has(renameKey(after.table, after.name));
+		if (isNewColumn && !isRenameTarget && after.notNull && parentTables.has(tableKey(after))) {
 			changes.push({
 				kind: 'add_not_null_column',
 				table: after.table,
@@ -227,14 +259,24 @@ function toColumn(entity: Record<string, unknown>): SnapshotColumn[] {
 }
 
 /**
- * Parses the max length from a `varchar(n)` / `character varying(n)` type string.
+ * The character-length bound of a string column type: a finite cap for a bounded type (`varchar(n)`,
+ * `char(n)`), `Infinity` for an unbounded string type (`text`, bare `varchar`), or `null` for a
+ * non-string type (where a length narrowing cannot apply). Treating `text` as `Infinity` is what lets
+ * the differ catch the common `text → varchar(n)` narrowing, not just `varchar(n) → varchar(m)`.
  *
  * @param type - The column's SQL type string from the snapshot.
- * @returns The declared length, or `null` when the type is not a length-bearing varchar.
+ * @returns The max length (possibly `Infinity`), or `null` when the type is not string-like.
  */
-function varcharLength(type: string): number | null {
-	const match = /^(?:varchar|character varying)\((\d+)\)$/i.exec(type.trim());
-	return match ? Number(match[1]) : null;
+function stringMaxLength(type: string): number | null {
+	const normalized = type.trim().toLowerCase();
+	const bounded = /^(?:varchar|character varying|char|character|nvarchar|nchar)\((\d+)\)$/.exec(
+		normalized,
+	);
+	if (bounded) return Number(bounded[1]);
+	if (/^(?:varchar|character varying|char|character|nvarchar|nchar|text|clob)$/.test(normalized)) {
+		return Number.POSITIVE_INFINITY;
+	}
+	return null;
 }
 
 /**
@@ -260,7 +302,7 @@ function listMigrationDirs(out: string): string[] {
  * @returns The composite key.
  */
 function columnKey(column: SnapshotColumn): string {
-	return `${column.schema} ${column.table} ${column.name}`;
+	return `${column.schema}\0${column.table}\0${column.name}`;
 }
 
 /**
@@ -270,7 +312,19 @@ function columnKey(column: SnapshotColumn): string {
  * @returns The composite table key.
  */
 function tableKey(column: SnapshotColumn): string {
-	return `${column.schema} ${column.table}`;
+	return `${column.schema}\0${column.table}`;
+}
+
+/**
+ * The identity key for a rename endpoint: table + column name (NUL-separated). Schema is omitted
+ * because a rename decision carries `(table, column)` and stays within one table.
+ *
+ * @param table - The table name.
+ * @param name - The column name.
+ * @returns The composite `(table, name)` key.
+ */
+function renameKey(table: string, name: string): string {
+	return `${table}\0${name}`;
 }
 
 /**

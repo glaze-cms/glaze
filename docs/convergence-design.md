@@ -167,3 +167,26 @@ Still out of scope for now (each has a follow-up task):
 - **`__drizzle_migrations` is not written by converge's apply.** Harmless within converge (it diffs
   against the snapshot), but a double-apply hazard if `drizzle-kit migrate` ever runs the same DB.
   Handle when the team/persist path lands, alongside a lock serializing convergence on a shared `out`.
+
+## Full-codebase adversarial hunt (2026-07-21)
+
+A four-reviewer §8 sweep of the whole spine + seams. **Fixed on the spot** (each with a regression
+test): a **fail-open silent-loss** in the differ (space-joined column keys collided on identifiers
+containing spaces → NUL-separated now); a **fail-open desync** (a throwing `confirmDrop`/`confirmLoss`
+after generate-write leaked the migration → converge now sweeps + returns a typed error); a **hidden
+loss** (the oracle listed `public` tables but counted them unqualified through `search_path` → counts
+are now schema-qualified to the listed relation); a **column-rename false-block** (the differ now
+consumes drizzle's rename decision instead of re-inferring a `drop_column`); an **atomicity escape**
+(a leading comment / embedded `;COMMIT;` bypassed the transaction-control guard → now comment/string
+-stripped and scanned per `;`); a **merge fail-open** (`prevIds.length > 1` now fails closed); the
+concurrent-`out` guard **no longer deletes a peer's dir**; two **runtime-seam divergences** (Bun
+`spawn` now merges env like Node; Node `spawn` reports non-zero on signal death and buffers stdout as
+bytes; Node `writeFile` creates parent dirs); `text → varchar(n)` narrowing is now detected; the
+decoder captures `--explain` `hints`; `toConvergenceErrorCode` uses `Object.hasOwn` (no prototype
+leak); and `quoteIdentifier`'s Postgres-only 63-byte cap was removed (it false-blocked SQLite).
+
+**Deferred** (fail-closed or out-of-scope; tasked): `add_unique` / `char(n)` / `numeric(p,s)` not yet
+derived by the differ (the DB rejects them mid-apply → layer-2 rolls back, so safe-but-ugly); FTS5
+virtual-table shadow tables can false-block (fail-closed); SQLite FK enforcement is not actually on
+(`defer_foreign_keys` is a no-op without `foreign_keys=ON` — the row-count oracle is the guarantee, not
+FK); a real `out` lock for concurrent convergence; and configurable `maxRounds`.

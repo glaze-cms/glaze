@@ -17,7 +17,7 @@
  * affected tables (which would also remove the unrelated-table concurrency window).
  */
 
-import { quoteIdentifier, readCount } from '../sql.ts';
+import { quoteQualifiedName, readCount } from '../sql.ts';
 import { listUserTables } from './introspection.ts';
 
 import type { Dialect, RawExecutor } from '../../dialect/index.ts';
@@ -38,11 +38,14 @@ export async function captureRowCounts(
 	const counts = new Map<string, number>();
 
 	for (const table of tables) {
+		// Schema-qualify so the count targets exactly the relation introspection listed, not one the
+		// connection's `search_path` resolves to (a same-named shadow table would otherwise be counted).
+		const reference = quoteQualifiedName(table.schema, table.name);
 		// Sequential by design: these probes share one transaction-bound connection, which
 		// serializes statements — parallelizing would be unsafe, not faster.
 		// oxlint-disable-next-line no-await-in-loop
-		const rows = await query(`SELECT COUNT(*) AS c FROM ${quoteIdentifier(table)}`);
-		counts.set(table, readCount(rows));
+		const rows = await query(`SELECT COUNT(*) AS c FROM ${reference}`);
+		counts.set(table.name, readCount(rows));
 	}
 
 	return counts;

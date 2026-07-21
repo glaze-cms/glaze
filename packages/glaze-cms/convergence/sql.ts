@@ -5,24 +5,18 @@
  * integer literals reach SQL.
  */
 
-/** Encoder reused for UTF-8 byte-length checks. */
-const utf8 = new TextEncoder();
-
-/**
- * Postgres truncates identifiers to 63 bytes (`NAMEDATALEN - 1`), which would silently make a probe
- * read a different object. SQLite has no such limit, but bounding both keeps behavior consistent and
- * turns an over-long name into a fail-closed error rather than a wrong verdict.
- */
-const MAX_IDENTIFIER_BYTES = 63;
-
 /**
  * Escapes and double-quotes a single SQL identifier (unqualified — no schema prefix). Accepts any
  * legal identifier (hyphens, spaces, digits, Unicode) by doubling embedded double quotes, which
  * makes injection impossible while both Postgres and SQLite honor the result.
  *
+ * No length bound is imposed: Postgres rejects/truncates over-long identifiers at DDL time (so a real
+ * schema can't hold one), while SQLite permits long names — an artificial 63-byte cap here only
+ * false-blocked valid SQLite identifiers.
+ *
  * @param raw - The identifier as authored (e.g. `note`, `user-profiles`, `order id`).
  * @returns The safely double-quoted identifier (e.g. `"user-profiles"`).
- * @throws {Error} If `raw` is empty, contains a NUL byte, or exceeds {@link MAX_IDENTIFIER_BYTES}.
+ * @throws {Error} If `raw` is empty or contains a NUL byte.
  *
  * @example
  * ```ts
@@ -38,13 +32,27 @@ export function quoteIdentifier(raw: string): string {
 	if (raw.includes('\0')) {
 		throw new Error('SQL identifier must not contain a NUL byte');
 	}
-	if (utf8.encode(raw).length > MAX_IDENTIFIER_BYTES) {
-		throw new Error(
-			`SQL identifier exceeds ${String(MAX_IDENTIFIER_BYTES)} bytes: ${JSON.stringify(raw)}`,
-		);
-	}
 
 	return `"${raw.replaceAll('"', '""')}"`;
+}
+
+/**
+ * Builds a schema-qualified table reference (`"schema"."table"`) when a schema is given, or a bare
+ * quoted identifier otherwise (SQLite has no schema namespace). Used so the row-count oracle counts
+ * exactly the relation introspection enumerated, rather than one resolved through `search_path`.
+ *
+ * @param schema - The schema name, or `undefined`/empty for an unqualified reference (SQLite).
+ * @param table - The table name.
+ * @returns The safely-quoted, optionally schema-qualified reference.
+ *
+ * @example
+ * ```ts
+ * quoteQualifiedName('public', 'users'); // → '"public"."users"'
+ * quoteQualifiedName(undefined, 'users'); // → '"users"'
+ * ```
+ */
+export function quoteQualifiedName(schema: string | undefined, table: string): string {
+	return schema ? `${quoteIdentifier(schema)}.${quoteIdentifier(table)}` : quoteIdentifier(table);
 }
 
 /**

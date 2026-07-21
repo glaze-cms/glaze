@@ -27,7 +27,9 @@ async function writeFile(path: string, contents: string): Promise<void> {
 async function spawn(command: string[], options?: SpawnOptions): Promise<SpawnResult> {
 	const proc = Bun.spawn(command, {
 		...(options?.cwd !== undefined ? { cwd: options.cwd } : {}),
-		...(options?.env !== undefined ? { env: options.env } : {}),
+		// Merge over the current environment (parity with the Node adapter). Passing `options.env`
+		// alone would make Bun REPLACE the child's environment, stripping PATH/creds.
+		env: { ...process.env, ...options?.env },
 		stdout: 'pipe',
 		stderr: 'pipe',
 	});

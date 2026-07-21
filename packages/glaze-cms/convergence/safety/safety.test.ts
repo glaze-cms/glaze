@@ -26,11 +26,12 @@ test('quoteIdentifier escapes and quotes legal identifiers', () => {
 	expect(quoteIdentifier('x"; DROP TABLE t; --')).toBe('"x""; DROP TABLE t; --"');
 });
 
-test('quoteIdentifier rejects empty, NUL-byte, and over-long identifiers', () => {
+test('quoteIdentifier rejects empty and NUL-byte identifiers but allows long ones', () => {
 	expect(() => quoteIdentifier('')).toThrow();
 	expect(() => quoteIdentifier('a\0b')).toThrow();
-	expect(() => quoteIdentifier('x'.repeat(64))).toThrow();
-	expect(quoteIdentifier('x'.repeat(63))).toBe(`"${'x'.repeat(63)}"`);
+	// No length cap: Postgres can't hold an over-long identifier, and SQLite allows long names — an
+	// artificial 63-byte throw only false-blocked valid SQLite migrations.
+	expect(quoteIdentifier('x'.repeat(200))).toBe(`"${'x'.repeat(200)}"`);
 });
 
 test('assertNonNegativeInteger accepts non-negative integers and rejects the rest', () => {

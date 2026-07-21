@@ -56,7 +56,9 @@ export function decodeEnvelope(raw: unknown): OperationResult {
  */
 function decodeOk(raw: Record<string, unknown>): OperationResult {
 	const statements = asStringArray(raw.statements);
-	const warnings = asStringArray(raw.warnings);
+	// `export` emits destructive advisories under `warnings`, `--explain` under `hints` — capture both
+	// so the approval preview never silently loses a "this is destructive" marker.
+	const warnings = [...asStringArray(raw.warnings), ...asStringArray(raw.hints)];
 
 	const base = { status: 'ok', statements } as const;
 	const withPath =

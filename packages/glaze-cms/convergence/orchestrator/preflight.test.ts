@@ -72,3 +72,46 @@ test('deriveUnsafeChanges flags a new NOT NULL column but not a nullable one', (
 	const nullable = deriveUnsafeChanges(parent, [col('t', 'id'), col('t', 'note')]);
 	expect(nullable).toEqual([]);
 });
+
+test('deriveUnsafeChanges keys columns unambiguously when identifiers contain spaces', () => {
+	// Regression for the space-key collision: `('a b','c')` and `('a','b c')` collide under a
+	// space-joined key, which would hide the drop of `c` (silent data loss). NUL-separated keys don't.
+	const parent = [col('a b', 'id'), col('a b', 'c'), col('a', 'b c')];
+	const next = [col('a b', 'id'), col('a', 'b c')]; // table `a b` survives; column `c` is dropped
+
+	expect(deriveUnsafeChanges(parent, next)).toEqual([
+		{ kind: 'drop_column', table: 'a b', column: 'c' },
+	]);
+});
+
+test('deriveUnsafeChanges treats a resolved column rename as a rename, not a drop + add', () => {
+	const parent = [col('users', 'id'), col('users', 'handle', { notNull: true })];
+	const next = [col('users', 'id'), col('users', 'nick', { notNull: true })];
+
+	// With the rename known, neither a drop of `handle` nor an add of `nick` is derived.
+	expect(
+		deriveUnsafeChanges(parent, next, [{ table: 'users', from: 'handle', to: 'nick' }]),
+	).toEqual([]);
+
+	// Without it, the same diff is (wrongly) read as a drop + a new NOT NULL column — the bug this guards.
+	expect(deriveUnsafeChanges(parent, next)).toEqual([
+		{ kind: 'drop_column', table: 'users', column: 'handle' },
+		{ kind: 'add_not_null_column', table: 'users', column: 'nick', hasDefault: false },
+	]);
+});
+
+test('deriveUnsafeChanges flags text → varchar(n) as a narrowing, but not the reverse', () => {
+	expect(
+		deriveUnsafeChanges(
+			[col('t', 'c', { type: 'text' })],
+			[col('t', 'c', { type: 'varchar(20)' })],
+		),
+	).toEqual([{ kind: 'narrow_column', table: 't', column: 'c', maxLength: 20 }]);
+
+	expect(
+		deriveUnsafeChanges(
+			[col('t', 'c', { type: 'varchar(20)' })],
+			[col('t', 'c', { type: 'text' })],
+		),
+	).toEqual([]);
+});

@@ -44,8 +44,26 @@ class VerificationError extends Error {
 	}
 }
 
-/** Matches statements that would control the transaction the apply owns, breaking its atomicity. */
+/** Matches a transaction-control command at the start of a (comment-stripped) command string. */
 const TRANSACTION_CONTROL = /^\s*(?:begin|commit|end|rollback|savepoint|release)\b/i;
+
+/**
+ * Detects a transaction-control command anywhere in a statement — as the first token, after a leading
+ * comment, or embedded after a `;` in a compound statement — any of which would hijack the apply's own
+ * transaction and break atomicity. String literals and quoted identifiers are blanked first so a `;`
+ * or keyword inside them cannot cause a (fail-closed but annoying) false positive.
+ *
+ * @param statement - A single migration statement.
+ * @returns `true` when a transaction-control command is present.
+ */
+function hasTransactionControl(statement: string): boolean {
+	const sanitized = statement
+		.replaceAll(/--[^\n]*/g, ' ')
+		.replaceAll(/\/\*[\s\S]*?\*\//g, ' ')
+		.replaceAll(/'(?:[^']|'')*'/g, "''")
+		.replaceAll(/"(?:[^"]|"")*"/g, '""');
+	return sanitized.split(';').some((command) => TRANSACTION_CONTROL.test(command));
+}
 
 /**
  * Applies a migration atomically and verifies it did not silently lose data.
@@ -86,10 +104,15 @@ export async function applyMigration(
 }
 
 /**
- * Applies transaction-scoped settings before the migration runs. On SQLite, defers foreign-key
- * enforcement to commit time — the drizzle-kit table-rebuild dance drops and recreates tables, and
- * `PRAGMA foreign_keys` toggles are no-ops inside a transaction, so `defer_foreign_keys` is the
- * correct way to let the rebuild proceed while still enforcing integrity at commit.
+ * Applies transaction-scoped settings before the migration runs. On SQLite, `PRAGMA defer_foreign_keys
+ * = ON` lets the drizzle-kit table-rebuild dance (drop + recreate) proceed without tripping FK checks
+ * mid-transaction.
+ *
+ * NOTE: this only **defers** checks that would otherwise fire — it does not enable FK enforcement, and
+ * `bun:sqlite`/`better-sqlite3` default `PRAGMA foreign_keys` OFF, so no FK integrity is actually
+ * enforced at commit today. Turning enforcement on (and validating it against drizzle's rebuild
+ * output) is a tracked follow-up; the **row-count oracle**, not FK enforcement, is the data-loss
+ * guarantee here.
  *
  * @param tx - The transaction-bound executor.
  * @param dialect - The target dialect.
@@ -127,7 +150,7 @@ async function captureVerified(tx: RawExecutor, dialect: Dialect): Promise<Map<s
  */
 async function runStatements(tx: RawExecutor, statements: readonly string[]): Promise<void> {
 	for (const statement of statements) {
-		if (TRANSACTION_CONTROL.test(statement)) {
+		if (hasTransactionControl(statement)) {
 			throw new StatementError(
 				statement,
 				'transaction-control statements are not allowed in a migration',

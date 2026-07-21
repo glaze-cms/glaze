@@ -181,6 +181,35 @@ matrixTest(
 	},
 );
 
+matrixTest(
+	'rejects transaction control hidden by a comment or embedded in a compound statement',
+	async ({ db, dialect }) => {
+		await db.raw('create table t (id integer primary key)');
+		await db.raw('insert into t (id) values (1)');
+
+		// A leading comment used to slip a bare COMMIT past the first-token check.
+		const commented = await applyMigration(db, { dialect, statements: ['-- note\nCOMMIT'] });
+		expect(commented.success).toBe(false);
+
+		// An embedded COMMIT in a compound statement would (on postgres.js) commit mid-migration.
+		const compound = await applyMigration(db, {
+			dialect,
+			statements: ['alter table t add column x text;\nCOMMIT'],
+		});
+		expect(compound.success).toBe(false);
+
+		// Nothing ran: the row survives and the sneaked-in column was never added.
+		expect(await db.raw('select id from t')).toHaveLength(1);
+		let columnExists = true;
+		try {
+			await db.raw('select x from t');
+		} catch {
+			columnExists = false;
+		}
+		expect(columnExists).toBe(false);
+	},
+);
+
 test('findUnexpectedLosses flags a vanished table as vanished (a confirmable drop)', () => {
 	const before = new Map([['posts', 100]]);
 	const after = new Map<string, number>();

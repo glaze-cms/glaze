@@ -1,5 +1,6 @@
 import { spawn as spawnChild } from 'node:child_process';
-import { readFile as readFileNode, writeFile as writeFileNode } from 'node:fs/promises';
+import { mkdir, readFile as readFileNode, writeFile as writeFileNode } from 'node:fs/promises';
+import { dirname } from 'node:path';
 
 import type { Runtime, SpawnOptions, SpawnResult } from './types.ts';
 
@@ -13,11 +14,13 @@ async function readFile(path: string): Promise<string> {
 }
 
 /**
- * Writes a UTF-8 file using `node:fs/promises`.
+ * Writes a UTF-8 file using `node:fs/promises`, creating parent directories first for parity with
+ * `Bun.write` (which auto-creates them).
  * @param path - The file path.
  * @param contents - The string to write.
  */
 async function writeFile(path: string, contents: string): Promise<void> {
+	await mkdir(dirname(path), { recursive: true });
 	await writeFileNode(path, contents);
 }
 
@@ -40,12 +43,21 @@ function spawn(command: string[], options?: SpawnOptions): Promise<SpawnResult> 
 			env: { ...process.env, ...options?.env },
 		});
 
-		let stdout = '';
-		let stderr = '';
-		child.stdout?.on('data', (chunk) => (stdout += String(chunk)));
-		child.stderr?.on('data', (chunk) => (stderr += String(chunk)));
+		const stdoutChunks: Buffer[] = [];
+		const stderrChunks: Buffer[] = [];
+		// Collect raw Buffers and decode once: `String(chunk)` per `data` event corrupts a multibyte
+		// UTF-8 sequence split across chunk boundaries (which would then break `JSON.parse`).
+		child.stdout?.on('data', (chunk: Buffer) => stdoutChunks.push(chunk));
+		child.stderr?.on('data', (chunk: Buffer) => stderrChunks.push(chunk));
 		child.on('error', reject);
-		child.on('close', (code) => resolve({ exitCode: code ?? 0, stdout, stderr }));
+		// A signal-killed process reports `code === null`; treat it as failure (non-zero), not success.
+		child.on('close', (code) =>
+			resolve({
+				exitCode: code ?? 1,
+				stdout: Buffer.concat(stdoutChunks).toString('utf8'),
+				stderr: Buffer.concat(stderrChunks).toString('utf8'),
+			}),
+		);
 	});
 }
 

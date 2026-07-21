@@ -35,6 +35,7 @@ import type { DatabaseHandle, Dialect } from '../../dialect/index.ts';
 import type { ApplyResult, TableRename, UnexpectedRowLoss } from '../apply/index.ts';
 import type { ConvergenceErrorCode, SchemaDecision } from '../envelope/index.ts';
 import type { DataLossFinding } from '../safety/index.ts';
+import type { ColumnRename } from './preflight.ts';
 import type { ResolvedOutcome, Resolver } from './types.ts';
 
 /** An apply failure that is not the confirmable data-loss case. */
@@ -123,8 +124,9 @@ export async function converge(options: ConvergeOptions): Promise<ConvergeResult
 	if (added.length === 0) return { status: 'no_changes' };
 	if (added.length > 1) {
 		// generate writes exactly one migration; more than one means a concurrent converge raced on the
-		// same `out`. Fail closed rather than guess which dir is ours (and misapply/leak the rest).
-		sweepNewMigrations(out, priorMigrations);
+		// same `out`. Fail closed WITHOUT sweeping — we cannot tell which dir is ours, and deleting a
+		// peer's (possibly already-applied) migration would regress the snapshot below the DB. Leave
+		// them for the operator / a future `out` lock to reconcile.
 		return {
 			status: 'error',
 			code: 'internal',
@@ -132,27 +134,41 @@ export async function converge(options: ConvergeOptions): Promise<ConvergeResult
 		};
 	}
 	const migrationDir = added[0] as string;
-	const statements = readMigrationStatements(migrationDir);
 
-	if (gate === 'audit') {
-		// No durable pending ledger exists yet, so audit must not leave the snapshot ahead of the DB:
-		// roll the migration back and return the SQL for review only. The next converge regenerates it.
+	// Everything past here can throw — a filesystem error, or an injected confirmer that rejects. A
+	// throw must not leave the migration dir behind (that would advance the snapshot with nothing
+	// applied), so sweep it and return a typed error rather than an uncaught rejection.
+	try {
+		const statements = readMigrationStatements(migrationDir);
+
+		if (gate === 'audit') {
+			// No durable pending ledger exists yet, so audit must not leave the snapshot ahead of the DB:
+			// roll the migration back and return the SQL for review only. The next converge regenerates it.
+			rmSync(migrationDir, { recursive: true, force: true });
+			return { status: 'pending', statements };
+		}
+
+		const result = await guardAndApply({
+			db,
+			dialect,
+			statements,
+			renamedTables: deriveRenamedTables(renames),
+			renamedColumns: deriveRenamedColumns(renames),
+			migrationDir,
+			out,
+			confirmLoss,
+			confirmDrop,
+		});
+		if (result.status !== 'applied') rmSync(migrationDir, { recursive: true, force: true });
+		return result;
+	} catch (error) {
 		rmSync(migrationDir, { recursive: true, force: true });
-		return { status: 'pending', statements };
+		return {
+			status: 'error',
+			code: 'internal',
+			detail: error instanceof Error ? error.message : String(error),
+		};
 	}
-
-	const result = await guardAndApply({
-		db,
-		dialect,
-		statements,
-		renamedTables: deriveRenamedTables(renames),
-		migrationDir,
-		out,
-		confirmLoss,
-		confirmDrop,
-	});
-	if (result.status !== 'applied') rmSync(migrationDir, { recursive: true, force: true });
-	return result;
 }
 
 /** Everything {@link guardAndApply} needs to pre-flight and apply one freshly-generated migration. */
@@ -161,6 +177,7 @@ interface GuardAndApplyArgs {
 	readonly dialect: Dialect;
 	readonly statements: readonly string[];
 	readonly renamedTables: readonly TableRename[];
+	readonly renamedColumns: readonly ColumnRename[];
 	readonly migrationDir: string;
 	readonly out: string;
 	readonly confirmLoss: LossResolver | undefined;
@@ -177,10 +194,25 @@ interface GuardAndApplyArgs {
  * @returns The converge result.
  */
 async function guardAndApply(args: GuardAndApplyArgs): Promise<ConvergeResult> {
-	const { db, dialect, statements, renamedTables, migrationDir, out, confirmLoss, confirmDrop } =
-		args;
+	const {
+		db,
+		dialect,
+		statements,
+		renamedTables,
+		renamedColumns,
+		migrationDir,
+		out,
+		confirmLoss,
+		confirmDrop,
+	} = args;
 
-	const preflight = await runPreflight((sql) => db.raw(sql), dialect, migrationDir, out);
+	const preflight = await runPreflight(
+		(sql) => db.raw(sql),
+		dialect,
+		migrationDir,
+		out,
+		renamedColumns,
+	);
 	if (preflight.status === 'error') {
 		return { status: 'error', code: 'internal', detail: preflight.detail };
 	}
@@ -346,6 +378,37 @@ function deriveRenamedTables(renames: readonly CapturedRename[]): TableRename[] 
  */
 function tableName(tuple: readonly string[]): string {
 	return tuple[tuple.length - 1] ?? '';
+}
+
+/**
+ * Derives the column renames layer-1 pre-flight needs from the resolved rename decisions, so a renamed
+ * column is not re-derived as a `drop_column` (its data carries across the rename). Only column-kind
+ * renames apply. This is the "use drizzle's decision rather than re-infer it" path.
+ *
+ * @param renames - The captured rename resolutions.
+ * @returns The column renames (`table`, `from` → `to`), skipping any with an incomplete tuple.
+ */
+function deriveRenamedColumns(renames: readonly CapturedRename[]): ColumnRename[] {
+	return renames
+		.filter(
+			({ decision }) => decision.type === 'rename_or_create' && decision.entityKind === 'column',
+		)
+		.map(({ decision, from }) => ({
+			table: tableSlot(decision.entity),
+			from: tableName(from),
+			to: tableName(decision.entity),
+		}))
+		.filter((rename) => rename.table !== '' && rename.from !== '' && rename.to !== '');
+}
+
+/**
+ * Extracts the table name (the second-to-last slot) from a column entity tuple `[…, table, column]`.
+ *
+ * @param tuple - A column entity identifier tuple (e.g. `['public', 'users', 'handle']`).
+ * @returns The table name, or `''` when the tuple is too short.
+ */
+function tableSlot(tuple: readonly string[]): string {
+	return tuple[tuple.length - 2] ?? '';
 }
 
 /**

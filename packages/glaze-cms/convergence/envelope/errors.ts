@@ -34,5 +34,8 @@ const ERROR_CODE_MAP: Readonly<Record<string, ConvergenceErrorCode>> = {
  * @returns The mapped {@link ConvergenceErrorCode}, or `unknown` when unrecognized.
  */
 export function toConvergenceErrorCode(rawCode: string): ConvergenceErrorCode {
-	return ERROR_CODE_MAP[rawCode] ?? 'unknown';
+	// `Object.hasOwn`, not a direct index: an inherited member (`toString`, `constructor`, …) would
+	// otherwise resolve to a truthy function and slip past the `unknown` fallback.
+	const mapped = Object.hasOwn(ERROR_CODE_MAP, rawCode) ? ERROR_CODE_MAP[rawCode] : undefined;
+	return mapped ?? 'unknown';
 }
