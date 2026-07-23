@@ -10,6 +10,7 @@
 
 import { Elysia } from 'elysia';
 
+import { createAuthPlugin } from '../auth/index.ts';
 import { createHealthCheck } from '../health/index.ts';
 import { handleStop } from '../lifecycle/index.ts';
 import { createSecurityHeaders } from '../security/index.ts';
@@ -47,6 +48,7 @@ export function createGlazeApp(context: GlazeContext): GlazeApp {
 		.decorate(context)
 		.use(createSecurityHeaders(options.security.headers))
 		.use(createHealthCheck(options.health))
+		.use(createAuthPlugin(context))
 		.get('/', () => buildManifest(options))
 		.onStop(() => handleStop(context));
 

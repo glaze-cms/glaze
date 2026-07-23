@@ -33,12 +33,20 @@ export async function glaze(options: GlazeOptions = {}): Promise<GlazeApp> {
 	const db = await resolveDialect(config.dialect).createDatabase({ connection: config.connection });
 
 	const context: GlazeContext = { db, config, options: resolvedOptions, logger, runtime };
-	const app = createGlazeApp(context);
-	const coreRoutes = snapshotRoutes(app);
 
 	try {
+		// Composition can throw before listen (e.g. the auth secret guard fails closed in production),
+		// so it lives inside the try alongside start — any failure after the DB is open must release it.
+		const app = createGlazeApp(context);
+		const coreRoutes = snapshotRoutes(app);
+
 		await handleStart(context);
 		app.listen(resolvedOptions.port);
+
+		installShutdownHandlers(app);
+		scheduleReservedWarning(app, coreRoutes, resolvedOptions, logger);
+
+		return app;
 	} catch (error) {
 		// Boot failed after the DB was opened — release it so a failed start doesn't leak the connection.
 		await context.db.close().catch((closeError: unknown) => {
@@ -46,11 +54,6 @@ export async function glaze(options: GlazeOptions = {}): Promise<GlazeApp> {
 		});
 		throw error;
 	}
-
-	installShutdownHandlers(app);
-	scheduleReservedWarning(app, coreRoutes, resolvedOptions, logger);
-
-	return app;
 }
 
 /**

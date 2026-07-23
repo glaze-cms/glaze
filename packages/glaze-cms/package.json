@@ -56,6 +56,7 @@
 	"dependencies": {
 		"@elysiajs/cors": "latest",
 		"@elysiajs/node": "latest",
+		"better-auth": "^1.6.24",
 		"better-sqlite3": "latest",
 		"drizzle-kit": "1.0.0-rc.4",
 		"drizzle-orm": "1.0.0-rc.4",

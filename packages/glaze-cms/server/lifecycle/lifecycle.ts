@@ -1,26 +1,30 @@
 /**
  * The server lifecycle — `handleStart` and `handleStop`, mirroring Elysia's `onStart`/`onStop`. On
- * start: verify the database is reachable, failing **loud** (a thrown, typed error) if not, so a
- * misconfigured database surfaces at boot rather than on the first request. On stop: close the database
- * handle so the process can exit cleanly.
+ * start: verify the database is reachable (failing **loud** if not, so a misconfigured database
+ * surfaces at boot rather than on the first request), then materialize Glaze's internal auth tables so
+ * they exist before the server accepts traffic. On stop: close the database handle so the process can
+ * exit cleanly.
  *
- * NOTE — convergence-at-boot is intentionally deferred. `converge()` needs a schema *path* (drizzle-kit
- * `generate` reads a file), but `glaze.config.ts` currently provides `schema` as an *object*.
+ * NOTE — convergence-at-boot for *user content* is intentionally deferred. `converge()` needs a schema
+ * *path* (drizzle-kit `generate` reads a file), but `glaze.config.ts` provides `schema` as an *object*.
  * Reconciling that (a config schema-path, or the low-level `generateDrizzleJson(imports)` object path)
- * is a focused follow-up; this is the hook point where it will run.
+ * is a focused follow-up; it will run here alongside the auth materialization.
  */
+
+import { materializeAuthTables } from '../auth/index.ts';
 
 import type { GlazeContext } from '../app/context.ts';
 
 /**
- * Runs Glaze's startup sequence: verify the database is reachable. (Convergence will run here once the
- * schema-source reconciliation lands — see the module note.)
+ * Runs Glaze's startup sequence: verify the database is reachable, then materialize the internal auth
+ * schema. (User-content convergence will run here once the schema-source reconciliation lands.)
  *
  * @param context - The Glaze context (db, logger, config, …).
- * @returns Resolves when startup completes; rejects (fails loud) if the database is unreachable.
+ * @returns Resolves when startup completes; rejects (fails loud) if startup cannot complete.
  */
 export async function handleStart(context: GlazeContext): Promise<void> {
 	await verifyDatabaseReachable(context);
+	await materializeAuthTables(context);
 }
 
 /**
