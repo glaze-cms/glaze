@@ -21,4 +21,6 @@ export const DEFAULT_CSP: Readonly<Record<string, string>> = {
 	'base-uri': "'self'",
 	'frame-ancestors': "'none'",
 	'object-src': "'none'",
+	// form-action does NOT fall back to default-src, so set it explicitly.
+	'form-action': "'self'",
 };

@@ -11,7 +11,7 @@ import { createLogger } from '#logger';
 import { resolveRuntime } from '#runtime';
 
 import { createGlazeApp } from '../app/index.ts';
-import { start } from '../lifecycle/index.ts';
+import { handleStart } from '../lifecycle/index.ts';
 import { resolveOptions } from '../options/index.ts';
 import { reservedPrefixes, snapshotRoutes, warnReservedCollisions } from '../reserved/index.ts';
 
@@ -36,11 +36,38 @@ export async function glaze(options: GlazeOptions = {}): Promise<GlazeApp> {
 	const app = createGlazeApp(context);
 	const coreRoutes = snapshotRoutes(app);
 
-	await start(context);
-	app.listen(resolvedOptions.port);
+	try {
+		await handleStart(context);
+		app.listen(resolvedOptions.port);
+	} catch (error) {
+		// Boot failed after the DB was opened — release it so a failed start doesn't leak the connection.
+		await context.db.close().catch((closeError: unknown) => {
+			logger.error(`Failed to close the database after a boot failure: ${String(closeError)}`);
+		});
+		throw error;
+	}
+
+	installShutdownHandlers(app);
 	scheduleReservedWarning(app, coreRoutes, resolvedOptions, logger);
 
 	return app;
+}
+
+/**
+ * Registers SIGINT/SIGTERM handlers that gracefully stop the server (which triggers `onStop` →
+ * `handleStop` → the DB is closed), then exit — so a container stop / Ctrl-C drains cleanly instead of
+ * dropping the connection. `once` so a second signal falls through to the default (hard) terminate.
+ *
+ * @param app - The running app to stop.
+ */
+function installShutdownHandlers(app: GlazeApp): void {
+	const shutdown = (): void => {
+		void app.stop().finally(() => {
+			process.exit(0);
+		});
+	};
+	process.once('SIGINT', shutdown);
+	process.once('SIGTERM', shutdown);
 }
 
 /**

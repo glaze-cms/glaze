@@ -27,3 +27,16 @@ test('resolveOptions honors an explicit port and merges CSP onto the secure base
 	// …without dropping the locked baseline
 	expect(resolved.security.headers.csp['default-src']).toBe("'self'");
 });
+
+test('resolveOptions LOCKS the CSP baseline — a user cannot weaken a protected directive', () => {
+	const resolved = resolveOptions({
+		security: { headers: { csp: { 'default-src': "* 'unsafe-inline' 'unsafe-eval'" } } },
+	});
+	// the attempted override is ignored; the locked value wins
+	expect(resolved.security.headers.csp['default-src']).toBe("'self'");
+});
+
+test('resolveOptions rejects a root prefix or equal api/admin prefixes', () => {
+	expect(() => resolveOptions({ prefixes: { api: '/' } })).toThrow();
+	expect(() => resolveOptions({ prefixes: { api: '/x', admin: '/x' } })).toThrow();
+});

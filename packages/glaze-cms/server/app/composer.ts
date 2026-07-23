@@ -1,15 +1,18 @@
 /**
  * The composition root: assembles the Glaze Elysia app from the resolved context. Reads top-down like
- * a table of contents — decorate the context, then register the core chain (security headers →
- * content-API CORS → health → root manifest) and wire graceful shutdown. The returned app is the
- * chainable instance users attach their own routes to; startup/listen is driven by the entry point.
+ * a table of contents — decorate the context, then register the core chain (security headers → health →
+ * root manifest) and wire graceful shutdown. The returned app is the chainable instance users attach
+ * their own routes to; startup/listen is driven by the entry point.
+ *
+ * (Content-API CORS mounts with the content API — it must share a scope with the `/api` routes it
+ * guards, which land in a later increment.)
  */
 
 import { Elysia } from 'elysia';
 
 import { createHealthCheck } from '../health/index.ts';
-import { stop } from '../lifecycle/index.ts';
-import { createCorsPlugin, createSecurityHeaders } from '../security/index.ts';
+import { handleStop } from '../lifecycle/index.ts';
+import { createSecurityHeaders } from '../security/index.ts';
 import { selectAdapter } from './adapter.ts';
 
 import type { ResolvedGlazeOptions } from '../options/index.ts';
@@ -39,13 +42,13 @@ export function createGlazeApp(context: GlazeContext): GlazeApp {
 	// Include `adapter` only on Node — `exactOptionalPropertyTypes` forbids `adapter: undefined`, and
 	// omitting it selects Elysia's default (Bun) adapter.
 	const adapter = selectAdapter(context.runtime.name);
+
 	const app = new Elysia(adapter ? { adapter } : {})
 		.decorate(context)
 		.use(createSecurityHeaders(options.security.headers))
-		.group(options.prefixes.api, (api) => api.use(createCorsPlugin(options.security.cors)))
 		.use(createHealthCheck(options.health))
 		.get('/', () => buildManifest(options))
-		.onStop(() => stop(context));
+		.onStop(() => handleStop(context));
 
 	return app as unknown as GlazeApp;
 }

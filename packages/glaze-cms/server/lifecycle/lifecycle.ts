@@ -1,8 +1,8 @@
 /**
- * The server lifecycle — `start` and `stop`, mirroring Elysia's `onStart`/`onStop`. On start: verify
- * the database is reachable, failing **loud** (a thrown, typed error) if not, so a misconfigured
- * database surfaces at boot rather than on the first request. On stop: close the database handle so the
- * process can exit cleanly.
+ * The server lifecycle — `handleStart` and `handleStop`, mirroring Elysia's `onStart`/`onStop`. On
+ * start: verify the database is reachable, failing **loud** (a thrown, typed error) if not, so a
+ * misconfigured database surfaces at boot rather than on the first request. On stop: close the database
+ * handle so the process can exit cleanly.
  *
  * NOTE — convergence-at-boot is intentionally deferred. `converge()` needs a schema *path* (drizzle-kit
  * `generate` reads a file), but `glaze.config.ts` currently provides `schema` as an *object*.
@@ -19,7 +19,7 @@ import type { GlazeContext } from '../app/context.ts';
  * @param context - The Glaze context (db, logger, config, …).
  * @returns Resolves when startup completes; rejects (fails loud) if the database is unreachable.
  */
-export async function start(context: GlazeContext): Promise<void> {
+export async function handleStart(context: GlazeContext): Promise<void> {
 	await verifyDatabaseReachable(context);
 }
 
@@ -29,7 +29,7 @@ export async function start(context: GlazeContext): Promise<void> {
  * @param context - The Glaze context.
  * @returns Resolves once resources are released.
  */
-export async function stop(context: GlazeContext): Promise<void> {
+export async function handleStop(context: GlazeContext): Promise<void> {
 	await context.db.close();
 }
 

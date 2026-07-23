@@ -1,1 +1,1 @@
-export { start, stop } from './lifecycle.ts';
+export { handleStart, handleStop } from './lifecycle.ts';

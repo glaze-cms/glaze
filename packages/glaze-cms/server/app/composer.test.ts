@@ -71,3 +71,12 @@ test('the returned app is chainable — a user route is served', async () => {
 	expect(response.status).toBe(200);
 	expect(await response.text()).toBe('signed up');
 });
+
+test('security headers are set even on a 404 (not just handled routes)', async () => {
+	const app = createGlazeApp(testContext());
+	const response = await get(app, '/does-not-exist');
+	expect(response.status).toBe(404);
+	// the response attackers probe most must still carry the headers
+	expect(response.headers.get('content-security-policy')).toContain("default-src 'self'");
+	expect(response.headers.get('x-frame-options')).toBe('DENY');
+});

@@ -28,22 +28,40 @@ import type {
 export function resolveOptions(options: GlazeOptions = {}): ResolvedGlazeOptions {
 	const { port, security, prefixes, health, logger } = options;
 
+	const adminPrefix = normalizePath(prefixes?.admin ?? DEFAULT_ADMIN_PREFIX);
+	const apiPrefix = normalizePath(prefixes?.api ?? DEFAULT_API_PREFIX);
+	assertUsablePrefixes(apiPrefix, adminPrefix);
+
 	return {
 		port: resolvePort(port),
 		security: {
 			cors: security?.cors,
 			headers: resolveHeaders(security?.headers),
 		},
-		prefixes: {
-			admin: normalizePath(prefixes?.admin ?? DEFAULT_ADMIN_PREFIX),
-			api: normalizePath(prefixes?.api ?? DEFAULT_API_PREFIX),
-		},
+		prefixes: { admin: adminPrefix, api: apiPrefix },
 		health: {
 			enabled: health?.enabled ?? true,
 			path: normalizePath(health?.path ?? DEFAULT_HEALTH_PATH),
 		},
 		logger,
 	};
+}
+
+/**
+ * Rejects prefix misconfigurations that would break routing or the reserved-prefix advisory: a root
+ * (`/`) prefix swallows every route, and equal api/admin prefixes make the two surfaces ambiguous.
+ *
+ * @param api - The normalized API prefix.
+ * @param admin - The normalized admin prefix.
+ * @throws {Error} When a prefix is root or the two are equal.
+ */
+function assertUsablePrefixes(api: string, admin: string): void {
+	if (api === '/' || admin === '/') {
+		throw new Error(`Glaze route prefixes must not be root '/': api='${api}', admin='${admin}'.`);
+	}
+	if (api === admin) {
+		throw new Error(`Glaze api and admin prefixes must differ: both are '${api}'.`);
+	}
 }
 
 /**
@@ -55,7 +73,9 @@ export function resolveOptions(options: GlazeOptions = {}): ResolvedGlazeOptions
  */
 function resolveHeaders(headers: HeadersOptions | undefined): ResolvedHeadersOptions {
 	return {
-		csp: { ...DEFAULT_CSP, ...headers?.csp },
+		// User directives spread first, then the locked baseline overrides — a user can ADD directives
+		// (e.g. `img-src`) but cannot WEAKEN the protected keys (`default-src`, `frame-ancestors`, …).
+		csp: { ...headers?.csp, ...DEFAULT_CSP },
 		hsts: headers?.hsts ?? isProduction(),
 	};
 }
@@ -70,8 +90,9 @@ function resolveHeaders(headers: HeadersOptions | undefined): ResolvedHeadersOpt
 function resolvePort(port: number | undefined): number {
 	if (port !== undefined) return port;
 
-	const fromEnv = process.env['PORT'] ?? process.env['GLAZE_PORT'];
-	if (fromEnv === undefined) return DEFAULT_PORT;
+	// A set-but-empty/whitespace `PORT=` is a blanked-out var, not port 0 — treat it as absent.
+	const fromEnv = (process.env['PORT'] ?? process.env['GLAZE_PORT'])?.trim();
+	if (!fromEnv) return DEFAULT_PORT;
 
 	const parsed = Number(fromEnv);
 	return Number.isInteger(parsed) && parsed >= 0 ? parsed : DEFAULT_PORT;
