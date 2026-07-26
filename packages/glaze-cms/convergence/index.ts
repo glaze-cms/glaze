@@ -4,6 +4,7 @@ export {
 	decodeEnvelope,
 	toConvergenceErrorCode,
 } from './envelope/index.ts';
+export { createInteractiveResolver } from './interactive/index.ts';
 export { converge, createGenerateCompute, resolveWithDecisions } from './orchestrator/index.ts';
 export {
 	checkColumnHasData,
@@ -27,6 +28,7 @@ export type {
 	OperationResult,
 	SchemaDecision,
 } from './envelope/index.ts';
+export type { InteractiveResolver, ResolverIo } from './interactive/index.ts';
 export type {
 	ConvergeOptions,
 	ConvergeResult,

@@ -13,12 +13,11 @@ import type { GlazeConfig } from './types.ts';
  * ```ts
  * // glaze.config.ts
  * import { defineGlazeConfig } from 'glaze-cms/config';
- * import * as schema from './schema';
  *
  * export default defineGlazeConfig({
  * 	dialect: 'postgres',
  * 	connection: process.env.DATABASE_URL!,
- * 	schema,
+ * 	schema: './schema/*.ts',
  * 	workflow: { mode: 'solo' },
  * });
  * ```

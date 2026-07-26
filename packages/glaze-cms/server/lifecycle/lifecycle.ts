@@ -1,23 +1,20 @@
 /**
  * The server lifecycle — `handleStart` and `handleStop`, mirroring Elysia's `onStart`/`onStop`. On
  * start: verify the database is reachable (failing **loud** if not, so a misconfigured database
- * surfaces at boot rather than on the first request), then materialize Glaze's internal auth tables so
- * they exist before the server accepts traffic. On stop: close the database handle so the process can
- * exit cleanly.
- *
- * NOTE — convergence-at-boot for *user content* is intentionally deferred. `converge()` needs a schema
- * *path* (drizzle-kit `generate` reads a file), but `glaze.config.ts` provides `schema` as an *object*.
- * Reconciling that (a config schema-path, or the low-level `generateDrizzleJson(imports)` object path)
- * is a focused follow-up; it will run here alongside the auth materialization.
+ * surfaces at boot rather than on the first request), materialize Glaze's internal auth tables, then
+ * converge the live database to the developer's Drizzle schema — internals first, then user content —
+ * so everything exists before the server accepts traffic. On stop: close the database handle so the
+ * process can exit cleanly.
  */
 
 import { materializeAuthTables } from '../auth/index.ts';
+import { runConvergence } from '../convergence/index.ts';
 
 import type { GlazeContext } from '../app/context.ts';
 
 /**
- * Runs Glaze's startup sequence: verify the database is reachable, then materialize the internal auth
- * schema. (User-content convergence will run here once the schema-source reconciliation lands.)
+ * Runs Glaze's startup sequence: verify the database is reachable, materialize the internal auth
+ * schema, then converge user content to the configured schema. Any step failing (loud) aborts boot.
  *
  * @param context - The Glaze context (db, logger, config, …).
  * @returns Resolves when startup completes; rejects (fails loud) if startup cannot complete.
@@ -25,6 +22,7 @@ import type { GlazeContext } from '../app/context.ts';
 export async function handleStart(context: GlazeContext): Promise<void> {
 	await verifyDatabaseReachable(context);
 	await materializeAuthTables(context);
+	await runConvergence(context);
 }
 
 /**

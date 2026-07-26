@@ -1,1 +1,1 @@
-export { glaze } from './glaze.ts';
+export { glaze } from './entry.ts';

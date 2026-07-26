@@ -24,12 +24,13 @@ export interface GlazeConfig {
 	/** Postgres connection string, or the SQLite file path (typically an env reference). */
 	connection: string;
 	/**
-	 * The Drizzle schema (table definitions) as an object of exports.
-	 * @default {}
+	 * Path or glob to the Drizzle schema module(s) — the desired database state that convergence
+	 * materializes at boot. A single file (`'./schema.ts'`) or the per-entity layout (`'./schema/*.ts'`)
+	 * both work. Omitted ⇒ no user schema, and convergence is skipped.
 	 */
-	schema?: Record<string, unknown>;
+	schema?: string;
 	/**
-	 * Directory for generated migration files.
+	 * Directory for generated migration files (the snapshot chain).
 	 * @default './drizzle'
 	 */
 	migrations?: string;
@@ -44,7 +45,8 @@ export interface GlazeConfig {
 export interface ResolvedGlazeConfig {
 	dialect: Dialect;
 	connection: string;
-	schema: Record<string, unknown>;
+	/** The schema path/glob, or `undefined` when the project has no user schema yet. */
+	schema: string | undefined;
 	migrations: string;
 	workflow: WorkflowConfig;
 }

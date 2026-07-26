@@ -14,7 +14,7 @@ export function resolveConfig(config: GlazeConfig): ResolvedGlazeConfig {
 	return {
 		dialect: config.dialect,
 		connection: config.connection,
-		schema: config.schema ?? {},
+		schema: config.schema,
 		migrations: config.migrations ?? DEFAULT_MIGRATIONS_DIR,
 		workflow: config.workflow ?? { mode: 'solo' },
 	};
