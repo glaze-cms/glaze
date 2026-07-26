@@ -4,4 +4,5 @@ export {
 	DEFAULT_CSP,
 	DEFAULT_HEALTH_PATH,
 	DEFAULT_PORT,
+	MIN_AUTH_SECRET_LENGTH,
 } from './defaults.ts';

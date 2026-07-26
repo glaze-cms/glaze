@@ -2,7 +2,7 @@ import { PassThrough } from 'node:stream';
 
 import { expect, test } from '#harness';
 
-import { askLine, createInteractiveResolver, type ResolverIo } from './resolver.ts';
+import { askLine, createInteractiveResolver, isInteractive, type ResolverIo } from './resolver.ts';
 
 import type { UnexpectedRowLoss } from '../apply/index.ts';
 import type { SchemaDecision } from '../envelope/index.ts';
@@ -152,4 +152,48 @@ test('askLine resolves to empty on EOF, so callers fail closed', async () => {
 	const pending = askLine(input, output, 'q: ');
 	input.end();
 	expect(await pending).toBe('');
+});
+
+/**
+ * Evaluates {@link isInteractive} with `stdin.isTTY` stubbed and the interactivity env vars controlled,
+ * restoring all three afterward. Env is cleared first so an ambient `CI` (in the test CI itself) can't leak in.
+ *
+ * @param isTty - The value to report for `process.stdin.isTTY`.
+ * @param env - `CI` / `GLAZE_NO_TTY` values to set for the check.
+ * @returns The result of `isInteractive()`.
+ */
+function checkInteractive(isTty: boolean, env: { CI?: string; GLAZE_NO_TTY?: string }): boolean {
+	const savedTty = process.stdin.isTTY;
+	const savedCi = process.env['CI'];
+	const savedNoTty = process.env['GLAZE_NO_TTY'];
+	process.stdin.isTTY = isTty;
+	delete process.env['CI'];
+	delete process.env['GLAZE_NO_TTY'];
+	Object.assign(process.env, env);
+	try {
+		return isInteractive();
+	} finally {
+		process.stdin.isTTY = savedTty;
+		if (savedCi === undefined) delete process.env['CI'];
+		else process.env['CI'] = savedCi;
+		if (savedNoTty === undefined) delete process.env['GLAZE_NO_TTY'];
+		else process.env['GLAZE_NO_TTY'] = savedNoTty;
+	}
+}
+
+test('isInteractive is true for a TTY with no non-interactive signal', () => {
+	expect(checkInteractive(true, {})).toBe(true);
+});
+
+test('isInteractive is false when stdin is not a TTY', () => {
+	expect(checkInteractive(false, {})).toBe(false);
+});
+
+// The fail-closed escape hatches: a TTY with no human on it must not block boot.
+test('GLAZE_NO_TTY forces non-interactive even on a TTY', () => {
+	expect(checkInteractive(true, { GLAZE_NO_TTY: '1' })).toBe(false);
+});
+
+test('CI forces non-interactive even on a TTY', () => {
+	expect(checkInteractive(true, { CI: 'true' })).toBe(false);
 });

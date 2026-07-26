@@ -61,7 +61,12 @@ export interface ConvergeOptions {
 	readonly dialect: Dialect;
 	/** Path to the Drizzle schema module (the desired state). */
 	readonly schema: string;
-	/** Migration/snapshot output dir — a gitignored `.glaze/` cache for solo, a committed dir for team. */
+	/**
+	 * Migration/snapshot output dir. Must **persist across restarts** (a committed directory) so the
+	 * snapshot chain stays in lockstep with the database — if it is lost/gitignored, a later boot
+	 * re-`generate`s a `CREATE` for tables that already exist. A per-mode gitignored `.glaze/` cache
+	 * (self-healed via a drizzle `pull` re-baseline) is a future increment; today both modes use this.
+	 */
 	readonly out: string;
 	/** Resolves structural decisions (rename vs create). */
 	readonly resolve: Resolver;

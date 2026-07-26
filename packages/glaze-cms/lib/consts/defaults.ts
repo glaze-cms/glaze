@@ -15,6 +15,9 @@ export const DEFAULT_HEALTH_PATH = '/_health';
 /** Default HTTP port the server listens on when none is configured or found in the environment. */
 export const DEFAULT_PORT = 4000;
 
+/** Minimum length Glaze requires of `GLAZE_AUTH_SECRET`; a shorter secret is too weak to sign sessions. */
+export const MIN_AUTH_SECRET_LENGTH = 32;
+
 /** The locked-secure Content-Security-Policy baseline; user directives merge on top (extend, not replace). */
 export const DEFAULT_CSP: Readonly<Record<string, string>> = {
 	'default-src': "'self'",

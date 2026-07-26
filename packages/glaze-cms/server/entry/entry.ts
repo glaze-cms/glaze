@@ -11,6 +11,7 @@ import { createLogger } from '#logger';
 import { resolveRuntime } from '#runtime';
 
 import { createGlazeApp } from '../app/index.ts';
+import { validateEnv } from '../env/index.ts';
 import { handleStart } from '../lifecycle/index.ts';
 import { resolveOptions } from '../options/index.ts';
 import { reservedPrefixes, snapshotRoutes, warnReservedCollisions } from '../reserved/index.ts';
@@ -65,6 +66,7 @@ function scheduleReservedWarning(
 export async function glaze(options: GlazeOptions = {}): Promise<GlazeApp> {
 	const resolvedOptions = resolveOptions(options);
 	const logger = createLogger(resolvedOptions.logger);
+	validateEnv(logger);
 	const config = resolveConfig(await loadConfig());
 	const runtime = resolveRuntime();
 	const db = await resolveDialect(config.dialect).createDatabase({ connection: config.connection });

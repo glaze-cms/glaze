@@ -1,5 +1,7 @@
 import { createInterface } from 'node:readline/promises';
 
+import { isEnvFlagEnabled } from '#utils';
+
 import { describeReason, formatEntity, formatPanel, isAffirmative, renameFrom } from './utils.ts';
 
 import type { UnexpectedRowLoss } from '../apply/index.ts';
@@ -201,17 +203,29 @@ export async function askLine(input: Readable, output: Writable, prompt: string)
 }
 
 /**
- * The default {@link ResolverIo}: reads a line from stdin via {@link askLine} and reports whether
- * stdin is a TTY. Cross-runtime (Bun and Node).
+ * Whether the process can prompt a human: stdin is a TTY **and** no non-interactive signal is set.
+ * `CI` (set by every mainstream CI system) or `GLAZE_NO_TTY` (the explicit escape hatch for a container
+ * that allocates a TTY with no human on it — `docker run -t` without `-i`, some process managers) each
+ * force `false`, so every prompt declines (fails closed) instead of blocking boot forever on an answer
+ * that can't come.
+ *
+ * @returns `true` when it is safe to prompt interactively.
+ */
+export function isInteractive(): boolean {
+	if (isEnvFlagEnabled('CI') || isEnvFlagEnabled('GLAZE_NO_TTY')) return false;
+	return process.stdin.isTTY;
+}
+
+/**
+ * The default {@link ResolverIo}: reads a line from stdin via {@link askLine} and reports interactivity
+ * via {@link isInteractive}. Cross-runtime (Bun and Node).
  *
  * @returns A stdio-backed I/O port.
  */
 function stdioIo(): ResolverIo {
 	return {
 		ask: (prompt) => askLine(process.stdin, process.stdout, prompt),
-		isTty() {
-			return process.stdin.isTTY;
-		},
+		isTty: isInteractive,
 	};
 }
 

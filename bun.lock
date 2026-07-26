@@ -18,6 +18,7 @@
       "dependencies": {
         "@elysiajs/cors": "latest",
         "@elysiajs/node": "latest",
+        "@sinclair/typebox": "^0.34.0",
         "better-auth": "^1.6.24",
         "better-sqlite3": "latest",
         "drizzle-kit": "1.0.0-rc.4",
