@@ -1,28 +1,31 @@
 /**
  * The content router: auto-generated `/{apiPrefix}/{collection}` CRUD routes, one collection per Drizzle
  * table. Reads top-down — drop excluded/reserved collections, build the guarded base app (the auth macro
- * plus content-scoped CORS), then register each collection's routes onto it. Every content route opts
- * into `{ auth: true }`, so the macro gates it (401 without a session) and injects `user`/`session`.
+ * plus content-scoped CORS and validation-error normalization), then register each collection's routes.
+ * Every content route opts into `{ auth: true }`, so the macro gates it (401 without a session) and
+ * injects `user`/`session`; POST/PATCH also carry a generated TypeBox body schema.
  *
  * A table with a single-column primary key gets the full set (list, create, get/update/delete by id); a
- * table without one gets list + create only. Data access goes through the dialect-agnostic core query
- * builder (see `./handlers.ts`); this file owns only HTTP shape — parsing, status codes, body limits.
+ * table without one gets list + create only. Every response is the `{ success, data, error }` envelope
+ * (see `../responses`). Data access goes through the dialect-agnostic core query builder (`./handlers.ts`).
  */
 
 import { Elysia } from 'elysia';
 
 import { createAuthMacro } from '../auth/index.ts';
+import { buildErrorResponse, buildSuccessResponse } from '../responses/index.ts';
 import { createCorsResponder } from '../security/index.ts';
 import {
 	coerceId,
 	createRow,
 	deleteRow,
-	filterBody,
 	getRow,
 	listRows,
 	updateRow,
 	type ContentDb,
+	type Row,
 } from './handlers.ts';
+import { buildCollectionSchemas } from './validation.ts';
 
 import type { Logger } from '#logger';
 import type { GlazeContext } from '../app/context.ts';
@@ -35,11 +38,6 @@ const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 100;
 /** Cap `offset` at the safe-integer ceiling so a huge value can't overflow the driver's bind type. */
 const MAX_OFFSET = Number.MAX_SAFE_INTEGER;
-
-/** The error bodies the router returns, kept as named constants so the shape stays consistent. */
-const EMPTY_BODY = { error: 'Request body must be a non-empty object of known fields' } as const;
-const INVALID_ID = { error: 'Invalid id for this collection' } as const;
-const NOT_FOUND = { error: 'Not found' } as const;
 
 /**
  * Collection names that would collide with a Glaze-owned route and are never served as content. `auth`
@@ -87,6 +85,24 @@ function parseOffset(raw: string | undefined): number {
 }
 
 /**
+ * Extracts per-field detail from an Elysia validation error into the envelope's `fields` shape.
+ *
+ * @param error - The error thrown for a `VALIDATION` failure.
+ * @returns The field-level messages (empty when none can be read).
+ */
+function toValidationFields(error: unknown): { path: string; message: string }[] {
+	const all = (error as { all?: unknown }).all;
+	if (!Array.isArray(all)) return [];
+	const fields: { path: string; message: string }[] = [];
+	for (const item of all as { path?: unknown; message?: unknown }[]) {
+		if (typeof item.path === 'string' && typeof item.message === 'string') {
+			fields.push({ path: item.path, message: item.message });
+		}
+	}
+	return fields;
+}
+
+/**
  * Filters the collections to those actually servable as CRUD, warning (once each) about any dropped for
  * an unsafe name or a reserved-route collision. Dropped tables are still managed by convergence.
  *
@@ -125,17 +141,41 @@ function servableCollections(
 }
 
 /**
- * Builds the guarded base app: the named content plugin with the auth macro applied and, when CORS is
- * configured, a **local** `onAfterHandle` that stamps the content-scoped CORS headers (local so they
- * never leak onto sibling scopes — the root manifest or the auth routes). Extracted so its type (which
- * carries the `auth` macro) can name the per-collection registrar.
+ * Builds the guarded base app: the named content plugin with the auth macro, a local validation-error
+ * normalizer (Elysia's `VALIDATION` → the 422 envelope), and — when CORS is configured — a local
+ * `onAfterHandle` stamping the content-scoped CORS headers. Both hooks are local, so they never leak
+ * onto sibling scopes (the root manifest or the auth routes). Extracted so its type (which carries the
+ * `auth` macro) can name the per-collection registrar.
  *
  * @param auth - The shared Better Auth instance.
  * @param responder - The content CORS responder, or `null` for deny-by-default.
+ * @param logger - The logger, for unexpected content-route errors.
  * @returns The base Elysia instance, macro-enabled.
  */
-function createContentApp(auth: SessionProvider, responder: CorsResponder | null) {
-	const app = new Elysia({ name: 'glaze.content' }).use(createAuthMacro(auth));
+function createContentApp(auth: SessionProvider, responder: CorsResponder | null, logger: Logger) {
+	const app = new Elysia({ name: 'glaze.content' })
+		.use(createAuthMacro(auth))
+		// Keep EVERY content-route error in the envelope: body-schema failures → 422, malformed JSON → 400,
+		// genuine not-found passes through to Elysia's 404, and anything else (a thrown handler / driver
+		// error) is logged and enveloped as 500 rather than leaking Elysia's default shape. (LEA-6 will
+		// refine the 500 fallback into typed 4xx for known DB-constraint violations.)
+		.onError(({ code, error }) => {
+			if (code === 'VALIDATION') {
+				return buildErrorResponse(
+					422,
+					'VALIDATION',
+					'Request body failed validation',
+					toValidationFields(error),
+				);
+			}
+			if (code === 'PARSE')
+				return buildErrorResponse(400, 'VALIDATION', 'Request body is not valid JSON');
+			if (code === 'NOT_FOUND') return undefined;
+			const detail =
+				error instanceof Error ? (error.stack ?? error.message) : JSON.stringify(error);
+			logger.error(`Unhandled content-route error: ${detail}`);
+			return buildErrorResponse(500, 'INTERNAL', 'Internal server error');
+		});
 	if (responder) {
 		app.onAfterHandle(({ request, set }) => {
 			responder.decorate(set.headers, request.headers.get('origin'));
@@ -148,9 +188,10 @@ function createContentApp(auth: SessionProvider, responder: CorsResponder | null
 type ContentApp = ReturnType<typeof createContentApp>;
 
 /**
- * Registers one collection's CRUD routes onto the content app (Elysia mutates in place). Id-keyed routes
- * are registered only when the collection has a single-column primary key. When CORS is configured, an
- * ungated `OPTIONS` preflight is registered alongside each path.
+ * Registers one collection's CRUD routes onto the content app (Elysia mutates in place). POST/PATCH
+ * carry the generated body schemas (Elysia validates + strips unknown fields before the handler runs).
+ * Id-keyed routes are registered only when the collection has a single-column primary key; an ungated
+ * `OPTIONS` preflight is registered alongside each path when CORS is configured.
  *
  * @param app - The macro-enabled content app.
  * @param collection - The collection to expose.
@@ -166,21 +207,22 @@ function registerCollectionRoutes(
 	responder: CorsResponder | null,
 ): void {
 	const base = `${apiPrefix}/${collection.name}`;
+	const { body, update } = buildCollectionSchemas(collection);
 
 	app.get(
 		base,
-		({ query }) => listRows(db, collection, parseLimit(query.limit), parseOffset(query.offset)),
+		async ({ query }) =>
+			buildSuccessResponse(
+				await listRows(db, collection, parseLimit(query.limit), parseOffset(query.offset)),
+			),
 		{ auth: true },
 	);
 
 	app.post(
 		base,
-		async ({ body, status }) => {
-			const values = filterBody(collection, body, { excludePk: false });
-			if (!values || Object.keys(values).length === 0) return status(400, EMPTY_BODY);
-			return status(201, await createRow(db, collection, values));
-		},
-		{ auth: true },
+		async ({ body: input, status }) =>
+			status(201, buildSuccessResponse(await createRow(db, collection, input as Row))),
+		{ auth: true, body },
 	);
 
 	if (responder) app.options(base, ({ request }) => responder.preflight(request));
@@ -189,37 +231,39 @@ function registerCollectionRoutes(
 
 	app.get(
 		`${base}/:id`,
-		async ({ params, status }) => {
+		async ({ params }) => {
 			const id = coerceId(collection, params.id);
-			if (!id.ok) return status(400, INVALID_ID);
+			if (!id.ok) return buildErrorResponse(400, 'INVALID_ID', 'Invalid id for this collection');
 			const row = await getRow(db, collection, id.value);
-			return row ?? status(404, NOT_FOUND);
+			return row ? buildSuccessResponse(row) : buildErrorResponse(404, 'NOT_FOUND', 'Not found');
 		},
 		{ auth: true },
 	);
 
 	app.patch(
 		`${base}/:id`,
-		async ({ params, body, status }) => {
+		async ({ params, body: input }) => {
 			const id = coerceId(collection, params.id);
-			if (!id.ok) return status(400, INVALID_ID);
-			const values = filterBody(collection, body, { excludePk: true });
-			if (!values || Object.keys(values).length === 0) return status(400, EMPTY_BODY);
+			if (!id.ok) return buildErrorResponse(400, 'INVALID_ID', 'Invalid id for this collection');
+			const values = input as Row;
+			if (Object.keys(values).length === 0) {
+				return buildErrorResponse(422, 'VALIDATION', 'Request body has no fields to update');
+			}
 			const row = await updateRow(db, collection, id.value, values);
-			return row ?? status(404, NOT_FOUND);
+			return row ? buildSuccessResponse(row) : buildErrorResponse(404, 'NOT_FOUND', 'Not found');
 		},
-		{ auth: true },
+		{ auth: true, body: update },
 	);
 
 	app.delete(
 		`${base}/:id`,
-		async ({ params, status }) => {
+		async ({ params }) => {
 			const id = coerceId(collection, params.id);
-			if (!id.ok) return status(400, INVALID_ID);
+			if (!id.ok) return buildErrorResponse(400, 'INVALID_ID', 'Invalid id for this collection');
 			const deleted = await deleteRow(db, collection, id.value);
-			// 200 with a small body (not 204): a null-body 204 is invalid under undici (Node), and a raw
-			// 204 Response would bypass the CORS/security-header merge — this keeps both, cross-runtime.
-			return deleted ? { deleted: true } : status(404, NOT_FOUND);
+			return deleted
+				? buildSuccessResponse({ deleted: true })
+				: buildErrorResponse(404, 'NOT_FOUND', 'Not found');
 		},
 		{ auth: true },
 	);
@@ -248,7 +292,7 @@ export function createContentRouter({
 		logger,
 	);
 
-	const app = createContentApp(auth, responder);
+	const app = createContentApp(auth, responder, logger);
 	const db = context.db.db as ContentDb;
 	for (const collection of served) {
 		registerCollectionRoutes(app, collection, db, options.prefixes.api, responder);

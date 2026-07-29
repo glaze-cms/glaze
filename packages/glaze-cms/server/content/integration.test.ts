@@ -132,7 +132,7 @@ matrixTest('a real sign-up authenticates content CRUD end to end', async ({ db, 
 
 		const list = await send(app, 'GET', '/api/posts', { headers: { cookie } });
 		expect(list.status).toBe(200);
-		expect(await list.json()).toHaveLength(1);
+		expect(((await list.json()) as { data: unknown[] }).data).toHaveLength(1);
 
 		// The same token authenticates the external-API path as a Bearer credential.
 		const token = cookie.split('=')[1] ?? '';
@@ -140,7 +140,9 @@ matrixTest('a real sign-up authenticates content CRUD end to end', async ({ db, 
 			headers: { authorization: `Bearer ${token}` },
 		});
 		expect(byBearer.status).toBe(200);
-		expect(((await byBearer.json()) as Record<string, unknown>)['title']).toBe('hello');
+		expect(((await byBearer.json()) as { data: Record<string, unknown> }).data['title']).toBe(
+			'hello',
+		);
 
 		// The row really landed in the database.
 		const rows = await db.raw('select title from posts where id = 1');

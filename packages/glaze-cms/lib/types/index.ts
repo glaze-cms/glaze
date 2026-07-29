@@ -4,3 +4,4 @@
  */
 
 export type { Strict } from './strict.ts';
+export type { ApiResponse, GlazeError, GlazeErrorCode } from './response.ts';

@@ -8,6 +8,8 @@
 
 import { Elysia } from 'elysia';
 
+import { buildErrorResponse } from '../responses/index.ts';
+
 /**
  * The minimal slice of the Better Auth instance the macro needs. Declaring it structurally (rather than
  * the full auth type) lets tests inject a stub `{ api: { getSession } }` without a cast.
@@ -30,9 +32,9 @@ export interface SessionProvider {
 export function createAuthMacro(auth: SessionProvider) {
 	return new Elysia({ name: 'glaze.auth.macro' }).macro({
 		auth: {
-			async resolve({ status, request }) {
+			async resolve({ request }) {
 				const result = await auth.api.getSession({ headers: request.headers });
-				if (!result) return status(401);
+				if (!result) return buildErrorResponse(401, 'UNAUTHORIZED', 'Authentication required');
 				return { user: result.user, session: result.session };
 			},
 		},

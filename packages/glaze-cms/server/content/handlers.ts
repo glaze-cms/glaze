@@ -142,32 +142,6 @@ export async function deleteRow(
 }
 
 /**
- * Filters a raw request body down to the collection's known columns, dropping unknown fields and
- * (optionally) the primary key. Returns `undefined` when the body isn't a plain object.
- *
- * @param collection - The target collection.
- * @param body - The raw parsed request body.
- * @param options - `excludePk` drops the primary-key field (for updates).
- * @returns The filtered values, or `undefined` when the body is not an object.
- */
-export function filterBody(
-	collection: Collection,
-	body: unknown,
-	options: { readonly excludePk: boolean },
-): Row | undefined {
-	if (typeof body !== 'object' || body === null || Array.isArray(body)) return undefined;
-
-	const pkKey = options.excludePk ? pkPropertyName(collection) : undefined;
-	const filtered: Row = {};
-	for (const [key, value] of Object.entries(body)) {
-		// `Object.hasOwn`, not `key in` — the latter matches inherited `Object.prototype` keys
-		// (`constructor`, `toString`, `__proto__`), which are not columns and must never reach a write.
-		if (Object.hasOwn(collection.columns, key) && key !== pkKey) filtered[key] = value;
-	}
-	return filtered;
-}
-
-/**
  * Coerces a URL `:id` string to the primary key's type, so it binds correctly and cannot silently
  * select the wrong row. Drizzle's `dataType` categorizes the column (with a width suffix, e.g.
  * `number int53`, `bigint int64`):
@@ -199,17 +173,4 @@ export function coerceId(
 		return { ok: true, value };
 	}
 	return { ok: true, value: raw };
-}
-
-/**
- * Finds the property-name key of a collection's primary-key column.
- *
- * @param collection - The target collection.
- * @returns The PK's property key, or `undefined` when there is no single-column PK.
- */
-function pkPropertyName(collection: Collection): string | undefined {
-	for (const [key, column] of Object.entries(collection.columns)) {
-		if (column === collection.pk) return key;
-	}
-	return undefined;
 }

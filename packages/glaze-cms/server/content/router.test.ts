@@ -56,7 +56,7 @@ function writePostsSchema(dir: string, dialect: Dialect): string {
 	writeFileSync(
 		path,
 		`import { ${table}, integer, text } from 'drizzle-orm/${core}';\n` +
-			`export const posts = ${table}('posts', { id: integer('id').primaryKey(), title: text('title') });\n`,
+			`export const posts = ${table}('posts', { id: integer('id').primaryKey(), title: text('title').notNull() });\n`,
 	);
 	return path;
 }
@@ -92,7 +92,7 @@ function buildContext(
  * @param db - The database handle.
  */
 async function createPostsTable(db: DatabaseHandle): Promise<void> {
-	await db.raw('create table posts (id integer primary key, title text)');
+	await db.raw('create table posts (id integer primary key, title text not null)');
 }
 
 /**
@@ -142,6 +142,23 @@ function send(
 	return router.handle(new Request(`http://localhost${path}`, init));
 }
 
+/** The `{ success, data, error }` envelope every content response carries. */
+interface Envelope {
+	success: boolean;
+	data: unknown;
+	error: { code: string; message: string; fields?: { path: string; message: string }[] } | null;
+}
+
+/** Parses a response body as the API envelope, surfacing the status + raw text if it isn't JSON. */
+async function toEnvelope(response: Response): Promise<Envelope> {
+	const text = await response.text();
+	try {
+		return JSON.parse(text) as Envelope;
+	} catch {
+		throw new Error(`expected a JSON envelope, got ${response.status}: ${text.slice(0, 120)}`);
+	}
+}
+
 matrixTest('creates a row and drops unknown fields', async ({ db, dialect }) => {
 	const dir = mkdtempSync(TEMP_FIXTURE_PREFIX);
 	try {
@@ -155,9 +172,9 @@ matrixTest('creates a row and drops unknown fields', async ({ db, dialect }) => 
 		});
 		expect(response.status).toBe(201);
 
-		const created = (await response.json()) as Record<string, unknown>;
+		const created = (await toEnvelope(response)).data as Record<string, unknown>;
 		expect(created['title']).toBe('hello');
-		// An unknown field must be filtered out (not merely ignored by the DB) — its absence proves it.
+		// An unknown field must be stripped by validation (not merely ignored by the DB) — its absence proves it.
 		expect('bogus' in created).toBe(false);
 
 		const rows = await db.raw('select title from posts where id = 1');
@@ -178,19 +195,19 @@ matrixTest('lists, reads, updates, and deletes by id', async ({ db, dialect }) =
 
 		const list = await send(router, 'GET', '/api/posts');
 		expect(list.status).toBe(200);
-		expect(await list.json()).toHaveLength(2);
+		expect((await toEnvelope(list)).data).toHaveLength(2);
 
 		const read = await send(router, 'GET', '/api/posts/1');
 		expect(read.status).toBe(200);
-		expect(((await read.json()) as Record<string, unknown>)['title']).toBe('first');
+		expect(((await toEnvelope(read)).data as Record<string, unknown>)['title']).toBe('first');
 
 		const updated = await send(router, 'PATCH', '/api/posts/1', { title: 'renamed' });
 		expect(updated.status).toBe(200);
-		expect(((await updated.json()) as Record<string, unknown>)['title']).toBe('renamed');
+		expect(((await toEnvelope(updated)).data as Record<string, unknown>)['title']).toBe('renamed');
 
 		const removed = await send(router, 'DELETE', '/api/posts/1');
 		expect(removed.status).toBe(200);
-		expect(((await removed.json()) as Record<string, unknown>)['deleted']).toBe(true);
+		expect(((await toEnvelope(removed)).data as Record<string, unknown>)['deleted']).toBe(true);
 
 		const gone = await send(router, 'GET', '/api/posts/1');
 		expect(gone.status).toBe(404);
@@ -224,7 +241,11 @@ matrixTest('rejects an unauthenticated request with 401', async ({ db, dialect }
 		await createPostsTable(db);
 		const router = await buildRouter(db, dialect, dir, { session: null });
 
-		expect((await send(router, 'GET', '/api/posts')).status).toBe(401);
+		const response = await send(router, 'GET', '/api/posts');
+		expect(response.status).toBe(401);
+		const env = await toEnvelope(response);
+		expect(env.success).toBe(false);
+		expect(env.error?.code).toBe('UNAUTHORIZED');
 	} finally {
 		rmSync(dir, { recursive: true, force: true });
 	}
@@ -257,13 +278,84 @@ matrixTest(
 				// eslint-disable-next-line no-await-in-loop
 				await send(router, 'POST', '/api/posts', { id, title: `p${id}` });
 			}
-			const rows = (await (await send(router, 'GET', '/api/posts')).json()) as { id: number }[];
+			const rows = (await toEnvelope(await send(router, 'GET', '/api/posts'))).data as {
+				id: number;
+			}[];
 			expect(rows.map((row) => row.id)).toEqual([1, 2, 3]);
 		} finally {
 			rmSync(dir, { recursive: true, force: true });
 		}
 	},
 );
+
+matrixTest('422s a body that fails validation, enveloped', async ({ db, dialect }) => {
+	const dir = mkdtempSync(TEMP_FIXTURE_PREFIX);
+	try {
+		await createPostsTable(db);
+		const router = await buildRouter(db, dialect, dir);
+
+		// `title` (NOT NULL, no default) is required on both dialects — omitting it fails validation.
+		const missing = await send(router, 'POST', '/api/posts', { id: 1 });
+		expect(missing.status).toBe(422);
+		const env = await toEnvelope(missing);
+		expect(env.success).toBe(false);
+		expect(env.error?.code).toBe('VALIDATION');
+
+		// A wrong-typed field is rejected, not coerced.
+		const wrongType = await send(router, 'POST', '/api/posts', { id: 2, title: 42 });
+		expect(wrongType.status).toBe(422);
+	} finally {
+		rmSync(dir, { recursive: true, force: true });
+	}
+});
+
+matrixTest('a PATCH body cannot reassign the primary key', async ({ db, dialect }) => {
+	const dir = mkdtempSync(TEMP_FIXTURE_PREFIX);
+	try {
+		await createPostsTable(db);
+		const router = await buildRouter(db, dialect, dir);
+		await send(router, 'POST', '/api/posts', { id: 1, title: 'orig' });
+
+		// `id` is omitted from the update schema, so it is stripped: row 1 is renamed, nothing moves to 9.
+		const updated = await send(router, 'PATCH', '/api/posts/1', { id: 9, title: 'renamed' });
+		expect(updated.status).toBe(200);
+		expect(((await toEnvelope(updated)).data as Record<string, unknown>)['title']).toBe('renamed');
+		expect((await send(router, 'GET', '/api/posts/9')).status).toBe(404);
+
+		const rows = await db.raw('select id, title from posts');
+		expect(rows).toHaveLength(1);
+		expect(String(rows[0]?.['id'])).toBe('1');
+		expect(String(rows[0]?.['title'])).toBe('renamed');
+
+		// An empty update body has nothing to set → 422 (enveloped).
+		expect((await send(router, 'PATCH', '/api/posts/1', {})).status).toBe(422);
+	} finally {
+		rmSync(dir, { recursive: true, force: true });
+	}
+});
+
+matrixTest('a malformed JSON body stays in the envelope (400)', async ({ db, dialect }) => {
+	const dir = mkdtempSync(TEMP_FIXTURE_PREFIX);
+	try {
+		await createPostsTable(db);
+		const router = await buildRouter(db, dialect, dir);
+
+		// Bypass `send` (which stringifies) to post a body that is NOT valid JSON.
+		const response = await router.handle(
+			new Request('http://localhost/api/posts', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: '{ not json',
+			}),
+		);
+		expect(response.status).toBe(400);
+		const env = await toEnvelope(response);
+		expect(env.success).toBe(false);
+		expect(env.error?.code).toBe('VALIDATION');
+	} finally {
+		rmSync(dir, { recursive: true, force: true });
+	}
+});
 
 matrixTest(
 	'skips a collection whose name collides with a reserved route',
