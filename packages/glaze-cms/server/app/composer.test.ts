@@ -40,7 +40,7 @@ async function get(app: ReturnType<typeof createGlazeApp>, path: string): Promis
 }
 
 test('health route returns ok', async () => {
-	const app = createGlazeApp(testContext());
+	const app = createGlazeApp(testContext(), []);
 	const response = await get(app, '/_health');
 	expect(response.status).toBe(200);
 
@@ -49,7 +49,7 @@ test('health route returns ok', async () => {
 });
 
 test('root route returns the discovery manifest', async () => {
-	const app = createGlazeApp(testContext());
+	const app = createGlazeApp(testContext(), []);
 	const response = await get(app, '/');
 	expect(response.status).toBe(200);
 
@@ -59,14 +59,14 @@ test('root route returns the discovery manifest', async () => {
 });
 
 test('a strict security header is set on responses', async () => {
-	const app = createGlazeApp(testContext());
+	const app = createGlazeApp(testContext(), []);
 	const response = await get(app, '/_health');
 	expect(response.headers.get('content-security-policy')).toContain("default-src 'self'");
 	expect(response.headers.get('x-content-type-options')).toBe('nosniff');
 });
 
 test('the returned app is chainable — a user route is served', async () => {
-	const app = createGlazeApp(testContext());
+	const app = createGlazeApp(testContext(), []);
 	app.get('/newsletter', () => 'signed up');
 	const response = await get(app, '/newsletter');
 	expect(response.status).toBe(200);
@@ -74,7 +74,7 @@ test('the returned app is chainable — a user route is served', async () => {
 });
 
 test('security headers are set even on a 404 (not just handled routes)', async () => {
-	const app = createGlazeApp(testContext());
+	const app = createGlazeApp(testContext(), []);
 	const response = await get(app, '/does-not-exist');
 	expect(response.status).toBe(404);
 	// the response attackers probe most must still carry the headers

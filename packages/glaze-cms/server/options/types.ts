@@ -47,6 +47,16 @@ export interface HealthOptions {
 	readonly path?: string;
 }
 
+/** Content-API options — which of the schema's tables get generated CRUD routes. */
+export interface ContentOptions {
+	/**
+	 * Collection (table) names to **not** serve CRUD for. Excluded tables are still created and evolved
+	 * by convergence — they simply get no `/api/{collection}` routes (e.g. internal join tables, or
+	 * tables you serve by hand). @default []
+	 */
+	readonly exclude?: readonly string[];
+}
+
 /** The runtime options passed to `glaze({…})`. All optional; see {@link resolveOptions} for defaults. */
 export interface GlazeOptions {
 	/** The port to listen on. Falls back to `PORT`/`GLAZE_PORT` env, then `4000`. */
@@ -57,6 +67,8 @@ export interface GlazeOptions {
 	readonly prefixes?: PrefixOptions;
 	/** Health-check configuration. */
 	readonly health?: HealthOptions;
+	/** Content-API configuration (which tables get CRUD routes). */
+	readonly content?: ContentOptions;
 	/** Logger configuration (forwarded to the Glaze logger). */
 	readonly logger?: LoggerOptions;
 }
@@ -84,6 +96,8 @@ export interface ResolvedGlazeOptions {
 	readonly prefixes: { readonly admin: string; readonly api: string };
 	/** Resolved health config. */
 	readonly health: { readonly enabled: boolean; readonly path: string };
+	/** Resolved content config — the collection names to exclude from CRUD. */
+	readonly content: { readonly exclude: readonly string[] };
 	/** Logger configuration, or `undefined`. */
 	readonly logger: LoggerOptions | undefined;
 }

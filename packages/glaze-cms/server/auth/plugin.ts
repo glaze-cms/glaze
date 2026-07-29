@@ -10,10 +10,10 @@
 
 import { Elysia } from 'elysia';
 
-import { createAuth } from './instance.ts';
 import { forwardTrustedIp, type PeerAddressSource } from './ip.ts';
 
 import type { GlazeContext } from '../app/context.ts';
+import type { GlazeAuth } from './instance.ts';
 
 /** Elysia's response-mutation bag — the subset the auth handler reads and clears. */
 interface ResponseSet {
@@ -21,13 +21,13 @@ interface ResponseSet {
 }
 
 /**
- * Builds the Glaze auth plugin from the resolved context.
+ * Builds the Glaze auth plugin from the resolved context and the shared Better Auth instance.
  *
  * @param context - The Glaze context (database handle, config, resolved options).
+ * @param auth - The shared Better Auth instance (composed once at the composition root).
  * @returns An Elysia plugin serving Better Auth under `{apiPrefix}/auth`.
  */
-export function createAuthPlugin(context: GlazeContext) {
-	const auth = createAuth(context);
+export function createAuthPlugin(context: GlazeContext, auth: GlazeAuth) {
 	const authBase = `${context.options.prefixes.api}/auth`;
 
 	const handle = async (

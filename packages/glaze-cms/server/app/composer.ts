@@ -10,12 +10,14 @@
 
 import { Elysia } from 'elysia';
 
-import { createAuthPlugin } from '../auth/index.ts';
+import { createAuth, createAuthPlugin } from '../auth/index.ts';
+import { createContentRouter } from '../content/index.ts';
 import { createHealthCheck } from '../health/index.ts';
 import { handleStop } from '../lifecycle/index.ts';
 import { createSecurityHeaders } from '../security/index.ts';
 import { selectAdapter } from './adapter.ts';
 
+import type { Collection } from '../content/index.ts';
 import type { ResolvedGlazeOptions } from '../options/index.ts';
 import type { GlazeApp, GlazeContext } from './context.ts';
 
@@ -35,20 +37,27 @@ interface GlazeManifest {
  * Builds the Glaze app: the decorated Elysia instance with the core chain and graceful shutdown wired.
  *
  * @param context - The resolved Glaze context (db, config, options, logger, runtime).
+ * @param collections - The content collections derived from the developer's schema (empty ⇒ no CRUD).
  * @returns The composed Glaze app, ready to `listen`.
  */
-export function createGlazeApp(context: GlazeContext): GlazeApp {
+export function createGlazeApp(
+	context: GlazeContext,
+	collections: readonly Collection[],
+): GlazeApp {
 	const { options } = context;
 
-	// Include `adapter` only on Node — `exactOptionalPropertyTypes` forbids `adapter: undefined`, and
-	// omitting it selects Elysia's default (Bun) adapter.
 	const adapter = selectAdapter(context.runtime.name);
+
+	// One Better Auth instance, shared by the auth plugin (which mounts its handler) and the content
+	// router's protection macro (which reads sessions) — never two engines.
+	const auth = createAuth(context);
 
 	const app = new Elysia(adapter ? { adapter } : {})
 		.decorate(context)
 		.use(createSecurityHeaders(options.security.headers))
 		.use(createHealthCheck(options.health))
-		.use(createAuthPlugin(context))
+		.use(createAuthPlugin(context, auth))
+		.use(createContentRouter({ context, auth, collections }))
 		.get('/', () => buildManifest(options))
 		.onStop(() => handleStop(context));
 

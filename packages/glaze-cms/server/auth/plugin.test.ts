@@ -33,7 +33,7 @@ function buildContext(db: DatabaseHandle, dialect: Dialect): GlazeContext {
 async function bootAuthApp(db: DatabaseHandle, dialect: Dialect): Promise<GlazeApp> {
 	const context = buildContext(db, dialect);
 	await materializeAuthTables(context);
-	return createGlazeApp(context);
+	return createGlazeApp(context, []);
 }
 
 /** POSTs a JSON body to an auth route. */

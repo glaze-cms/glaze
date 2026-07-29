@@ -1,6 +1,7 @@
 export { resolveOptions } from './resolver.ts';
 
 export type {
+	ContentOptions,
 	CorsOptions,
 	GlazeOptions,
 	HeadersOptions,

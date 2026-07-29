@@ -1,2 +1,4 @@
-export { createCorsPlugin } from './cors.ts';
+export { createCorsResponder } from './cors.ts';
 export { createSecurityHeaders } from './headers.ts';
+
+export type { CorsResponder } from './cors.ts';

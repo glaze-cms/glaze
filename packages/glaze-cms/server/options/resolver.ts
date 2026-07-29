@@ -26,7 +26,7 @@ import type {
  * @returns The fully-resolved options with every field concrete.
  */
 export function resolveOptions(options: GlazeOptions = {}): ResolvedGlazeOptions {
-	const { port, security, prefixes, health, logger } = options;
+	const { port, security, prefixes, health, content, logger } = options;
 
 	const adminPrefix = normalizePath(prefixes?.admin ?? DEFAULT_ADMIN_PREFIX);
 	const apiPrefix = normalizePath(prefixes?.api ?? DEFAULT_API_PREFIX);
@@ -43,6 +43,7 @@ export function resolveOptions(options: GlazeOptions = {}): ResolvedGlazeOptions
 			enabled: health?.enabled ?? true,
 			path: normalizePath(health?.path ?? DEFAULT_HEALTH_PATH),
 		},
+		content: { exclude: content?.exclude ?? [] },
 		logger,
 	};
 }
