@@ -96,6 +96,43 @@ async function createPostsTable(db: DatabaseHandle): Promise<void> {
 }
 
 /**
+ * Writes a `posts` schema whose columns back a UNIQUE constraint (`email`) and a foreign key
+ * (`author_id`). The FK lives only in the DDL (see {@link createConstraintTables}); the module keeps
+ * `authorId` a plain column so the generated body schema accepts it.
+ *
+ * @param dir - The directory to write into.
+ * @param dialect - The dialect whose table helper/import to emit.
+ * @returns The written file path.
+ */
+function writeConstraintSchema(dir: string, dialect: Dialect): string {
+	const path = join(dir, 'posts.mjs');
+	const core = dialect === 'postgres' ? 'pg-core' : 'sqlite-core';
+	const table = dialect === 'postgres' ? 'pgTable' : 'sqliteTable';
+	writeFileSync(
+		path,
+		`import { ${table}, integer, text } from 'drizzle-orm/${core}';\n` +
+			`export const posts = ${table}('posts', { id: integer('id').primaryKey(), email: text('email'), authorId: integer('author_id') });\n`,
+	);
+	return path;
+}
+
+/**
+ * Provisions the constraint fixtures: an `authors` parent plus a `posts` table with a UNIQUE `email` and
+ * a FK `author_id → authors(id)`. Enables SQLite FK enforcement for the test (off by default in the
+ * seam), so a FK violation actually throws on both dialects.
+ *
+ * @param db - The database handle.
+ * @param dialect - The active dialect.
+ */
+async function createConstraintTables(db: DatabaseHandle, dialect: Dialect): Promise<void> {
+	if (dialect === 'sqlite') await db.raw('PRAGMA foreign_keys = ON');
+	await db.raw('create table authors (id integer primary key)');
+	await db.raw(
+		'create table posts (id integer primary key, email text unique, author_id integer references authors(id))',
+	);
+}
+
+/**
  * Composes a content router over a freshly written `posts` schema and provisioned table.
  *
  * @param db - The database handle.
@@ -409,3 +446,42 @@ matrixTest('scopes CORS to content routes, never sibling scopes', async ({ db, d
 		rmSync(dir, { recursive: true, force: true });
 	}
 });
+
+matrixTest(
+	'maps real DB constraint violations to typed 4xx envelopes, not 500s',
+	async ({ db, dialect }) => {
+		const dir = mkdtempSync(TEMP_FIXTURE_PREFIX);
+		try {
+			await createConstraintTables(db, dialect);
+			const context = buildContext(db, dialect, writeConstraintSchema(dir, dialect));
+			const collections = await loadCollections(context.config);
+			const router = createContentRouter({ context, auth: authStub(SESSION), collections });
+			const post = (body: unknown) => send(router, 'POST', '/api/posts', body);
+
+			// A valid create still succeeds (no false positives) and seeds the conflicting row.
+			expect((await post({ id: 1, email: 'a@b.com' })).status).toBe(201);
+
+			// Duplicate primary key → 409 CONFLICT, naming the pk column.
+			const dupPk = await post({ id: 1, email: 'z@z.com' });
+			expect(dupPk.status).toBe(409);
+			const dupPkEnv = await toEnvelope(dupPk);
+			expect(dupPkEnv.success).toBe(false);
+			expect(dupPkEnv.error?.code).toBe('CONFLICT');
+			expect(dupPkEnv.error?.fields?.[0]?.path).toBe('id');
+
+			// Duplicate unique value → 409 CONFLICT, naming the unique column.
+			const dupUnique = await post({ id: 2, email: 'a@b.com' });
+			expect(dupUnique.status).toBe(409);
+			const dupUniqueEnv = await toEnvelope(dupUnique);
+			expect(dupUniqueEnv.error?.code).toBe('CONFLICT');
+			expect(dupUniqueEnv.error?.fields?.[0]?.path).toBe('email');
+
+			// Missing FK parent → 409 FOREIGN_KEY.
+			const badFk = await post({ id: 3, email: 'f@k.com', authorId: 999 });
+			expect(badFk.status).toBe(409);
+			expect((await toEnvelope(badFk)).error?.code).toBe('FOREIGN_KEY');
+		} finally {
+			rmSync(dir, { recursive: true, force: true });
+		}
+	},
+);

@@ -3,6 +3,8 @@ import { getTableConfig, PgTable, pgSchema } from 'drizzle-orm/pg-core';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 
+import { classifyPostgresConstraint } from './errors.ts';
+
 import type {
 	CreateDatabaseOptions,
 	DatabaseHandle,
@@ -164,4 +166,5 @@ async function createDatabase(options: CreateDatabaseOptions): Promise<DatabaseH
 export const postgresDialect: DialectAdapter = {
 	dialect: 'postgres',
 	createDatabase,
+	classifyConstraint: classifyPostgresConstraint,
 };

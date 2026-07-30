@@ -1,3 +1,5 @@
+import type { ConstraintClassifier } from './errors.ts';
+
 /** The database dialects Glaze supports. */
 export type Dialect = 'postgres' | 'sqlite';
 
@@ -92,4 +94,10 @@ export interface DialectAdapter {
 	 * @returns A live database handle.
 	 */
 	createDatabase(options: CreateDatabaseOptions): Promise<DatabaseHandle>;
+	/**
+	 * Classifies a driver error thrown by a write as a constraint violation (or `null` when it is not
+	 * one). Stateless and dialect-specific — the one place the request path resolves a Postgres vs
+	 * SQLite error shape, so callers stay dialect-agnostic.
+	 */
+	readonly classifyConstraint: ConstraintClassifier;
 }

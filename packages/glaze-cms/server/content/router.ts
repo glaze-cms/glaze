@@ -12,6 +12,8 @@
 
 import { Elysia } from 'elysia';
 
+import { resolveDialect } from '#dialect';
+
 import { createAuthMacro } from '../auth/index.ts';
 import { buildErrorResponse, buildSuccessResponse } from '../responses/index.ts';
 import { createCorsResponder } from '../security/index.ts';
@@ -27,7 +29,9 @@ import {
 } from './handlers.ts';
 import { buildCollectionSchemas } from './validation.ts';
 
+import type { ConstraintClassifier, ConstraintKind, ConstraintViolation } from '#dialect';
 import type { Logger } from '#logger';
+import type { GlazeErrorCode } from '#types';
 import type { GlazeContext } from '../app/context.ts';
 import type { SessionProvider } from '../auth/index.ts';
 import type { CorsResponder } from '../security/index.ts';
@@ -102,6 +106,61 @@ function toValidationFields(error: unknown): { path: string; message: string }[]
 	return fields;
 }
 
+/** How each constraint-violation kind maps to a typed HTTP response (status + code + messages). */
+const CONSTRAINT_RESPONSES: Record<
+	ConstraintKind,
+	{ status: number; code: GlazeErrorCode; message: string; fieldMessage: string }
+> = {
+	unique: {
+		status: 409,
+		code: 'CONFLICT',
+		message: 'A record with these values already exists',
+		fieldMessage: 'must be unique',
+	},
+	foreign_key: {
+		status: 409,
+		code: 'FOREIGN_KEY',
+		message: 'A referenced record does not exist or is still in use',
+		fieldMessage: 'references a missing record',
+	},
+	not_null: {
+		status: 422,
+		code: 'NOT_NULL',
+		message: 'A required field is missing',
+		fieldMessage: 'is required',
+	},
+	check: {
+		status: 422,
+		code: 'CHECK',
+		message: 'A value violates a database constraint',
+		fieldMessage: 'failed a constraint',
+	},
+	unknown: {
+		status: 409,
+		code: 'CONFLICT',
+		message: 'The request conflicts with a database constraint',
+		fieldMessage: 'violates a constraint',
+	},
+};
+
+/**
+ * Maps a classified constraint violation to its typed 4xx envelope, naming the offending column(s) in
+ * `fields` when the driver reported them.
+ *
+ * @param violation - The dialect-agnostic violation from the classifier.
+ * @returns The Elysia status response carrying the failure envelope.
+ */
+function mapConstraintViolation(violation: ConstraintViolation) {
+	const spec = CONSTRAINT_RESPONSES[violation.kind];
+	const fields = violation.columns.map((column) => ({ path: column, message: spec.fieldMessage }));
+	return buildErrorResponse(
+		spec.status,
+		spec.code,
+		spec.message,
+		fields.length ? fields : undefined,
+	);
+}
+
 /**
  * Filters the collections to those actually servable as CRUD, warning (once each) about any dropped for
  * an unsafe name or a reserved-route collision. Dropped tables are still managed by convergence.
@@ -150,15 +209,21 @@ function servableCollections(
  * @param auth - The shared Better Auth instance.
  * @param responder - The content CORS responder, or `null` for deny-by-default.
  * @param logger - The logger, for unexpected content-route errors.
+ * @param classifyConstraint - The dialect's constraint-error classifier (maps driver throws to 4xx).
  * @returns The base Elysia instance, macro-enabled.
  */
-function createContentApp(auth: SessionProvider, responder: CorsResponder | null, logger: Logger) {
+function createContentApp(
+	auth: SessionProvider,
+	responder: CorsResponder | null,
+	logger: Logger,
+	classifyConstraint: ConstraintClassifier,
+) {
 	const app = new Elysia({ name: 'glaze.content' })
 		.use(createAuthMacro(auth))
 		// Keep EVERY content-route error in the envelope: body-schema failures → 422, malformed JSON → 400,
-		// genuine not-found passes through to Elysia's 404, and anything else (a thrown handler / driver
-		// error) is logged and enveloped as 500 rather than leaking Elysia's default shape. (LEA-6 will
-		// refine the 500 fallback into typed 4xx for known DB-constraint violations.)
+		// genuine not-found passes through to Elysia's 404, a DB constraint violation → its typed 4xx, and
+		// anything else (an unexpected throw) is logged and enveloped as 500 rather than leaking Elysia's
+		// default shape.
 		.onError(({ code, error }) => {
 			if (code === 'VALIDATION') {
 				return buildErrorResponse(
@@ -171,6 +236,12 @@ function createContentApp(auth: SessionProvider, responder: CorsResponder | null
 			if (code === 'PARSE')
 				return buildErrorResponse(400, 'VALIDATION', 'Request body is not valid JSON');
 			if (code === 'NOT_FOUND') return undefined;
+			const violation = classifyConstraint(error);
+			if (violation) {
+				// A client error (they sent a value the schema-level checks can't catch), not an incident.
+				logger.debug(`Content constraint violation (${violation.kind}) mapped to a 4xx response`);
+				return mapConstraintViolation(violation);
+			}
 			const detail =
 				error instanceof Error ? (error.stack ?? error.message) : JSON.stringify(error);
 			logger.error(`Unhandled content-route error: ${detail}`);
@@ -283,8 +354,9 @@ export function createContentRouter({
 	auth,
 	collections,
 }: ContentRouterInput): ContentApp {
-	const { options, logger } = context;
+	const { config, options, logger } = context;
 	const responder = createCorsResponder(options.security.cors);
+	const classifyConstraint = resolveDialect(config.dialect).classifyConstraint;
 	const served = servableCollections(
 		collections,
 		new Set(options.content.exclude),
@@ -292,7 +364,7 @@ export function createContentRouter({
 		logger,
 	);
 
-	const app = createContentApp(auth, responder, logger);
+	const app = createContentApp(auth, responder, logger, classifyConstraint);
 	const db = context.db.db as ContentDb;
 	for (const collection of served) {
 		registerCollectionRoutes(app, collection, db, options.prefixes.api, responder);

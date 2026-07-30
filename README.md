@@ -52,13 +52,14 @@ Glaze takes a different line:
 | Auth — Better Auth (email/password cookie session **+** bearer token)            | ✅ Working                                              |
 | Auto-generated content CRUD API from your Drizzle tables                         | ✅ Working                                              |
 | Request validation (TypeBox from your schema) + `{success,data,error}` responses | ✅ Working                                              |
+| Typed 4xx for DB constraint violations (unique/FK/not-null/check, PG + SQLite)   | ✅ Working                                              |
 | API reference docs — Scalar / Swagger at `/openapi`                              | ✅ Working                                              |
 | Environment validation at boot (fails fast with fix hints)                       | ✅ Working                                              |
 | Matrix test harness (`{Bun, Node} × {Postgres, SQLite}`)                         | ✅ Working                                              |
 | Solo workflow                                                                    | ✅ Working · Team / audit workflows designed, not wired |
 | Admin UI (React)                                                                 | 🚧 Planned                                              |
 | Real-time collaboration (WebSocket surfacing of schema decisions)                | 🚧 Planned                                              |
-| Typed 4xx error mapping for DB constraints · `bun create glaze` · npm publish    | 🚧 Planned ([tracked](#roadmap))                        |
+| `bun create glaze` onboarding · npm publish                                      | 🚧 Planned ([tracked](#roadmap))                        |
 
 ## Requirements
 
@@ -132,8 +133,10 @@ curl localhost:4000/api/posts -b cookies.txt
 Per collection you get: `GET /api/posts` (list, `?limit=&offset=`), `POST /api/posts` (create),
 and — when the table has a single-column primary key — `GET|PATCH|DELETE /api/posts/:id`. Every content
 route requires a valid session; request bodies are validated against your schema (TypeBox) and unknown
-fields are dropped; every response is a `{ success, data, error }` envelope. Opt a table out of being
-_served_ (while convergence still manages it) with `glaze({ content: { exclude: ['internal_join_table'] } })`.
+fields are dropped; every response is a `{ success, data, error }` envelope. Database constraint
+violations that validation can't pre-empt — a duplicate key, a missing foreign key — come back as a
+typed 4xx (`CONFLICT` / `FOREIGN_KEY` / …), not a 500. Opt a table out of being _served_ (while
+convergence still manages it) with `glaze({ content: { exclude: ['internal_join_table'] } })`.
 
 **Explore it.** Interactive API reference docs are generated from your schema at
 [`/openapi`](http://localhost:4000/openapi) (Scalar by default; `glaze({ docs: { provider: 'swagger' } })`
@@ -201,9 +204,8 @@ Elysia 1.4 · Drizzle ORM + drizzle-kit (RC) · Better Auth · `postgres.js` · 
 ## Roadmap
 
 Deferred work and review follow-ups are tracked as issues (the Admin origin + content model, filtering/
-sorting/relations, roles + draft/publish, request validation via `drizzle-typebox`, typed 4xx error
-mapping, rate limiting, and the WebSocket collaboration layer). The developer-origin CRUD here is the
-substrate the rest builds on.
+sorting/relations, roles + draft/publish, content-API rate limiting, and the WebSocket collaboration
+layer). The developer-origin CRUD here is the substrate the rest builds on.
 
 ## License
 

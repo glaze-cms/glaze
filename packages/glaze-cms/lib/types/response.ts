@@ -10,6 +10,10 @@ export type GlazeErrorCode =
 	| 'NOT_FOUND'
 	| 'INVALID_ID'
 	| 'UNAUTHORIZED'
+	| 'CONFLICT'
+	| 'FOREIGN_KEY'
+	| 'NOT_NULL'
+	| 'CHECK'
 	| 'INTERNAL';
 
 /** A structured API error: a translatable code, a human message, and optional per-field detail. */
@@ -28,9 +32,10 @@ export interface GlazeError {
  *
  * @example
  * ```ts
- * const res: ApiResponse<Post> = await (await fetch('/api/posts/1')).json();
+ * const res: ApiResponse<Post> = await (await fetch('/api/posts', { method: 'POST', body }))
+ * 	.json();
  * if (res.success) console.log(res.data.title);
- * else console.error(res.error.code); // 'NOT_FOUND' | …
+ * else if (res.error.code === 'CONFLICT') console.error(res.error.fields); // e.g. title must be unique
  * ```
  */
 export type ApiResponse<T> =

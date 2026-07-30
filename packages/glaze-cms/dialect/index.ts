@@ -3,6 +3,7 @@ import { sqliteDialect } from './sqlite.ts';
 
 import type { Dialect, DialectAdapter } from './types.ts';
 
+export type { ConstraintClassifier, ConstraintKind, ConstraintViolation } from './errors.ts';
 export type {
 	CreateDatabaseOptions,
 	DatabaseHandle,

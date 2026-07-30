@@ -2,6 +2,7 @@ import { is } from 'drizzle-orm';
 import { getTableConfig, SQLiteTable } from 'drizzle-orm/sqlite-core';
 
 import { resolveRuntime } from '../runtime/index.ts';
+import { classifySqliteConstraint } from './errors.ts';
 
 import type {
 	CreateDatabaseOptions,
@@ -208,4 +209,5 @@ async function createDatabase(options: CreateDatabaseOptions): Promise<DatabaseH
 export const sqliteDialect: DialectAdapter = {
 	dialect: 'sqlite',
 	createDatabase,
+	classifyConstraint: classifySqliteConstraint,
 };
