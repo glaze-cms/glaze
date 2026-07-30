@@ -6,6 +6,7 @@
  */
 
 import type { LoggerOptions } from '#logger';
+import type { ElysiaOpenAPIConfig } from '@elysiajs/openapi';
 
 /** CORS for the external content API (never applied to the same-origin admin — see CLAUDE.md §10). */
 export interface CorsOptions {
@@ -47,6 +48,22 @@ export interface HealthOptions {
 	readonly path?: string;
 }
 
+/** Interactive API reference docs (Scalar / Swagger), generated from your content routes. */
+export interface APIDocsOptions {
+	/** Whether the docs UI and OpenAPI spec are served. @default true */
+	readonly enabled?: boolean;
+	/** Mount path for the docs UI (the spec is served beneath it). @default '/openapi' */
+	readonly path?: string;
+	/** Which reference UI to render. @default 'scalar' */
+	readonly provider?: 'scalar' | 'swagger';
+	/** OpenAPI document metadata — title, description, version, servers, tags, security schemes. */
+	readonly documentation?: ElysiaOpenAPIConfig['documentation'];
+	/** Scalar UI options — theme, dark mode, layout, and the like. */
+	readonly scalar?: ElysiaOpenAPIConfig['scalar'];
+	/** Swagger UI options. */
+	readonly swagger?: ElysiaOpenAPIConfig['swagger'];
+}
+
 /** Content-API options — which of the schema's tables get generated CRUD routes. */
 export interface ContentOptions {
 	/**
@@ -69,6 +86,8 @@ export interface GlazeOptions {
 	readonly health?: HealthOptions;
 	/** Content-API configuration (which tables get CRUD routes). */
 	readonly content?: ContentOptions;
+	/** API reference docs (Scalar/Swagger) configuration. */
+	readonly docs?: APIDocsOptions;
 	/** Logger configuration (forwarded to the Glaze logger). */
 	readonly logger?: LoggerOptions;
 }
@@ -98,6 +117,15 @@ export interface ResolvedGlazeOptions {
 	readonly health: { readonly enabled: boolean; readonly path: string };
 	/** Resolved content config — the collection names to exclude from CRUD. */
 	readonly content: { readonly exclude: readonly string[] };
+	/** Resolved API-docs config (enabled/path/provider concrete; UI + metadata passed through). */
+	readonly docs: {
+		readonly enabled: boolean;
+		readonly path: string;
+		readonly provider: 'scalar' | 'swagger';
+		readonly documentation: APIDocsOptions['documentation'];
+		readonly scalar: APIDocsOptions['scalar'];
+		readonly swagger: APIDocsOptions['swagger'];
+	};
 	/** Logger configuration, or `undefined`. */
 	readonly logger: LoggerOptions | undefined;
 }

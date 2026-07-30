@@ -56,6 +56,7 @@
 	"dependencies": {
 		"@elysiajs/cors": "latest",
 		"@elysiajs/node": "latest",
+		"@elysiajs/openapi": "^1.4.15",
 		"@sinclair/typebox": "^0.34.0",
 		"better-auth": "^1.6.24",
 		"better-sqlite3": "latest",

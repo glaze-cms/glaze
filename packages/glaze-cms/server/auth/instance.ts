@@ -12,6 +12,7 @@
 
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
+import { openAPI } from 'better-auth/plugins';
 import { bearer } from 'better-auth/plugins/bearer';
 
 import { resolveAuthProvider } from './provider.ts';
@@ -49,7 +50,10 @@ export function createAuth(context: GlazeContext) {
 		}),
 		emailAndPassword: { enabled: true },
 		session: { cookieCache: { enabled: true } },
-		plugins: [bearer()],
+		// `openAPI` serves Better Auth's own reference (Scalar) at `{apiPrefix}/auth/reference` — the auth
+		// routes are a schemaless catch-all in Glaze's content spec, so Better Auth documents them itself.
+		// Gated on the docs toggle so `docs.enabled: false` turns off every docs surface together.
+		plugins: options.docs.enabled ? [bearer(), openAPI()] : [bearer()],
 		rateLimit: { enabled: true },
 		// The rate limiter reads the client IP from this header; `./ip.ts` overwrites it with the
 		// trusted peer address so a client cannot spoof its own bucket.

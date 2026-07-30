@@ -45,19 +45,20 @@ Glaze takes a different line:
 
 ## Status
 
-| Area                                                                  | State                                                   |
-| --------------------------------------------------------------------- | ------------------------------------------------------- |
-| HTTP API server (Elysia, Bun + Node)                                  | ✅ Working                                              |
-| Convergence at boot (drizzle-kit SDK, PG + SQLite)                    | ✅ Working                                              |
-| Auth — Better Auth (email/password cookie session **+** bearer token) | ✅ Working                                              |
-| Auto-generated content CRUD API from your Drizzle tables              | ✅ Working                                              |
-| Environment validation at boot (fails fast with fix hints)            | ✅ Working                                              |
-| Matrix test harness (`{Bun, Node} × {Postgres, SQLite}`)              | ✅ Working                                              |
-| Solo workflow                                                         | ✅ Working · Team / audit workflows designed, not wired |
-| Admin UI (React)                                                      | 🚧 Planned                                              |
-| Real-time collaboration (WebSocket surfacing of schema decisions)     | 🚧 Planned                                              |
-| Request validation (`drizzle-typebox`), typed 4xx error mapping       | 🚧 Planned ([tracked](#roadmap))                        |
-| `bun create glaze` onboarding · npm publish                           | 🚧 Planned                                              |
+| Area                                                                             | State                                                   |
+| -------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| HTTP API server (Elysia, Bun + Node)                                             | ✅ Working                                              |
+| Convergence at boot (drizzle-kit SDK, PG + SQLite)                               | ✅ Working                                              |
+| Auth — Better Auth (email/password cookie session **+** bearer token)            | ✅ Working                                              |
+| Auto-generated content CRUD API from your Drizzle tables                         | ✅ Working                                              |
+| Request validation (TypeBox from your schema) + `{success,data,error}` responses | ✅ Working                                              |
+| API reference docs — Scalar / Swagger at `/openapi`                              | ✅ Working                                              |
+| Environment validation at boot (fails fast with fix hints)                       | ✅ Working                                              |
+| Matrix test harness (`{Bun, Node} × {Postgres, SQLite}`)                         | ✅ Working                                              |
+| Solo workflow                                                                    | ✅ Working · Team / audit workflows designed, not wired |
+| Admin UI (React)                                                                 | 🚧 Planned                                              |
+| Real-time collaboration (WebSocket surfacing of schema decisions)                | 🚧 Planned                                              |
+| Typed 4xx error mapping for DB constraints · `bun create glaze` · npm publish    | 🚧 Planned ([tracked](#roadmap))                        |
 
 ## Requirements
 
@@ -130,8 +131,13 @@ curl localhost:4000/api/posts -b cookies.txt
 
 Per collection you get: `GET /api/posts` (list, `?limit=&offset=`), `POST /api/posts` (create),
 and — when the table has a single-column primary key — `GET|PATCH|DELETE /api/posts/:id`. Every content
-route requires a valid session; unknown body fields are dropped. Opt a table out of being _served_
-(while convergence still manages it) with `glaze({ content: { exclude: ['internal_join_table'] } })`.
+route requires a valid session; request bodies are validated against your schema (TypeBox) and unknown
+fields are dropped; every response is a `{ success, data, error }` envelope. Opt a table out of being
+_served_ (while convergence still manages it) with `glaze({ content: { exclude: ['internal_join_table'] } })`.
+
+**Explore it.** Interactive API reference docs are generated from your schema at
+[`/openapi`](http://localhost:4000/openapi) (Scalar by default; `glaze({ docs: { provider: 'swagger' } })`
+for Swagger UI). The auth API has its own reference at `/api/auth/reference`.
 
 > **SQLite variant:** set `dialect: 'sqlite'`, `connection: './data.db'` (or `':memory:'`), and import
 > your table helpers from `drizzle-orm/sqlite-core`. Everything else is identical — the matrix tests

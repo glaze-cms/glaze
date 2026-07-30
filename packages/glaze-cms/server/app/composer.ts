@@ -12,6 +12,7 @@ import { Elysia } from 'elysia';
 
 import { createAuth, createAuthPlugin } from '../auth/index.ts';
 import { createContentRouter } from '../content/index.ts';
+import { createDocsPlugin } from '../docs/index.ts';
 import { createHealthCheck } from '../health/index.ts';
 import { handleStop } from '../lifecycle/index.ts';
 import { createSecurityHeaders } from '../security/index.ts';
@@ -58,6 +59,7 @@ export function createGlazeApp(
 		.use(createHealthCheck(options.health))
 		.use(createAuthPlugin(context, auth))
 		.use(createContentRouter({ context, auth, collections }))
+		.use(createDocsPlugin(options.docs, options.prefixes.api))
 		.get('/', () => buildManifest(options))
 		.onStop(() => handleStop(context));
 

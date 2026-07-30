@@ -7,6 +7,7 @@ import {
 	DEFAULT_ADMIN_PREFIX,
 	DEFAULT_API_PREFIX,
 	DEFAULT_CSP,
+	DEFAULT_DOCS_PATH,
 	DEFAULT_HEALTH_PATH,
 	DEFAULT_PORT,
 } from '#consts';
@@ -26,7 +27,7 @@ import type {
  * @returns The fully-resolved options with every field concrete.
  */
 export function resolveOptions(options: GlazeOptions = {}): ResolvedGlazeOptions {
-	const { port, security, prefixes, health, content, logger } = options;
+	const { port, security, prefixes, health, content, docs, logger } = options;
 
 	const adminPrefix = normalizePath(prefixes?.admin ?? DEFAULT_ADMIN_PREFIX);
 	const apiPrefix = normalizePath(prefixes?.api ?? DEFAULT_API_PREFIX);
@@ -44,6 +45,14 @@ export function resolveOptions(options: GlazeOptions = {}): ResolvedGlazeOptions
 			path: normalizePath(health?.path ?? DEFAULT_HEALTH_PATH),
 		},
 		content: { exclude: content?.exclude ?? [] },
+		docs: {
+			enabled: docs?.enabled ?? true,
+			path: normalizePath(docs?.path ?? DEFAULT_DOCS_PATH),
+			provider: docs?.provider ?? 'scalar',
+			documentation: docs?.documentation,
+			scalar: docs?.scalar,
+			swagger: docs?.swagger,
+		},
 		logger,
 	};
 }

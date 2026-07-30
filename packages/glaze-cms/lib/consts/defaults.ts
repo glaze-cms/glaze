@@ -12,6 +12,9 @@ export const DEFAULT_API_PREFIX = '/api';
 /** Default health route path. */
 export const DEFAULT_HEALTH_PATH = '/_health';
 
+/** Default mount path for the API reference docs (Scalar/Swagger). */
+export const DEFAULT_DOCS_PATH = '/openapi';
+
 /** Default HTTP port the server listens on when none is configured or found in the environment. */
 export const DEFAULT_PORT = 4000;
 
