@@ -63,8 +63,8 @@ Glaze takes a different line:
 
 ## Requirements
 
-- **[Bun](https://bun.sh) 1.3+** (primary), or **Node 22+**.
-- **Postgres** (via `postgres.js`) or **SQLite** (`bun:sqlite` on Bun, `better-sqlite3` on Node).
+- **[Bun](https://bun.sh) 1.4+** (primary), or **Node 24+**.
+- **Postgres** (via `postgres.js`) or **SQLite** (`bun:sqlite` on Bun, `node:sqlite` on Node).
 
 ## Quickstart
 
@@ -167,7 +167,7 @@ Complexity lives deep in the tree; entry points read like a table of contents. T
 once at the composition root and injected inward, so the logic never branches on environment:
 
 - **Runtime seam — Bun vs Node.** Each runtime uses its native-fast primitive (`Bun.file`/`Bun.serve`/
-  `bun:sqlite` vs `node:fs`/`@elysiajs/node`/`better-sqlite3`). Node is a quiet capability that removes an
+  `bun:sqlite` vs `node:fs`/`@elysia/node`/`node:sqlite`). Node is a quiet capability that removes an
   adoption objection — not a marketed feature.
 - **Dialect seam — Postgres vs SQLite.** Kept thin by **delegating dialect-correct DDL to `drizzle-kit`**
   (including SQLite's table-rebuild dance). Glaze orchestrates the SDK and reads its typed JSON envelopes;
@@ -198,8 +198,8 @@ behavioral spec is expanded across the whole matrix rather than duplicated.
 
 ## Tech stack
 
-Elysia 1.4 · Drizzle ORM + drizzle-kit (RC) · Better Auth · `postgres.js` · `bun:sqlite` /
-`better-sqlite3` · TypeBox · Pino · oxlint + oxfmt + TypeScript.
+Elysia 2 · Drizzle ORM + drizzle-kit (RC) · Better Auth · `postgres.js` · `bun:sqlite` /
+`node:sqlite` · TypeBox · Pino · oxlint + oxfmt + TypeScript.
 
 ## Roadmap
 

@@ -92,23 +92,18 @@ test('serves the docs UI and an OpenAPI spec covering the content routes', async
 	}
 });
 
-test('relaxes CSP only on the docs surfaces, never globally', async () => {
+test('applies the strict global CSP consistently, including the docs route', async () => {
 	const dir = mkdtempSync(TEMP_FIXTURE_PREFIX);
 	try {
 		const app = await buildApp(dir, {});
 
-		const docsCsp = (await get(app, '/openapi')).headers.get('content-security-policy') ?? '';
-		expect(docsCsp).toContain('cdn.jsdelivr.net');
-
-		// Better Auth's own reference is a CDN Scalar page too — it gets the same relaxation.
-		const authRefCsp =
-			(await get(app, '/api/auth/reference')).headers.get('content-security-policy') ?? '';
-		expect(authRefCsp).toContain('cdn.jsdelivr.net');
-
-		// A normal route keeps the locked baseline — no leak.
+		// The locked baseline is the default on every response — a normal route and the docs page alike.
 		const rootCsp = (await get(app, '/')).headers.get('content-security-policy') ?? '';
 		expect(rootCsp).toContain("default-src 'self'");
-		expect(rootCsp.includes('cdn.jsdelivr.net')).toBe(false);
+
+		const docs = await get(app, '/openapi');
+		expect(docs.status).toBe(200);
+		expect(docs.headers.get('content-security-policy') ?? '').toContain("default-src 'self'");
 	} finally {
 		rmSync(dir, { recursive: true, force: true });
 	}

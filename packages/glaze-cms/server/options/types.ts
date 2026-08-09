@@ -6,7 +6,7 @@
  */
 
 import type { LoggerOptions } from '#logger';
-import type { ElysiaOpenAPIConfig } from '@elysiajs/openapi';
+import type { ElysiaOpenAPIConfig } from '@elysia/openapi';
 
 /** CORS for the external content API (never applied to the same-origin admin — see CLAUDE.md §10). */
 export interface CorsOptions {

@@ -14,10 +14,11 @@ import { forwardTrustedIp, type PeerAddressSource } from './ip.ts';
 
 import type { GlazeContext } from '../app/context.ts';
 import type { GlazeAuth } from './instance.ts';
+import type { HTTPHeaders } from 'elysia';
 
 /** Elysia's response-mutation bag — the subset the auth handler reads and clears. */
 interface ResponseSet {
-	headers: Record<string, string | number>;
+	headers: HTTPHeaders;
 }
 
 /**

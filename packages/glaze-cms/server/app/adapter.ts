@@ -1,9 +1,9 @@
 /**
- * The HTTP-server adapter seam. Elysia owns this seam (CLAUDE.md §5): the `@elysiajs/node` adapter runs
- * the app on Node, while Bun uses Elysia's default adapter. Resolved from the runtime seam's name.
+ * The HTTP-server adapter seam. Elysia owns this seam (CLAUDE.md §5): the `@elysia/node` adapter runs the
+ * app on Node, while Bun uses Elysia's default adapter. Resolved from the runtime seam's name.
  */
 
-import { node } from '@elysiajs/node';
+import { node } from '@elysia/node';
 
 import type { RuntimeName } from '#runtime';
 

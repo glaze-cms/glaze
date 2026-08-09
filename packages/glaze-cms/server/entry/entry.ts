@@ -30,7 +30,7 @@ import type { GlazeOptions, ResolvedGlazeOptions } from '../options/index.ts';
  */
 function installShutdownHandlers(app: GlazeApp): void {
 	const shutdown = (): void => {
-		void app.stop().finally(() => {
+		void Promise.resolve(app.stop()).finally(() => {
 			process.exit(0);
 		});
 	};

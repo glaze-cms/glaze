@@ -32,7 +32,9 @@ export interface SessionProvider {
 export function createAuthMacro(auth: SessionProvider) {
 	return new Elysia({ name: 'glaze.auth.macro' }).macro({
 		auth: {
-			async resolve({ request }) {
+			// A macro `derive` runs on beforeHandle: returning a `status(...)` short-circuits (the 401),
+			// returning an object injects its keys (`user`/`session`) into the route context.
+			async derive({ request }) {
 				const result = await auth.api.getSession({ headers: request.headers });
 				if (!result) return buildErrorResponse(401, 'UNAUTHORIZED', 'Authentication required');
 				return { user: result.user, session: result.session };

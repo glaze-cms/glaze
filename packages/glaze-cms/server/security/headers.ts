@@ -10,23 +10,17 @@ import { Elysia } from 'elysia';
 import type { ResolvedHeadersOptions } from '../options/index.ts';
 
 /**
- * Builds the security-headers plugin, stamping the resolved headers onto **every** response.
+ * Builds the security-headers plugin, setting the resolved headers as defaults on **every** response.
  *
- * Uses `onRequest` (not `onAfterHandle`) deliberately: `onAfterHandle` runs only on the success path,
- * so a 404, a thrown error, or a validation failure would ship with no headers — exactly the responses
- * attackers probe. Setting `set.headers` at request start applies to whatever response is produced.
+ * Uses `.headers()` (server-level default response headers), not a lifecycle hook: it applies across the
+ * whole app tree — including routes inside `.use`d plugins, error/404 responses, and the docs routes — and
+ * a route may still override any individual header (e.g. content CORS adds its own).
  *
  * @param options - The resolved header configuration (CSP directives + HSTS flag).
- * @returns An Elysia plugin that stamps the security headers onto all responses.
+ * @returns An Elysia plugin that sets the security headers as defaults on all responses.
  */
 export function createSecurityHeaders(options: ResolvedHeadersOptions) {
-	const headers = buildHeaders(options);
-
-	return new Elysia({ name: 'glaze.security-headers' }).onRequest(({ set }) => {
-		for (const [name, value] of Object.entries(headers)) {
-			set.headers[name] = value;
-		}
-	});
+	return new Elysia({ name: 'glaze.security-headers' }).headers(buildHeaders(options));
 }
 
 /**

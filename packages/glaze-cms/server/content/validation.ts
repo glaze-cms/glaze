@@ -1,28 +1,61 @@
 /**
- * Per-collection TypeBox request schemas, generated from the Drizzle table so validation tracks the
- * schema automatically (no hand-authored, drift-prone schemas per collection).
+ * Per-collection TypeBox request schemas, generated from the Drizzle table's columns so validation
+ * tracks the schema automatically (no hand-authored, drift-prone schemas per collection).
  *
- * The generator is bound to Elysia's OWN TypeBox instance via `createSchemaFactory({ typeboxInstance: t })`
- * so the schemas share one Kind registry — Elysia's validator silently ignores a schema built by a
- * different `@sinclair/typebox` copy (it then treats routes as unvalidated). It uses drizzle's `-legacy`
- * entrypoint, which targets `@sinclair/typebox` 0.34 (what Elysia 1.4 uses); `drizzle-orm/typebox`
- * targets the incompatible bare `typebox` v1. (Flip both when the Elysia 2 swap moves to TypeBox v1.)
+ * Schemas are built with Elysia's OWN TypeBox instance (`t`), so they share its Kind registry — a schema
+ * built by a different TypeBox copy is silently ignored by Elysia's validator (routes then run
+ * unvalidated). A generic column→`t` mapper is used rather than `drizzle-orm/typebox`: that generator is
+ * pinned to a TypeBox major line that Elysia's bundled TypeBox does not match, so its schemas would not
+ * share the registry. Keep the mapper if you ever revisit `drizzle-orm/typebox` — swapping back is a
+ * change local to this file.
  */
 
-import { createSchemaFactory } from 'drizzle-orm/typebox-legacy';
 import { t } from 'elysia';
 
 import type { Collection } from './types.ts';
-import type { TSchema } from '@sinclair/typebox';
-
-const { createInsertSchema, createUpdateSchema } = createSchemaFactory({ typeboxInstance: t });
+import type { Column } from 'drizzle-orm';
+import type { AnySchema } from 'elysia';
 
 /** The request schemas for a collection. */
 export interface CollectionSchemas {
 	/** POST body — NOT-NULL columns without a default are required; defaulted/generated ones optional. */
-	readonly body: TSchema;
+	readonly body: AnySchema;
 	/** PATCH body — every column optional, with the primary key removed (it can never be reassigned). */
-	readonly update: TSchema;
+	readonly update: AnySchema;
+}
+
+/**
+ * Maps a Drizzle column's JS-level data type to a TypeBox schema. Exotic types (date/json/buffer/…) fall
+ * back to `t.Unknown()` — the property still participates in the object shape (so unknown fields are
+ * stripped), while the database remains the arbiter of the value.
+ *
+ * @param column - The Drizzle column.
+ * @returns The TypeBox schema for the column's value.
+ */
+function columnSchema(column: Column): AnySchema {
+	switch (column.dataType) {
+		case 'string':
+			return t.String();
+		case 'number':
+			return t.Number();
+		case 'boolean':
+			return t.Boolean();
+		case 'bigint':
+			return t.Integer();
+		default:
+			return t.Unknown();
+	}
+}
+
+/**
+ * Whether a column is optional in an insert body: a column with a default (or generated) value, or a
+ * nullable one, need not be supplied.
+ *
+ * @param column - The Drizzle column.
+ * @returns `true` when the column may be omitted from a create request.
+ */
+function isInsertOptional(column: Column): boolean {
+	return column.hasDefault || !column.notNull;
 }
 
 /**
@@ -32,13 +65,18 @@ export interface CollectionSchemas {
  * @returns Its {@link CollectionSchemas}.
  */
 export function buildCollectionSchemas(collection: Collection): CollectionSchemas {
-	const body = createInsertSchema(collection.table);
-	const full = createUpdateSchema(collection.table);
 	const pkKey = pkPropertyName(collection);
-	// Omit the PK from the update body: without this Elysia keeps a client-supplied `id` and the update
-	// would rewrite the primary key of the addressed row.
-	const update = pkKey ? t.Omit(full, [pkKey]) : full;
-	return { body, update };
+	const insertShape: Record<string, AnySchema> = {};
+	const updateShape: Record<string, AnySchema> = {};
+
+	for (const [key, column] of Object.entries(collection.columns)) {
+		const schema = columnSchema(column);
+		insertShape[key] = isInsertOptional(column) ? t.Optional(schema) : schema;
+		// The PK is never reassignable, so it is absent from the (all-optional) update body.
+		if (key !== pkKey) updateShape[key] = t.Optional(schema);
+	}
+
+	return { body: t.Object(insertShape), update: t.Object(updateShape) };
 }
 
 /**

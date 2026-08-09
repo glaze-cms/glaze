@@ -35,6 +35,7 @@ export type GlazeContext = {
  */
 export type GlazeApp = Elysia<
 	'',
+	'local',
 	{
 		decorator: GlazeContext;
 		store: Record<string, never>;

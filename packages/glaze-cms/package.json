@@ -54,21 +54,21 @@
 		"typecheck": "tsc --noEmit"
 	},
 	"dependencies": {
-		"@elysiajs/cors": "latest",
-		"@elysiajs/node": "latest",
-		"@elysiajs/openapi": "^1.4.15",
-		"@sinclair/typebox": "^0.34.0",
+		"@elysia/node": "2.0.0-beta.1",
+		"@elysia/openapi": "2.0.0-exp.1",
 		"better-auth": "^1.6.24",
-		"better-sqlite3": "latest",
 		"drizzle-kit": "1.0.0-rc.4",
 		"drizzle-orm": "1.0.0-rc.4",
-		"elysia": "latest",
+		"elysia": "2.0.0-beta.2",
 		"pino": "latest",
 		"pino-pretty": "latest",
-		"postgres": "latest"
+		"postgres": "latest",
+		"typebox": "^1.3"
 	},
 	"devDependencies": {
-		"@testcontainers/postgresql": "latest",
-		"@types/better-sqlite3": "latest"
+		"@testcontainers/postgresql": "latest"
+	},
+	"engines": {
+		"node": ">=24"
 	}
 }

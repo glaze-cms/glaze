@@ -4,23 +4,23 @@
  * with a per-variable message and an actionable hint — rather than surfacing as an obscure error deep
  * in boot (or, worse, a running-but-insecure server).
  *
- * TypeBox is the validator Elysia already loads (`@sinclair/typebox`, pinned `>=0.34.0 <1`), so this
- * adds no new runtime and no second validation library.
+ * TypeBox is the validator Elysia already loads (`typebox`), so this adds no new runtime and no second
+ * validation library.
  *
  * Scope is **Glaze-owned** env only. The database connection lives in `glaze.config.ts` (validated by
  * the config resolver), not here. `CI` / `GLAZE_NO_TTY` are ambient interactivity flags parsed
  * leniently elsewhere ({@link isEnvFlagEnabled}), not strict config — so they are deliberately absent.
  */
 
-import { Type } from '@sinclair/typebox';
-import { TypeCompiler } from '@sinclair/typebox/compiler';
-import { Value } from '@sinclair/typebox/value';
+import { Type } from 'typebox';
+import { Compile } from 'typebox/compile';
+import { Value } from 'typebox/value';
 
 import { DEFAULT_PORT, MIN_AUTH_SECRET_LENGTH } from '#consts';
 import { isProduction } from '#utils';
 
 import type { Logger } from '#logger';
-import type { Static } from '@sinclair/typebox';
+import type { Static } from 'typebox';
 
 /** Recognized `NODE_ENV` values; the first three are treated as local for hint wording. */
 const NODE_ENVS = ['local', 'development', 'test', 'staging', 'production'] as const;
@@ -64,7 +64,7 @@ const FRIENDLY_MESSAGE: Readonly<Record<string, string>> = {
 };
 
 /** Compiled once at module load — validation runs cheaply thereafter. */
-const EnvValidator = TypeCompiler.Compile(GlazeEnvSchema);
+const EnvValidator = Compile(GlazeEnvSchema);
 
 /**
  * Validates the environment and, on failure, prints each problem (variable + message + fix hint)
@@ -151,7 +151,7 @@ function collectErrors(env: GlazeEnv): EnvError[] {
 	const local = isLocalEnv(env.NODE_ENV);
 
 	for (const error of EnvValidator.Errors(env)) {
-		const variable = error.path.replace(/^\//, '');
+		const variable = error.instancePath.replace(/^\//, '');
 		if (variable === '' || byVariable.has(variable)) continue;
 		byVariable.set(variable, {
 			variable,

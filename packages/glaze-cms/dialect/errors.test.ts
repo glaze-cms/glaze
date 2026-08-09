@@ -130,6 +130,17 @@ test('sqlite: message-only fallback (bare SQLITE_CONSTRAINT, extended codes off)
 	expect(v?.columns).toEqual(['email']);
 });
 
+test('sqlite: node:sqlite shape (code ERR_SQLITE_ERROR) classifies via the message', () => {
+	// node:sqlite reports a generic `ERR_SQLITE_ERROR` code (not `SQLITE_CONSTRAINT_*`) but the same
+	// message, so the message fallback carries it — for the Node runtime leg.
+	const v = classifySqliteConstraint({
+		code: 'ERR_SQLITE_ERROR',
+		message: 'UNIQUE constraint failed: t.email',
+	});
+	expect(v?.kind).toBe('unique');
+	expect(v?.columns).toEqual(['email']);
+});
+
 test('sqlite: recognized-but-unclassified constraint → unknown, no columns', () => {
 	const v = classifySqliteConstraint({
 		code: 'SQLITE_CONSTRAINT',

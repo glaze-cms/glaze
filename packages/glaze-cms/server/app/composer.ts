@@ -61,7 +61,7 @@ export function createGlazeApp(
 		.use(createContentRouter({ context, auth, collections }))
 		.use(createDocsPlugin(options.docs, options.prefixes.api))
 		.get('/', () => buildManifest(options))
-		.onStop(() => handleStop(context));
+		.cleanup(() => handleStop(context));
 
 	return app as unknown as GlazeApp;
 }

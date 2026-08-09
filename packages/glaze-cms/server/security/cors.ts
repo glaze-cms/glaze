@@ -11,6 +11,7 @@
  */
 
 import type { CorsOptions } from '../options/index.ts';
+import type { HTTPHeaders } from 'elysia';
 
 /** Preflight advertises exactly the methods the content router serves. */
 const PREFLIGHT_METHODS = 'GET, POST, PATCH, DELETE, OPTIONS';
@@ -25,7 +26,7 @@ export interface CorsResponder {
 	 * @param headers - The response header bag to mutate (Elysia's `set.headers`).
 	 * @param requestOrigin - The request's `Origin` header, or `null`.
 	 */
-	decorate(headers: Record<string, string | number>, requestOrigin: string | null): void;
+	decorate(headers: HTTPHeaders, requestOrigin: string | null): void;
 	/**
 	 * Builds the preflight (`OPTIONS`) response — a 204 carrying the CORS headers when the origin is
 	 * allowed, an empty 204 otherwise.

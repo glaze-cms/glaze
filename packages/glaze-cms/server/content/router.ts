@@ -10,7 +10,7 @@
  * (see `../responses`). Data access goes through the dialect-agnostic core query builder (`./handlers.ts`).
  */
 
-import { Elysia } from 'elysia';
+import { Elysia, NotFound, ParseError, status, ValidationError } from 'elysia';
 
 import { resolveDialect } from '#dialect';
 
@@ -220,12 +220,12 @@ function createContentApp(
 ) {
 	const app = new Elysia({ name: 'glaze.content' })
 		.use(createAuthMacro(auth))
-		// Keep EVERY content-route error in the envelope: body-schema failures → 422, malformed JSON → 400,
-		// genuine not-found passes through to Elysia's 404, a DB constraint violation → its typed 4xx, and
-		// anything else (an unexpected throw) is logged and enveloped as 500 rather than leaking Elysia's
-		// default shape.
-		.onError(({ code, error }) => {
-			if (code === 'VALIDATION') {
+		// Keep EVERY content-route error in the { success, data, error } envelope (application/json): an
+		// error left unhandled here ships as the framework default `application/problem+json`, breaking the
+		// response contract. Body-schema failures → 422, malformed JSON → 400, a genuine not-found → the 404
+		// envelope, a DB constraint violation → its typed 4xx, and any other throw is logged + enveloped as 500.
+		.error(({ error }) => {
+			if (error instanceof ValidationError) {
 				return buildErrorResponse(
 					422,
 					'VALIDATION',
@@ -233,9 +233,9 @@ function createContentApp(
 					toValidationFields(error),
 				);
 			}
-			if (code === 'PARSE')
+			if (error instanceof ParseError)
 				return buildErrorResponse(400, 'VALIDATION', 'Request body is not valid JSON');
-			if (code === 'NOT_FOUND') return undefined;
+			if (error instanceof NotFound) return buildErrorResponse(404, 'NOT_FOUND', 'Not found');
 			const violation = classifyConstraint(error);
 			if (violation) {
 				// A client error (they sent a value the schema-level checks can't catch), not an incident.
@@ -248,7 +248,7 @@ function createContentApp(
 			return buildErrorResponse(500, 'INTERNAL', 'Internal server error');
 		});
 	if (responder) {
-		app.onAfterHandle(({ request, set }) => {
+		app.afterHandle(({ request, set }) => {
 			responder.decorate(set.headers, request.headers.get('origin'));
 		});
 	}
@@ -280,64 +280,47 @@ function registerCollectionRoutes(
 	const base = `${apiPrefix}/${collection.name}`;
 	const { body, update } = buildCollectionSchemas(collection);
 
-	app.get(
-		base,
-		async ({ query }) =>
-			buildSuccessResponse(
-				await listRows(db, collection, parseLimit(query.limit), parseOffset(query.offset)),
-			),
-		{ auth: true },
+	// Schema/options precede the handler.
+	app.get(base, { auth: true }, async ({ query }) =>
+		buildSuccessResponse(
+			await listRows(db, collection, parseLimit(query.limit), parseOffset(query.offset)),
+		),
 	);
 
-	app.post(
-		base,
-		async ({ body: input, status }) =>
-			status(201, buildSuccessResponse(await createRow(db, collection, input as Row))),
-		{ auth: true, body },
+	app.post(base, { auth: true, body }, async ({ body: input }) =>
+		status(201, buildSuccessResponse(await createRow(db, collection, input as Row))),
 	);
 
 	if (responder) app.options(base, ({ request }) => responder.preflight(request));
 
 	if (!collection.pk) return;
 
-	app.get(
-		`${base}/:id`,
-		async ({ params }) => {
-			const id = coerceId(collection, params.id);
-			if (!id.ok) return buildErrorResponse(400, 'INVALID_ID', 'Invalid id for this collection');
-			const row = await getRow(db, collection, id.value);
-			return row ? buildSuccessResponse(row) : buildErrorResponse(404, 'NOT_FOUND', 'Not found');
-		},
-		{ auth: true },
-	);
+	app.get(`${base}/:id`, { auth: true }, async ({ params }) => {
+		const id = coerceId(collection, params.id);
+		if (!id.ok) return buildErrorResponse(400, 'INVALID_ID', 'Invalid id for this collection');
+		const row = await getRow(db, collection, id.value);
+		return row ? buildSuccessResponse(row) : buildErrorResponse(404, 'NOT_FOUND', 'Not found');
+	});
 
-	app.patch(
-		`${base}/:id`,
-		async ({ params, body: input }) => {
-			const id = coerceId(collection, params.id);
-			if (!id.ok) return buildErrorResponse(400, 'INVALID_ID', 'Invalid id for this collection');
-			const values = input as Row;
-			if (Object.keys(values).length === 0) {
-				return buildErrorResponse(422, 'VALIDATION', 'Request body has no fields to update');
-			}
-			const row = await updateRow(db, collection, id.value, values);
-			return row ? buildSuccessResponse(row) : buildErrorResponse(404, 'NOT_FOUND', 'Not found');
-		},
-		{ auth: true, body: update },
-	);
+	app.patch(`${base}/:id`, { auth: true, body: update }, async ({ params, body: input }) => {
+		const id = coerceId(collection, params.id);
+		if (!id.ok) return buildErrorResponse(400, 'INVALID_ID', 'Invalid id for this collection');
+		const values = input as Row;
+		if (Object.keys(values).length === 0) {
+			return buildErrorResponse(422, 'VALIDATION', 'Request body has no fields to update');
+		}
+		const row = await updateRow(db, collection, id.value, values);
+		return row ? buildSuccessResponse(row) : buildErrorResponse(404, 'NOT_FOUND', 'Not found');
+	});
 
-	app.delete(
-		`${base}/:id`,
-		async ({ params }) => {
-			const id = coerceId(collection, params.id);
-			if (!id.ok) return buildErrorResponse(400, 'INVALID_ID', 'Invalid id for this collection');
-			const deleted = await deleteRow(db, collection, id.value);
-			return deleted
-				? buildSuccessResponse({ deleted: true })
-				: buildErrorResponse(404, 'NOT_FOUND', 'Not found');
-		},
-		{ auth: true },
-	);
+	app.delete(`${base}/:id`, { auth: true }, async ({ params }) => {
+		const id = coerceId(collection, params.id);
+		if (!id.ok) return buildErrorResponse(400, 'INVALID_ID', 'Invalid id for this collection');
+		const deleted = await deleteRow(db, collection, id.value);
+		return deleted
+			? buildSuccessResponse({ deleted: true })
+			: buildErrorResponse(404, 'NOT_FOUND', 'Not found');
+	});
 
 	if (responder) app.options(`${base}/:id`, ({ request }) => responder.preflight(request));
 }
