@@ -14,6 +14,15 @@ async function readFile(path: string): Promise<string> {
 }
 
 /**
+ * Reads a file as raw bytes using `node:fs/promises`.
+ * @param path - The file path.
+ * @returns The file contents as bytes.
+ */
+async function readBytes(path: string): Promise<Uint8Array> {
+	return readFileNode(path);
+}
+
+/**
  * Writes a UTF-8 file using `node:fs/promises`, creating parent directories first for parity with
  * `Bun.write` (which auto-creates them).
  * @param path - The file path.
@@ -65,6 +74,7 @@ function spawn(command: string[], options?: SpawnOptions): Promise<SpawnResult> 
 export const nodeRuntime: Runtime = {
 	name: 'node',
 	readFile,
+	readBytes,
 	writeFile,
 	spawn,
 };

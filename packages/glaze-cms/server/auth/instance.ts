@@ -15,6 +15,7 @@ import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { openAPI } from 'better-auth/plugins';
 import { bearer } from 'better-auth/plugins/bearer';
 
+import { resolveAuthBaseUrl } from './base-url.ts';
 import { resolveAuthProvider } from './provider.ts';
 import { buildAuthSchema } from './schema/index.ts';
 import { resolveAuthSecret } from './secret.ts';
@@ -33,7 +34,7 @@ export type GlazeAuth = ReturnType<typeof createAuth>;
 export function createAuth(context: GlazeContext) {
 	const { db, config, options, logger } = context;
 	const secret = resolveAuthSecret(logger);
-	const baseURL = process.env['GLAZE_AUTH_URL'];
+	const baseURL = resolveAuthBaseUrl(options.port);
 
 	return betterAuth({
 		basePath: `${options.prefixes.api}/auth`,
@@ -41,8 +42,8 @@ export function createAuth(context: GlazeContext) {
 		// Route Better Auth's logs through Glaze's structured logger (silent under test) instead of
 		// letting them bypass it to the console.
 		logger: { log: (level, message) => logger[level](`[auth] ${message}`) },
-		// Only set when provided; Better Auth infers per-request otherwise, and its options reject an
-		// explicit `undefined` under exactOptionalPropertyTypes.
+		// Omit the key entirely when unresolved (production without GLAZE_AUTH_URL) — Better Auth then infers
+		// per-request, and its options reject an explicit `undefined` under exactOptionalPropertyTypes.
 		...(baseURL ? { baseURL } : {}),
 		database: drizzleAdapter(db.db as Parameters<typeof drizzleAdapter>[0], {
 			provider: resolveAuthProvider(config.dialect),

@@ -10,6 +10,7 @@
 
 import { Elysia } from 'elysia';
 
+import { createAdminPlugin } from '../admin/index.ts';
 import { createAuth, createAuthPlugin } from '../auth/index.ts';
 import { createContentRouter } from '../content/index.ts';
 import { createDocsPlugin } from '../docs/index.ts';
@@ -60,6 +61,7 @@ export function createGlazeApp(
 		.use(createAuthPlugin(context, auth))
 		.use(createContentRouter({ context, auth, collections }))
 		.use(createDocsPlugin(options.docs, options.prefixes.api))
+		.use(createAdminPlugin(context))
 		.get('/', () => buildManifest(options))
 		.cleanup(() => handleStop(context));
 

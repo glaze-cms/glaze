@@ -1,0 +1,13 @@
+{
+	"name": "example-blog",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"dev": "bun --watch server.ts",
+		"start": "bun server.ts"
+	},
+	"dependencies": {
+		"drizzle-orm": "1.0.0-rc.4",
+		"glaze-cms": "workspace:*"
+	}
+}

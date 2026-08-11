@@ -59,6 +59,21 @@ function scheduleReservedWarning(
 }
 
 /**
+ * Logs the "ready" banner once the server is listening: the root URL it serves on, plus the admin
+ * dashboard, the content API, and — when enabled — the API-docs links.
+ *
+ * @param options - The resolved options (port, prefixes, docs).
+ * @param logger - The logger to announce through.
+ */
+function announceReady(options: ResolvedGlazeOptions, logger: Logger): void {
+	const base = `http://localhost:${options.port}`;
+	logger.info(`Glaze is ready — listening on ${base}`);
+	logger.info(`  ➜ Admin     ${base}${options.prefixes.admin}/`);
+	logger.info(`  ➜ API       ${base}${options.prefixes.api}`);
+	if (options.docs.enabled) logger.info(`  ➜ API docs  ${base}${options.docs.path}`);
+}
+
+/**
  * Boots the Glaze server: compose the app, verify the database is reachable, and listen.
  *
  * @param options - Runtime options (port/security/prefixes/health/logger). All optional.
@@ -80,7 +95,7 @@ export async function glaze(options: GlazeOptions = {}): Promise<GlazeApp> {
 		const coreRoutes = snapshotRoutes(app);
 
 		await handleStart(context);
-		app.listen(resolvedOptions.port);
+		app.listen(resolvedOptions.port, () => announceReady(resolvedOptions, logger));
 
 		installShutdownHandlers(app);
 		scheduleReservedWarning(app, coreRoutes, resolvedOptions, logger);

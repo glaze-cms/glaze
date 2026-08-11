@@ -10,6 +10,15 @@ async function readFile(path: string): Promise<string> {
 }
 
 /**
+ * Reads a file as raw bytes using Bun's native `Bun.file`.
+ * @param path - The file path.
+ * @returns The file contents as bytes.
+ */
+async function readBytes(path: string): Promise<Uint8Array> {
+	return Bun.file(path).bytes();
+}
+
+/**
  * Writes a UTF-8 file using Bun's native `Bun.write`.
  * @param path - The file path.
  * @param contents - The string to write.
@@ -47,6 +56,7 @@ async function spawn(command: string[], options?: SpawnOptions): Promise<SpawnRe
 export const bunRuntime: Runtime = {
 	name: 'bun',
 	readFile,
+	readBytes,
 	writeFile,
 	spawn,
 };

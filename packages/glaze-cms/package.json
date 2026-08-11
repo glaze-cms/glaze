@@ -5,6 +5,7 @@
 	"license": "MIT",
 	"files": [
 		"dist",
+		"admin-dist",
 		"index.ts",
 		"types/**/*.ts",
 		"config/**/*.ts",

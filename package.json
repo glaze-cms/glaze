@@ -3,7 +3,8 @@
 	"private": true,
 	"description": "Glaze CMS monorepo — the Bun-native headless CMS framework.",
 	"workspaces": [
-		"packages/*"
+		"packages/*",
+		"examples/*"
 	],
 	"type": "module",
 	"scripts": {

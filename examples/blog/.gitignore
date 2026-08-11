@@ -1,0 +1,5 @@
+.env
+blog.db
+blog.db-*
+drizzle/
+.glaze/

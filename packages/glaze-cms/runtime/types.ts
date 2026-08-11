@@ -36,6 +36,12 @@ export interface Runtime {
 	 */
 	readFile(path: string): Promise<string>;
 	/**
+	 * Reads a file as raw bytes (for serving binary assets like fonts/images without corrupting them).
+	 * @param path - Absolute or cwd-relative file path.
+	 * @returns The file contents as bytes.
+	 */
+	readBytes(path: string): Promise<Uint8Array>;
+	/**
 	 * Writes a UTF-8 file, creating or overwriting it.
 	 * @param path - Absolute or cwd-relative file path.
 	 * @param contents - The string to write.
