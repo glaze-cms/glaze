@@ -17,5 +17,13 @@
 		"no-console": "warn",
 		"import/no-duplicates": "error"
 	},
-	"ignorePatterns": ["dist", "node_modules", "**/*.d.ts"]
+	"ignorePatterns": ["dist", "node_modules", "**/*.d.ts", "packages/glaze-admin/gen"],
+	"overrides": [
+		{
+			"files": ["packages/glaze-admin/**"],
+			"rules": {
+				"import/no-unassigned-import": "off"
+			}
+		}
+	]
 }

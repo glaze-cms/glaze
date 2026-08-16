@@ -1,0 +1,148 @@
+@layer tokens {
+	/*
+	 * Light is the base definition: every token gets its value here, so no token is ever defined only
+	 * inside a media query. Dark redefines the semantic tokens only.
+	 *
+	 * `--font-sans` names Plus Jakarta Sans but nothing loads it — the production CSP is
+	 * `default-src 'self'`, which blocks external font hosts. Self-host the woff2 to make it apply.
+	 */
+	:root {
+		--font-sans: 'Plus Jakarta Sans', system-ui, sans-serif;
+
+		--color-pure-white: #ffffff;
+		--color-glaze-700: #ca405b;
+		--color-glaze-900: #a52a3a;
+		--color-blush-50: #fdfbfb;
+		--color-blush-80: #f6f1f2;
+		--color-blush-100: #f0e9ea;
+
+		--color-neutral-100: #f5f5f5;
+		--color-neutral-200: #e5e5e5;
+
+		--color-warm-50: #fffbfa;
+		--color-warm-100: #fff6f3;
+		--color-warm-200: #feede8;
+
+		--color-primary: #d4637a;
+		--color-primary-hover: #d04f6a;
+		--color-primary-ring: #f3b3c0;
+		--color-primary-foreground: var(--color-pure-white);
+		--color-primary-wash: #d4637a14;
+		--color-accent: #fde6ea;
+
+		--color-background: var(--color-pure-white);
+		--color-surface: var(--color-pure-white);
+		--color-foreground: #0a0a0a;
+		--color-foreground-alt: #525252;
+		--color-border: #d4d4d4;
+		--color-border-subtle: #e9e3e4;
+		--color-muted-foreground: #737373;
+
+		--color-danger: #b42318;
+		--color-danger-surface: #fef3f2;
+
+		--text-small: 0.875rem;
+		--text-regular: 1rem;
+		--text-large: 1.125rem;
+
+		--radius-small: 4px;
+		--radius-regular: 8px;
+		--radius-large: 12px;
+		--radius-full: 9999px;
+
+		--shadow-form-field: rgba(0, 0, 0, 0.08);
+		--shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+		--shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
+		--shadow-md: 0 5px 6px -1px rgba(0, 0, 0, 0.1);
+		--shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+		--shadow-panel: 2px 0 4px -2px rgba(0, 0, 0, 0.1), 4px 0 6px -1px rgba(0, 0, 0, 0.1);
+
+		--left-rail-width: 87px;
+	}
+
+	/* System preference, unless the viewer has explicitly chosen light. */
+	@media (prefers-color-scheme: dark) {
+		:root:not([data-theme='light']) {
+			--color-glaze-700: #f0a3b2;
+			--color-glaze-900: #f7c2cc;
+			--color-blush-50: #191416;
+			--color-blush-80: #1f1a1c;
+			--color-blush-100: #262022;
+
+			--color-neutral-100: #1b1618;
+			--color-neutral-200: #2a2426;
+
+			--color-warm-50: #151113;
+			--color-warm-100: #1b1618;
+			--color-warm-200: #241d20;
+
+			--color-primary: #e0798e;
+			--color-primary-hover: #e88ea0;
+			--color-primary-ring: #7d3d4c;
+			--color-primary-foreground: #1a1013;
+			--color-primary-wash: #e0798e1f;
+			--color-accent: #3a2027;
+
+			--color-background: #0f0d0e;
+			--color-surface: #171315;
+			--color-foreground: #f5f0f1;
+			--color-foreground-alt: #b8b0b2;
+			--color-border: #3a3436;
+			--color-border-subtle: #2e2729;
+			--color-muted-foreground: #9a9092;
+
+			--color-danger: #ff9a92;
+			--color-danger-surface: #2a1614;
+
+			--shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.4);
+			--shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.5), 0 1px 2px -1px rgba(0, 0, 0, 0.5);
+			--shadow-md: 0 5px 6px -1px rgba(0, 0, 0, 0.5);
+			--shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.55), 0 4px 6px -4px rgba(0, 0, 0, 0.55);
+			--shadow-panel: 2px 0 4px -2px rgba(0, 0, 0, 0.5), 4px 0 6px -1px rgba(0, 0, 0, 0.5);
+		}
+	}
+
+	/*
+	 * Explicit choice wins in both directions. The dark values are repeated rather than shared because a
+	 * rule inside `@media` and a rule outside it cannot be combined into one selector list in plain CSS.
+	 * Keep the two blocks in sync.
+	 */
+	:root[data-theme='dark'] {
+		--color-glaze-700: #f0a3b2;
+		--color-glaze-900: #f7c2cc;
+		--color-blush-50: #191416;
+		--color-blush-80: #1f1a1c;
+		--color-blush-100: #262022;
+
+		--color-neutral-100: #1b1618;
+		--color-neutral-200: #2a2426;
+
+		--color-warm-50: #151113;
+		--color-warm-100: #1b1618;
+		--color-warm-200: #241d20;
+
+		--color-primary: #e0798e;
+		--color-primary-hover: #e88ea0;
+		--color-primary-ring: #7d3d4c;
+		--color-primary-foreground: #1a1013;
+		--color-primary-wash: #e0798e1f;
+		--color-accent: #3a2027;
+
+		--color-background: #0f0d0e;
+		--color-surface: #171315;
+		--color-foreground: #f5f0f1;
+		--color-foreground-alt: #b8b0b2;
+		--color-border: #3a3436;
+		--color-border-subtle: #2e2729;
+		--color-muted-foreground: #9a9092;
+
+		--color-danger: #ff9a92;
+		--color-danger-surface: #2a1614;
+
+		--shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.4);
+		--shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.5), 0 1px 2px -1px rgba(0, 0, 0, 0.5);
+		--shadow-md: 0 5px 6px -1px rgba(0, 0, 0, 0.5);
+		--shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.55), 0 4px 6px -4px rgba(0, 0, 0, 0.55);
+		--shadow-panel: 2px 0 4px -2px rgba(0, 0, 0, 0.5), 4px 0 6px -1px rgba(0, 0, 0, 0.5);
+	}
+}

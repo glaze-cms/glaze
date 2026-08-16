@@ -13,7 +13,8 @@
 		"lint:fix": "oxlint --type-aware --fix",
 		"format": "oxfmt --check .",
 		"format:fix": "oxfmt --write .",
-		"test": "bun test",
+		"test": "bun test packages/glaze-cms",
+		"test:admin": "cd packages/glaze-admin && bun test",
 		"test:node": "node --test \"packages/glaze-cms/**/*.test.ts\""
 	},
 	"devDependencies": {

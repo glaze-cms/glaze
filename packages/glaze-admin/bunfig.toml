@@ -1,0 +1,6 @@
+# Applies when `bun test` runs from this package. The DOM globals are deliberately scoped here rather
+# than preloaded at the repo root, so the server tests in glaze-cms keep running in a DOM-free process.
+#
+# Order matters: `dom.ts` installs the DOM globals, and only then may `setup.ts` pull in Testing Library.
+[test]
+preload = ["./test/dom.ts", "./test/setup.ts"]

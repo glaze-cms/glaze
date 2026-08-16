@@ -1,0 +1,32 @@
+@layer components {
+	.sidebar {
+		position: relative;
+		z-index: 1;
+		height: 100%;
+
+		.sign-out {
+			gap: 0.5rem;
+			padding: 0.5rem;
+			font-size: var(--text-small);
+			color: inherit;
+			cursor: pointer;
+			background: none;
+			border: none;
+			border-radius: var(--radius-regular);
+			transition: background-color 200ms ease;
+
+			.icon {
+				width: 1em;
+				height: 1em;
+			}
+
+			&:hover {
+				background-color: var(--color-warm-200);
+			}
+
+			&:focus-visible {
+				outline: 3px solid var(--color-primary-ring);
+			}
+		}
+	}
+}

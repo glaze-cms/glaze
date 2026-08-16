@@ -6,16 +6,29 @@
 		"dev": "vite",
 		"build": "vite build",
 		"preview": "vite preview",
-		"typecheck": "tsc --noEmit"
+		"typecheck": "tsc --noEmit",
+		"test": "bun test"
 	},
 	"dependencies": {
-		"react": "^19.0.0",
-		"react-dom": "^19.0.0"
+		"@base-ui/react": "latest",
+		"@react-spring/web": "latest",
+		"@tanstack/react-query": "latest",
+		"@tanstack/react-router": "latest",
+		"better-auth": "latest",
+		"classnames": "latest",
+		"react": "latest",
+		"react-dom": "latest"
 	},
 	"devDependencies": {
-		"@types/react": "^19.0.0",
-		"@types/react-dom": "^19.0.0",
+		"@happy-dom/global-registrator": "latest",
+		"@tanstack/router-plugin": "latest",
+		"@testing-library/dom": "latest",
+		"@testing-library/react": "latest",
+		"@testing-library/user-event": "latest",
+		"@types/react": "latest",
+		"@types/react-dom": "latest",
 		"@vitejs/plugin-react": "latest",
-		"vite": "latest"
+		"vite": "latest",
+		"vite-plugin-svgr": "latest"
 	}
 }

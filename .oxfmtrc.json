@@ -2,6 +2,7 @@
 	"useTabs": true,
 	"singleQuote": true,
 	"trailingComma": "all",
+	"ignorePatterns": ["packages/glaze-admin/gen"],
 	"sortImports": {
 		"newlinesBetween": true,
 		"groups": [

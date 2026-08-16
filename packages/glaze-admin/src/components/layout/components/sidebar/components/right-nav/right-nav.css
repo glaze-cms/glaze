@@ -1,0 +1,56 @@
+@layer components {
+	.right-nav {
+		position: absolute;
+		top: 0;
+		left: var(--left-rail-width);
+		width: 223px;
+		height: 100%;
+		padding-top: 28px;
+		padding-inline: 12px;
+		background-color: var(--color-surface);
+		box-shadow: var(--shadow-panel);
+
+		.top {
+			display: flex;
+			flex-flow: row-reverse;
+			align-items: center;
+			justify-content: space-between;
+			width: 100%;
+
+			.close-button {
+				display: flex;
+				padding: 1rem;
+				margin: -1rem;
+				color: inherit;
+				cursor: pointer;
+				background: none;
+				border: none;
+
+				&:focus-visible {
+					outline: 3px solid var(--color-primary-ring);
+				}
+			}
+		}
+
+		.input-container {
+			max-width: 164px;
+
+			input {
+				border-radius: var(--radius-full);
+			}
+		}
+
+		.separator {
+			width: 100%;
+			height: 1px;
+			margin-block: 20px;
+			background-color: var(--color-border-subtle);
+		}
+
+		.bottom {
+			display: flex;
+			flex-direction: column;
+			gap: 1.25rem;
+		}
+	}
+}
