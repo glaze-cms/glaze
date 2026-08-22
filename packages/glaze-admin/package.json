@@ -10,25 +10,25 @@
 		"test": "bun test"
 	},
 	"dependencies": {
-		"@base-ui/react": "latest",
-		"@react-spring/web": "latest",
-		"@tanstack/react-query": "latest",
-		"@tanstack/react-router": "latest",
-		"better-auth": "latest",
-		"classnames": "latest",
-		"react": "latest",
-		"react-dom": "latest"
+		"@base-ui/react": "^1.7.0",
+		"@react-spring/web": "^10.1.2",
+		"@tanstack/react-query": "^5.102.0",
+		"@tanstack/react-router": "1.170.31",
+		"better-auth": "1.7.1",
+		"classnames": "^2.5.1",
+		"react": "^19.2.8",
+		"react-dom": "^19.2.8"
 	},
 	"devDependencies": {
-		"@happy-dom/global-registrator": "latest",
-		"@tanstack/router-plugin": "latest",
-		"@testing-library/dom": "latest",
-		"@testing-library/react": "latest",
-		"@testing-library/user-event": "latest",
-		"@types/react": "latest",
-		"@types/react-dom": "latest",
-		"@vitejs/plugin-react": "latest",
-		"vite": "latest",
-		"vite-plugin-svgr": "latest"
+		"@happy-dom/global-registrator": "20.11.6",
+		"@tanstack/router-plugin": "1.168.34",
+		"@testing-library/dom": "^10.4.1",
+		"@testing-library/react": "^16.3.2",
+		"@testing-library/user-event": "14.6.6",
+		"@types/react": "^19.2.18",
+		"@types/react-dom": "^19.2.4",
+		"@vitejs/plugin-react": "6.1.0",
+		"vite": "8.2.2",
+		"vite-plugin-svgr": "^5.2.0"
 	}
 }

@@ -3,8 +3,8 @@
 	"private": true,
 	"description": "Glaze CMS monorepo — the Bun-native headless CMS framework.",
 	"workspaces": [
-		"packages/*",
-		"examples/*"
+		"packages/**",
+		"examples/**"
 	],
 	"type": "module",
 	"scripts": {
@@ -18,10 +18,10 @@
 		"test:node": "node --test \"packages/glaze-cms/**/*.test.ts\""
 	},
 	"devDependencies": {
-		"@types/bun": "latest",
-		"oxfmt": "latest",
-		"oxlint": "latest",
-		"oxlint-tsgolint": "^0.25.0",
-		"typescript": "latest"
+		"@types/bun": "1.4.0",
+		"oxfmt": "0.64.0",
+		"oxlint": "1.79.0",
+		"oxlint-tsgolint": "^7.0.2001",
+		"typescript": "^7.0.2"
 	}
 }
