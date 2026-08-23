@@ -59,9 +59,9 @@ export function RightNav({ isOpen, onClose }: RightNavProps) {
 			<div className="separator" aria-hidden="true" />
 
 			<div className="bottom">
-				<Tooltip label={t.nav.newSchemaUnavailable} side="bottom">
+				<Tooltip label={t.nav.newEntity} side="bottom">
 					<Button variant="primary" LeftIcon={<PlusIcon />} size="small" disabled>
-						{t.nav.newSchema}
+						{t.nav.newEntity}
 					</Button>
 				</Tooltip>
 

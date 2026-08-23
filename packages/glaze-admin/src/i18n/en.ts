@@ -21,8 +21,8 @@ export const en = {
 		search: 'Search',
 		collections: 'Collections',
 		noCollections: 'No collections yet',
-		newSchema: 'New schema',
-		newSchemaUnavailable: 'Schema editing is not available yet',
+		newEntity: 'New Collection',
+		newEntityNotAvailable: 'Entity editing is not available yet',
 		signOut: 'Sign out',
 	},
 	auth: {
