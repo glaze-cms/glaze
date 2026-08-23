@@ -78,3 +78,63 @@ matrixTest('never drops unrelated user tables on re-materialization', async ({ d
 	expect(rows).toHaveLength(1);
 	expect(String(rows[0]?.['title'])).toBe('keep me');
 });
+
+/**
+ * The DB-qualified account table name for the dialect: Postgres namespaces it in a schema, SQLite
+ * prefixes the table name.
+ *
+ * @param dialect - The active dialect.
+ * @returns The account table reference for raw SQL.
+ */
+function accountTable(dialect: Dialect): string {
+	return dialect === 'postgres' ? 'glaze_auth.accounts' : 'zz__glaze_auth_accounts';
+}
+
+/**
+ * The user table reference for the dialect, needed because `account.user_id` is a foreign key.
+ *
+ * @param dialect - The active dialect.
+ * @returns The user table reference for raw SQL.
+ */
+function userTable(dialect: Dialect): string {
+	return dialect === 'postgres' ? 'glaze_auth.users' : 'zz__glaze_auth_users';
+}
+
+// Better Auth 1.7 keys an account on (issuer, account_id), and its link-account path is a read-then-
+// write with no constraint behind it — two concurrent callbacks for one provider identity both miss and
+// both insert. Its lookup has no ORDER BY, so the identity then resolves to whichever row the planner
+// returns: different users on different requests. The UNIQUE index is the only defence, so this asserts
+// the DATABASE rejects the duplicate rather than asserting the schema merely declares an index.
+matrixTest(
+	'the database rejects two accounts sharing one provider identity',
+	async ({ db, dialect }) => {
+		await materializeAuthTables(buildContext(db, dialect));
+
+		const epoch = dialect === 'postgres' ? "'1970-01-01'" : '0';
+		const bool = dialect === 'postgres' ? 'false' : '0';
+		await db.raw(
+			`insert into ${userTable(dialect)} (id, name, email, email_verified, created_at, updated_at) ` +
+				`values ('u1', 'n', 'e@x.test', ${bool}, ${epoch}, ${epoch})`,
+		);
+
+		const insertAccount = (id: string) =>
+			db.raw(
+				`insert into ${accountTable(dialect)} ` +
+					`(id, issuer, account_id, provider_id, user_id, created_at, updated_at) ` +
+					`values ('${id}', 'local:credential', 'shared-identity', 'credential', 'u1', ${epoch}, ${epoch})`,
+			);
+
+		await insertAccount('a1');
+
+		let rejected = false;
+		try {
+			await insertAccount('a2');
+		} catch {
+			rejected = true;
+		}
+		expect(rejected).toBe(true);
+
+		const rows = await db.raw(`select id from ${accountTable(dialect)}`);
+		expect(rows).toHaveLength(1);
+	},
+);

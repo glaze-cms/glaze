@@ -10,8 +10,14 @@
  * any other RBAC field (deferred).
  */
 
-import { boolean, pgSchema, text, timestamp } from 'drizzle-orm/pg-core';
-import { integer, sqliteTable, text as sqliteText } from 'drizzle-orm/sqlite-core';
+import { boolean, index, pgSchema, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core';
+import {
+	index as sqliteIndex,
+	integer,
+	sqliteTable,
+	text as sqliteText,
+	uniqueIndex as sqliteUniqueIndex,
+} from 'drizzle-orm/sqlite-core';
 
 import type { Dialect } from '#dialect';
 
@@ -28,9 +34,32 @@ export const AUTH_PG_SCHEMA = 'glaze_auth';
 export const AUTH_SQLITE_PREFIX = 'zz__glaze_auth_';
 
 /**
- * The DB column names Better Auth v1.6.x requires on each core model (snake_case). The single source
+ * Index names. SQLite's index namespace is per-database rather than per-table, so each carries the auth
+ * prefix to stay clear of user content.
+ *
+ * {@link ACCOUNT_IDENTITY_INDEX} is the one that matters for correctness: Better Auth 1.7 keys an
+ * account on `(issuer, account_id)` and its link-account path is a read-then-write with no constraint
+ * behind it, so without this UNIQUE index two concurrent callbacks for the same provider identity both
+ * miss and both insert. Its lookup has no `ORDER BY`, so the identity then resolves to whichever row the
+ * planner returns — different users on different requests. The index is the only defence.
+ */
+export const ACCOUNT_IDENTITY_INDEX = `${AUTH_SQLITE_PREFIX}accounts_issuer_account_id_uidx`;
+/** Index behind account lookups by owner (Better Auth declares `account.userId` as indexed). */
+export const ACCOUNT_USER_INDEX = `${AUTH_SQLITE_PREFIX}accounts_user_id_idx`;
+/** Index behind session revocation and list-sessions (`session.userId`). */
+export const SESSION_USER_INDEX = `${AUTH_SQLITE_PREFIX}sessions_user_id_idx`;
+/** Index behind every email-verification and password-reset lookup (`verification.identifier`). */
+export const VERIFICATION_IDENTIFIER_INDEX = `${AUTH_SQLITE_PREFIX}verifications_identifier_idx`;
+
+/**
+ * The DB column names Better Auth v1.7.x requires on each core model (snake_case). The single source
  * for the shape-guard test — if a Better Auth upgrade changes the contract, that test fails loudly in
  * the gate. Deliberately excludes any `role`/RBAC column.
+ *
+ * `account.issuer` scopes an account's identity to the identity provider that issued it, and is
+ * required: 1.7 keys accounts on `(issuer, account_id)` rather than `(provider_id, account_id)`, so a
+ * missing column makes every sign-up fail inside the adapter. Credential sign-ups store the synthetic
+ * `local:credential`; OAuth accounts store the provider's own issuer.
  */
 export const AUTH_EXPECTED_COLUMNS: Record<AuthModelName, readonly string[]> = {
 	user: ['id', 'name', 'email', 'email_verified', 'image', 'created_at', 'updated_at'],
@@ -46,6 +75,7 @@ export const AUTH_EXPECTED_COLUMNS: Record<AuthModelName, readonly string[]> = {
 	],
 	account: [
 		'id',
+		'issuer',
 		'account_id',
 		'provider_id',
 		'user_id',
@@ -90,45 +120,61 @@ function buildPostgresAuthSchema(): AuthSchema {
 		updatedAt: timestamp('updated_at').notNull(),
 	});
 
-	const session = authSchema.table('sessions', {
-		id: text('id').primaryKey(),
-		expiresAt: timestamp('expires_at').notNull(),
-		token: text('token').notNull().unique(),
-		createdAt: timestamp('created_at').notNull(),
-		updatedAt: timestamp('updated_at').notNull(),
-		ipAddress: text('ip_address'),
-		userAgent: text('user_agent'),
-		userId: text('user_id')
-			.notNull()
-			.references(() => user.id, { onDelete: 'cascade' }),
-	});
+	const session = authSchema.table(
+		'sessions',
+		{
+			id: text('id').primaryKey(),
+			expiresAt: timestamp('expires_at').notNull(),
+			token: text('token').notNull().unique(),
+			createdAt: timestamp('created_at').notNull(),
+			updatedAt: timestamp('updated_at').notNull(),
+			ipAddress: text('ip_address'),
+			userAgent: text('user_agent'),
+			userId: text('user_id')
+				.notNull()
+				.references(() => user.id, { onDelete: 'cascade' }),
+		},
+		(table) => [index(SESSION_USER_INDEX).on(table.userId)],
+	);
 
-	const account = authSchema.table('accounts', {
-		id: text('id').primaryKey(),
-		accountId: text('account_id').notNull(),
-		providerId: text('provider_id').notNull(),
-		userId: text('user_id')
-			.notNull()
-			.references(() => user.id, { onDelete: 'cascade' }),
-		accessToken: text('access_token'),
-		refreshToken: text('refresh_token'),
-		idToken: text('id_token'),
-		accessTokenExpiresAt: timestamp('access_token_expires_at'),
-		refreshTokenExpiresAt: timestamp('refresh_token_expires_at'),
-		scope: text('scope'),
-		password: text('password'),
-		createdAt: timestamp('created_at').notNull(),
-		updatedAt: timestamp('updated_at').notNull(),
-	});
+	const account = authSchema.table(
+		'accounts',
+		{
+			id: text('id').primaryKey(),
+			issuer: text('issuer').notNull(),
+			accountId: text('account_id').notNull(),
+			providerId: text('provider_id').notNull(),
+			userId: text('user_id')
+				.notNull()
+				.references(() => user.id, { onDelete: 'cascade' }),
+			accessToken: text('access_token'),
+			refreshToken: text('refresh_token'),
+			idToken: text('id_token'),
+			accessTokenExpiresAt: timestamp('access_token_expires_at'),
+			refreshTokenExpiresAt: timestamp('refresh_token_expires_at'),
+			scope: text('scope'),
+			password: text('password'),
+			createdAt: timestamp('created_at').notNull(),
+			updatedAt: timestamp('updated_at').notNull(),
+		},
+		(table) => [
+			uniqueIndex(ACCOUNT_IDENTITY_INDEX).on(table.issuer, table.accountId),
+			index(ACCOUNT_USER_INDEX).on(table.userId),
+		],
+	);
 
-	const verification = authSchema.table('verifications', {
-		id: text('id').primaryKey(),
-		identifier: text('identifier').notNull(),
-		value: text('value').notNull(),
-		expiresAt: timestamp('expires_at').notNull(),
-		createdAt: timestamp('created_at').notNull(),
-		updatedAt: timestamp('updated_at').notNull(),
-	});
+	const verification = authSchema.table(
+		'verifications',
+		{
+			id: text('id').primaryKey(),
+			identifier: text('identifier').notNull(),
+			value: text('value').notNull(),
+			expiresAt: timestamp('expires_at').notNull(),
+			createdAt: timestamp('created_at').notNull(),
+			updatedAt: timestamp('updated_at').notNull(),
+		},
+		(table) => [index(VERIFICATION_IDENTIFIER_INDEX).on(table.identifier)],
+	);
 
 	return { user, session, account, verification };
 }
@@ -151,45 +197,61 @@ function buildSqliteAuthSchema(): AuthSchema {
 		updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
 	});
 
-	const session = sqliteTable(`${AUTH_SQLITE_PREFIX}sessions`, {
-		id: sqliteText('id').primaryKey(),
-		expiresAt: integer('expires_at', { mode: 'timestamp' }).notNull(),
-		token: sqliteText('token').notNull().unique(),
-		createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
-		updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
-		ipAddress: sqliteText('ip_address'),
-		userAgent: sqliteText('user_agent'),
-		userId: sqliteText('user_id')
-			.notNull()
-			.references(() => user.id, { onDelete: 'cascade' }),
-	});
+	const session = sqliteTable(
+		`${AUTH_SQLITE_PREFIX}sessions`,
+		{
+			id: sqliteText('id').primaryKey(),
+			expiresAt: integer('expires_at', { mode: 'timestamp' }).notNull(),
+			token: sqliteText('token').notNull().unique(),
+			createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+			updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+			ipAddress: sqliteText('ip_address'),
+			userAgent: sqliteText('user_agent'),
+			userId: sqliteText('user_id')
+				.notNull()
+				.references(() => user.id, { onDelete: 'cascade' }),
+		},
+		(table) => [sqliteIndex(SESSION_USER_INDEX).on(table.userId)],
+	);
 
-	const account = sqliteTable(`${AUTH_SQLITE_PREFIX}accounts`, {
-		id: sqliteText('id').primaryKey(),
-		accountId: sqliteText('account_id').notNull(),
-		providerId: sqliteText('provider_id').notNull(),
-		userId: sqliteText('user_id')
-			.notNull()
-			.references(() => user.id, { onDelete: 'cascade' }),
-		accessToken: sqliteText('access_token'),
-		refreshToken: sqliteText('refresh_token'),
-		idToken: sqliteText('id_token'),
-		accessTokenExpiresAt: integer('access_token_expires_at', { mode: 'timestamp' }),
-		refreshTokenExpiresAt: integer('refresh_token_expires_at', { mode: 'timestamp' }),
-		scope: sqliteText('scope'),
-		password: sqliteText('password'),
-		createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
-		updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
-	});
+	const account = sqliteTable(
+		`${AUTH_SQLITE_PREFIX}accounts`,
+		{
+			id: sqliteText('id').primaryKey(),
+			issuer: sqliteText('issuer').notNull(),
+			accountId: sqliteText('account_id').notNull(),
+			providerId: sqliteText('provider_id').notNull(),
+			userId: sqliteText('user_id')
+				.notNull()
+				.references(() => user.id, { onDelete: 'cascade' }),
+			accessToken: sqliteText('access_token'),
+			refreshToken: sqliteText('refresh_token'),
+			idToken: sqliteText('id_token'),
+			accessTokenExpiresAt: integer('access_token_expires_at', { mode: 'timestamp' }),
+			refreshTokenExpiresAt: integer('refresh_token_expires_at', { mode: 'timestamp' }),
+			scope: sqliteText('scope'),
+			password: sqliteText('password'),
+			createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+			updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+		},
+		(table) => [
+			sqliteUniqueIndex(ACCOUNT_IDENTITY_INDEX).on(table.issuer, table.accountId),
+			sqliteIndex(ACCOUNT_USER_INDEX).on(table.userId),
+		],
+	);
 
-	const verification = sqliteTable(`${AUTH_SQLITE_PREFIX}verifications`, {
-		id: sqliteText('id').primaryKey(),
-		identifier: sqliteText('identifier').notNull(),
-		value: sqliteText('value').notNull(),
-		expiresAt: integer('expires_at', { mode: 'timestamp' }).notNull(),
-		createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
-		updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
-	});
+	const verification = sqliteTable(
+		`${AUTH_SQLITE_PREFIX}verifications`,
+		{
+			id: sqliteText('id').primaryKey(),
+			identifier: sqliteText('identifier').notNull(),
+			value: sqliteText('value').notNull(),
+			expiresAt: integer('expires_at', { mode: 'timestamp' }).notNull(),
+			createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+			updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+		},
+		(table) => [sqliteIndex(VERIFICATION_IDENTIFIER_INDEX).on(table.identifier)],
+	);
 
 	return { user, session, account, verification };
 }
