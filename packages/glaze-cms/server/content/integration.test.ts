@@ -9,7 +9,7 @@ import { resolveRuntime } from '#runtime';
 import { createGlazeApp } from '../app/index.ts';
 import { materializeAuthTables } from '../auth/index.ts';
 import { resolveOptions } from '../options/index.ts';
-import { loadCollections } from './schema.ts';
+import { loadEntities } from './loader.ts';
 
 import type { DatabaseHandle, Dialect } from '#dialect';
 import type { GlazeApp, GlazeContext } from '../app/index.ts';
@@ -53,7 +53,7 @@ function writePostsSchema(dir: string, dialect: Dialect): string {
 
 /**
  * Boots the full app over the live database: materializes auth tables, provisions the `posts` table,
- * loads its collection, and composes the app with content routes gated by the real auth macro.
+ * loads its entity, and composes the app with content routes gated by the real auth macro.
  *
  * @param db - The provisioned database handle.
  * @param dialect - The active dialect.
@@ -74,8 +74,8 @@ async function bootContentApp(
 	};
 	await materializeAuthTables(context);
 	await db.raw('create table posts (id integer primary key, title text)');
-	const collections = await loadCollections(context.config);
-	return createGlazeApp(context, collections);
+	const entities = await loadEntities(context.config);
+	return createGlazeApp(context, entities);
 }
 
 /** Extracts the `better-auth.session_token=…` cookie pair from a response, for echoing back. */

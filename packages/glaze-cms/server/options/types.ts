@@ -67,8 +67,8 @@ export interface APIDocsOptions {
 /** Content-API options — which of the schema's tables get generated CRUD routes. */
 export interface ContentOptions {
 	/**
-	 * Collection (table) names to **not** serve CRUD for. Excluded tables are still created and evolved
-	 * by convergence — they simply get no `/api/{collection}` routes (e.g. internal join tables, or
+	 * Entity (table) names to **not** serve CRUD for. Excluded tables are still created and evolved
+	 * by convergence — they simply get no `/api/{entity}` routes (e.g. internal join tables, or
 	 * tables you serve by hand). @default []
 	 */
 	readonly exclude?: readonly string[];
@@ -115,7 +115,7 @@ export interface ResolvedGlazeOptions {
 	readonly prefixes: { readonly admin: string; readonly api: string };
 	/** Resolved health config. */
 	readonly health: { readonly enabled: boolean; readonly path: string };
-	/** Resolved content config — the collection names to exclude from CRUD. */
+	/** Resolved content config — the entity names to exclude from CRUD. */
 	readonly content: { readonly exclude: readonly string[] };
 	/** Resolved API-docs config (enabled/path/provider concrete; UI + metadata passed through). */
 	readonly docs: {

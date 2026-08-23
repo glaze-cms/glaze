@@ -19,7 +19,7 @@ import { handleStop } from '../lifecycle/index.ts';
 import { createSecurityHeaders } from '../security/index.ts';
 import { selectAdapter } from './adapter.ts';
 
-import type { Collection } from '../content/index.ts';
+import type { Entity } from '../content/index.ts';
 import type { ResolvedGlazeOptions } from '../options/index.ts';
 import type { GlazeApp, GlazeContext } from './context.ts';
 
@@ -39,13 +39,10 @@ interface GlazeManifest {
  * Builds the Glaze app: the decorated Elysia instance with the core chain and graceful shutdown wired.
  *
  * @param context - The resolved Glaze context (db, config, options, logger, runtime).
- * @param collections - The content collections derived from the developer's schema (empty ⇒ no CRUD).
+ * @param entities - The content entities derived from the developer's schema (empty ⇒ no CRUD).
  * @returns The composed Glaze app, ready to `listen`.
  */
-export function createGlazeApp(
-	context: GlazeContext,
-	collections: readonly Collection[],
-): GlazeApp {
+export function createGlazeApp(context: GlazeContext, entities: readonly Entity[]): GlazeApp {
 	const { options } = context;
 
 	const adapter = selectAdapter(context.runtime.name);
@@ -59,7 +56,7 @@ export function createGlazeApp(
 		.use(createSecurityHeaders(options.security.headers))
 		.use(createHealthCheck(options.health))
 		.use(createAuthPlugin(context, auth))
-		.use(createContentRouter({ context, auth, collections }))
+		.use(createContentRouter({ context, auth, entities }))
 		.use(createDocsPlugin(options.docs, options.prefixes.api))
 		.use(createAdminPlugin(context))
 		.get('/', () => buildManifest(options))

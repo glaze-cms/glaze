@@ -7,7 +7,7 @@ import { createLogger } from '#logger';
 import { resolveRuntime } from '#runtime';
 
 import { createGlazeApp } from '../app/index.ts';
-import { loadCollections } from '../content/index.ts';
+import { loadEntities } from '../content/index.ts';
 import { resolveOptions } from '../options/index.ts';
 
 import type { DatabaseHandle } from '#dialect';
@@ -62,7 +62,7 @@ async function buildApp(dir: string, docs: APIDocsOptions) {
 		logger: createLogger({ level: 'silent' }),
 		runtime: resolveRuntime(),
 	};
-	return createGlazeApp(context, await loadCollections(config));
+	return createGlazeApp(context, await loadEntities(config));
 }
 
 /** GETs a path and returns the Response. */

@@ -1,4 +1,4 @@
-export { loadCollections } from './schema.ts';
+export { loadEntities } from './loader.ts';
 export { createContentRouter } from './router.ts';
 
-export type { Collection } from './types.ts';
+export type { Entity } from './types.ts';

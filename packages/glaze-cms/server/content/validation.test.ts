@@ -4,8 +4,8 @@ import { join } from 'node:path';
 import { resolveConfig } from '#config';
 import { expect, test } from '#harness';
 
-import { loadCollections } from './schema.ts';
-import { buildCollectionSchemas } from './validation.ts';
+import { loadEntities } from './loader.ts';
+import { buildEntitySchemas } from './validation.ts';
 
 import type { GlazeConfig } from '#config';
 
@@ -28,7 +28,7 @@ function propsOf(schema: unknown): string[] {
 	return Object.keys((schema as { properties?: Record<string, unknown> }).properties ?? {});
 }
 
-test('buildCollectionSchemas: insert requires only NOT-NULL-without-default columns', async () => {
+test('buildEntitySchemas: insert requires only NOT-NULL-without-default columns', async () => {
 	const dir = mkdtempSync(TEMP_FIXTURE_PREFIX);
 	try {
 		const path = join(dir, 'posts.mjs');
@@ -39,10 +39,10 @@ test('buildCollectionSchemas: insert requires only NOT-NULL-without-default colu
 				"title: text('title').notNull(), views: integer('views').default(0), note: text('note') });\n",
 		);
 		const config: GlazeConfig = { dialect: 'sqlite', connection: 'unused', schema: path };
-		const [collection] = await loadCollections(resolveConfig(config));
-		if (!collection) throw new Error('expected the posts collection');
+		const [entity] = await loadEntities(resolveConfig(config));
+		if (!entity) throw new Error('expected the posts entity');
 
-		const { body, update } = buildCollectionSchemas(collection);
+		const { body, update } = buildEntitySchemas(entity);
 
 		// A NOT-NULL column with no default is required; a defaulted or nullable column is optional.
 		const required = requiredOf(body);

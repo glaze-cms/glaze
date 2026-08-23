@@ -11,7 +11,7 @@ import { createLogger } from '#logger';
 import { resolveRuntime } from '#runtime';
 
 import { createGlazeApp } from '../app/index.ts';
-import { loadCollections } from '../content/index.ts';
+import { loadEntities } from '../content/index.ts';
 import { validateEnv } from '../env/index.ts';
 import { handleStart } from '../lifecycle/index.ts';
 import { resolveOptions } from '../options/index.ts';
@@ -90,8 +90,8 @@ export async function glaze(options: GlazeOptions = {}): Promise<GlazeApp> {
 	const context: GlazeContext = { db, config, options: resolvedOptions, logger, runtime };
 
 	try {
-		const collections = await loadCollections(config);
-		const app = createGlazeApp(context, collections);
+		const entities = await loadEntities(config);
+		const app = createGlazeApp(context, entities);
 		const coreRoutes = snapshotRoutes(app);
 
 		await handleStart(context);

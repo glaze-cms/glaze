@@ -1,6 +1,6 @@
 /**
- * Per-collection TypeBox request schemas, generated from the Drizzle table's columns so validation
- * tracks the schema automatically (no hand-authored, drift-prone schemas per collection).
+ * Per-entity TypeBox request schemas, generated from the Drizzle table's columns so validation
+ * tracks the schema automatically (no hand-authored, drift-prone schemas per entity).
  *
  * Schemas are built with Elysia's OWN TypeBox instance (`t`), so they share its Kind registry — a schema
  * built by a different TypeBox copy is silently ignored by Elysia's validator (routes then run
@@ -12,12 +12,12 @@
 
 import { t } from 'elysia';
 
-import type { Collection } from './types.ts';
+import type { Entity } from './types.ts';
 import type { Column } from 'drizzle-orm';
 import type { AnySchema } from 'elysia';
 
-/** The request schemas for a collection. */
-export interface CollectionSchemas {
+/** The request schemas for an entity. */
+export interface EntitySchemas {
 	/** POST body — NOT-NULL columns without a default are required; defaulted/generated ones optional. */
 	readonly body: AnySchema;
 	/** PATCH body — every column optional, with the primary key removed (it can never be reassigned). */
@@ -59,17 +59,17 @@ function isInsertOptional(column: Column): boolean {
 }
 
 /**
- * Builds the create/update request schemas for a collection.
+ * Builds the create/update request schemas for an entity.
  *
- * @param collection - The collection to derive schemas from.
- * @returns Its {@link CollectionSchemas}.
+ * @param entity - The entity to derive schemas from.
+ * @returns Its {@link EntitySchemas}.
  */
-export function buildCollectionSchemas(collection: Collection): CollectionSchemas {
-	const pkKey = pkPropertyName(collection);
+export function buildEntitySchemas(entity: Entity): EntitySchemas {
+	const pkKey = pkPropertyName(entity);
 	const insertShape: Record<string, AnySchema> = {};
 	const updateShape: Record<string, AnySchema> = {};
 
-	for (const [key, column] of Object.entries(collection.columns)) {
+	for (const [key, column] of Object.entries(entity.columns)) {
 		const schema = columnSchema(column);
 		insertShape[key] = isInsertOptional(column) ? t.Optional(schema) : schema;
 		// The PK is never reassignable, so it is absent from the (all-optional) update body.
@@ -80,14 +80,14 @@ export function buildCollectionSchemas(collection: Collection): CollectionSchema
 }
 
 /**
- * Finds the property-name key of a collection's primary-key column.
+ * Finds the property-name key of an entity's primary-key column.
  *
- * @param collection - The target collection.
+ * @param entity - The target entity.
  * @returns The PK's property key, or `undefined` when there is no single-column PK.
  */
-function pkPropertyName(collection: Collection): string | undefined {
-	for (const [key, column] of Object.entries(collection.columns)) {
-		if (column === collection.pk) return key;
+function pkPropertyName(entity: Entity): string | undefined {
+	for (const [key, column] of Object.entries(entity.columns)) {
+		if (column === entity.pk) return key;
 	}
 	return undefined;
 }

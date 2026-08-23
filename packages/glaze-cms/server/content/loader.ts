@@ -19,35 +19,37 @@ import { getTableConfig as getSqliteTableConfig, SQLiteTable } from 'drizzle-orm
 
 import type { ResolvedGlazeConfig } from '#config';
 import type { Dialect } from '#dialect';
-import type { Collection } from './types.ts';
+import type { Entity, ColumnReference } from './types.ts';
 import type { Column, Table } from 'drizzle-orm';
 
 /**
- * Loads the content collections from the configured Drizzle schema. Absent `config.schema` ⇒ no
- * collections (the content router registers nothing).
+ * Loads the content entities from the configured Drizzle schema. Absent `config.schema` ⇒ no
+ * entities (the content router registers nothing).
  *
  * @param config - The resolved Glaze config (schema path/glob + dialect).
- * @returns One {@link Collection} per exported Drizzle table, de-duplicated by name.
+ * @returns One {@link Entity} per exported Drizzle table, de-duplicated by name.
  */
-export async function loadCollections(config: ResolvedGlazeConfig): Promise<Collection[]> {
+export async function loadEntities(config: ResolvedGlazeConfig): Promise<Entity[]> {
 	if (!config.schema) return [];
 
 	const files = resolveSchemaFiles(config.schema);
 	const modules = await Promise.all(files.map((file) => import(pathToFileURL(file).href)));
 
-	const collections = new Map<string, Collection>();
+	const entities = new Map<string, Entity>();
 	for (const module of modules) {
 		for (const value of Object.values(module as Record<string, unknown>)) {
 			if (!isDrizzleTable(value, config.dialect)) continue;
 			const name = getTableName(value);
-			if (collections.has(name)) continue;
+			if (entities.has(name)) continue;
 			const columns = getTableColumns(value);
 			const pk = findSingleColumnPk(value, columns, config.dialect);
-			collections.set(name, { name, table: value, columns, pk });
+			const primaryKeyColumns = findPrimaryKeyColumns(value, columns, config.dialect);
+			const references = findReferences(value, columns, config.dialect);
+			entities.set(name, { name, table: value, columns, pk, primaryKeyColumns, references });
 		}
 	}
 
-	return [...collections.values()];
+	return [...entities.values()];
 }
 
 /**
@@ -115,9 +117,76 @@ function findSingleColumnPk(
  * @returns The columns of any table-level primary-key constraints.
  */
 function tablePrimaryKeyColumns(table: Table, dialect: Dialect): Column[] {
-	const config =
-		dialect === 'postgres'
-			? getPgTableConfig(table as PgTable)
-			: getSqliteTableConfig(table as SQLiteTable);
-	return config.primaryKeys.flatMap((primaryKey) => primaryKey.columns);
+	return readTableConfig(table, dialect).primaryKeys.flatMap((primaryKey) => primaryKey.columns);
+}
+
+/**
+ * Reads the dialect's table config. The single place a dialect branch is needed for table metadata:
+ * `getTableConfig` is dialect-specific by construction, so every caller that needs constraints goes
+ * through here rather than branching itself.
+ *
+ * @param table - The Drizzle table (already known to match the dialect).
+ * @param dialect - The active dialect.
+ * @returns The table's config, whose `primaryKeys` and `foreignKeys` are shaped alike per dialect.
+ */
+function readTableConfig(table: Table, dialect: Dialect) {
+	return dialect === 'postgres'
+		? getPgTableConfig(table as PgTable)
+		: getSqliteTableConfig(table as SQLiteTable);
+}
+
+/**
+ * Lists every primary-key column's property name, from both declaration styles. Unlike
+ * {@link findSingleColumnPk} this keeps composite keys, which is how a junction table is recognised.
+ *
+ * @param table - The Drizzle table.
+ * @param columns - The table's columns keyed by property name.
+ * @param dialect - The active dialect.
+ * @returns The property names of the primary-key columns, empty when the table has no key.
+ */
+function findPrimaryKeyColumns(
+	table: Table,
+	columns: Record<string, Column>,
+	dialect: Dialect,
+): string[] {
+	const primaries = [
+		...Object.values(columns).filter((column) => column.primary),
+		...tablePrimaryKeyColumns(table, dialect),
+	];
+	const names = new Set(primaries.map((column) => column.name));
+	return Object.entries(columns)
+		.filter(([, column]) => names.has(column.name))
+		.map(([key]) => key);
+}
+
+/**
+ * Maps a table's single-column foreign keys to the property name of the referencing column. Composite
+ * foreign keys are skipped: they have no single-field representation, and treating one of their columns
+ * as a standalone reference would misdescribe the relationship.
+ *
+ * @param table - The Drizzle table.
+ * @param columns - The table's columns keyed by property name.
+ * @param dialect - The active dialect.
+ * @returns References keyed by referencing property name.
+ */
+function findReferences(
+	table: Table,
+	columns: Record<string, Column>,
+	dialect: Dialect,
+): Record<string, ColumnReference> {
+	const byColumnName = new Map(Object.entries(columns).map(([key, column]) => [column.name, key]));
+	const references: Record<string, ColumnReference> = {};
+
+	for (const foreignKey of readTableConfig(table, dialect).foreignKeys) {
+		const { columns: local, foreignTable, foreignColumns } = foreignKey.reference();
+		if (local.length !== 1) continue;
+
+		const key = byColumnName.get(local[0]?.name ?? '');
+		const target = foreignColumns[0];
+		if (!key || !target) continue;
+
+		references[key] = { entity: getTableName(foreignTable), column: target.name };
+	}
+
+	return references;
 }

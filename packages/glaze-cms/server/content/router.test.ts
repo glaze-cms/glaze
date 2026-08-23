@@ -9,8 +9,8 @@ import { createLogger } from '#logger';
 import { resolveRuntime } from '#runtime';
 
 import { resolveOptions } from '../options/index.ts';
+import { loadEntities } from './loader.ts';
 import { createContentRouter } from './router.ts';
-import { loadCollections } from './schema.ts';
 
 import type { DatabaseHandle, Dialect } from '#dialect';
 import type { GlazeContext } from '../app/context.ts';
@@ -153,8 +153,8 @@ async function buildRouter(
 	const { session = SESSION, exclude = [] } = options;
 	const schema = writePostsSchema(dir, dialect);
 	const context = buildContext(db, dialect, schema, { exclude });
-	const collections = await loadCollections(context.config);
-	return createContentRouter({ context, auth: authStub(session), collections });
+	const entities = await loadEntities(context.config);
+	return createContentRouter({ context, auth: authStub(session), entities });
 }
 
 /**
@@ -184,6 +184,8 @@ interface Envelope {
 	success: boolean;
 	data: unknown;
 	error: { code: string; message: string; fields?: { path: string; message: string }[] } | null;
+	/** Present on list responses only. */
+	meta?: { total: number; limit: number; offset: number };
 }
 
 /** Parses a response body as the API envelope, surfacing the status + raw text if it isn't JSON. */
@@ -288,13 +290,13 @@ matrixTest('rejects an unauthenticated request with 401', async ({ db, dialect }
 	}
 });
 
-matrixTest('does not expose an excluded collection', async ({ db, dialect }) => {
+matrixTest('does not expose an excluded entity', async ({ db, dialect }) => {
 	const dir = mkdtempSync(TEMP_FIXTURE_PREFIX);
 	try {
 		await createPostsTable(db);
 		const router = await buildRouter(db, dialect, dir, { exclude: ['posts'] });
 
-		// No route registered ⇒ 404 (not 401): the collection is withheld entirely, still DB-managed.
+		// No route registered ⇒ 404 (not 401): the entity is withheld entirely, still DB-managed.
 		expect((await send(router, 'GET', '/api/posts')).status).toBe(404);
 	} finally {
 		rmSync(dir, { recursive: true, force: true });
@@ -394,27 +396,24 @@ matrixTest('a malformed JSON body stays in the envelope (400)', async ({ db, dia
 	}
 });
 
-matrixTest(
-	'skips a collection whose name collides with a reserved route',
-	async ({ db, dialect }) => {
-		const dir = mkdtempSync(TEMP_FIXTURE_PREFIX);
-		try {
-			const context = buildContext(db, dialect, writePostsSchema(dir, dialect));
-			const [posts] = await loadCollections(context.config);
-			if (!posts) throw new Error('expected the posts collection');
-			// Re-label the collection `auth` — it would shadow Better Auth's `/api/auth/*`, so it is skipped.
-			const router = createContentRouter({
-				context,
-				auth: authStub(SESSION),
-				collections: [{ ...posts, name: 'auth' }],
-			});
+matrixTest('skips an entity whose name collides with a reserved route', async ({ db, dialect }) => {
+	const dir = mkdtempSync(TEMP_FIXTURE_PREFIX);
+	try {
+		const context = buildContext(db, dialect, writePostsSchema(dir, dialect));
+		const [posts] = await loadEntities(context.config);
+		if (!posts) throw new Error('expected the posts entity');
+		// Re-label the entity `auth` — it would shadow Better Auth's `/api/auth/*`, so it is skipped.
+		const router = createContentRouter({
+			context,
+			auth: authStub(SESSION),
+			entities: [{ ...posts, name: 'auth' }],
+		});
 
-			expect((await send(router, 'GET', '/api/auth')).status).toBe(404);
-		} finally {
-			rmSync(dir, { recursive: true, force: true });
-		}
-	},
-);
+		expect((await send(router, 'GET', '/api/auth')).status).toBe(404);
+	} finally {
+		rmSync(dir, { recursive: true, force: true });
+	}
+});
 
 matrixTest('scopes CORS to content routes, never sibling scopes', async ({ db, dialect }) => {
 	const dir = mkdtempSync(TEMP_FIXTURE_PREFIX);
@@ -423,8 +422,8 @@ matrixTest('scopes CORS to content routes, never sibling scopes', async ({ db, d
 		await createPostsTable(db);
 		const schema = writePostsSchema(dir, dialect);
 		const context = buildContext(db, dialect, schema, { cors: { origin, credentials: true } });
-		const collections = await loadCollections(context.config);
-		const content = createContentRouter({ context, auth: authStub(SESSION), collections });
+		const entities = await loadEntities(context.config);
+		const content = createContentRouter({ context, auth: authStub(SESSION), entities });
 		const app = new Elysia().use(content).get('/', () => 'root');
 
 		const onContent = await app.handle(
@@ -454,8 +453,8 @@ matrixTest(
 		try {
 			await createConstraintTables(db, dialect);
 			const context = buildContext(db, dialect, writeConstraintSchema(dir, dialect));
-			const collections = await loadCollections(context.config);
-			const router = createContentRouter({ context, auth: authStub(SESSION), collections });
+			const entities = await loadEntities(context.config);
+			const router = createContentRouter({ context, auth: authStub(SESSION), entities });
 			const post = (body: unknown) => send(router, 'POST', '/api/posts', body);
 
 			// A valid create still succeeds (no false positives) and seeds the conflicting row.
@@ -480,6 +479,294 @@ matrixTest(
 			const badFk = await post({ id: 3, email: 'f@k.com', authorId: 999 });
 			expect(badFk.status).toBe(409);
 			expect((await toEnvelope(badFk)).error?.code).toBe('FOREIGN_KEY');
+		} finally {
+			rmSync(dir, { recursive: true, force: true });
+		}
+	},
+);
+
+matrixTest('reports the total row count alongside a page', async ({ db, dialect }) => {
+	const dir = mkdtempSync(TEMP_FIXTURE_PREFIX);
+	try {
+		await createPostsTable(db);
+		const router = await buildRouter(db, dialect, dir);
+		await Promise.all(
+			[1, 2, 3, 4, 5].map((id) => send(router, 'POST', '/api/posts', { id, title: `post ${id}` })),
+		);
+
+		const counted = await toEnvelope(
+			await send(router, 'GET', '/api/posts?limit=2&offset=2&count=true'),
+		);
+		expect(counted.data).toHaveLength(2);
+		// The total counts every matching row, not the page — a pager cannot work otherwise.
+		expect(counted.meta?.total).toBe(5);
+		expect(counted.meta?.limit).toBe(2);
+		expect(counted.meta?.offset).toBe(2);
+
+		// Counting doubles the cost of the hottest endpoint, so it is opt-in; `meta` is still present.
+		const uncounted = await toEnvelope(await send(router, 'GET', '/api/posts?limit=2'));
+		expect(uncounted.data).toHaveLength(2);
+		expect(uncounted.meta?.total).toBeNull();
+		expect(uncounted.meta?.limit).toBe(2);
+	} finally {
+		rmSync(dir, { recursive: true, force: true });
+	}
+});
+
+matrixTest('counts only the rows a filter matches', async ({ db, dialect }) => {
+	const dir = mkdtempSync(TEMP_FIXTURE_PREFIX);
+	try {
+		await createPostsTable(db);
+		const router = await buildRouter(db, dialect, dir);
+		await send(router, 'POST', '/api/posts', { id: 1, title: 'keep' });
+		await send(router, 'POST', '/api/posts', { id: 2, title: 'keep' });
+		await send(router, 'POST', '/api/posts', { id: 3, title: 'drop' });
+
+		const filtered = await toEnvelope(
+			await send(router, 'GET', '/api/posts?filter[title]=keep&count=true'),
+		);
+		expect(filtered.data).toHaveLength(2);
+		// The count must apply the same filter as the page, or the pager reports phantom rows.
+		expect(filtered.meta?.total).toBe(2);
+
+		const ranged = await toEnvelope(
+			await send(router, 'GET', '/api/posts?filter[id][gt]=1&count=true'),
+		);
+		expect(ranged.meta?.total).toBe(2);
+
+		const listed = await toEnvelope(
+			await send(router, 'GET', '/api/posts?filter[id][in]=1,3&count=true'),
+		);
+		expect(listed.meta?.total).toBe(2);
+	} finally {
+		rmSync(dir, { recursive: true, force: true });
+	}
+});
+
+matrixTest('sorts by a requested column and direction', async ({ db, dialect }) => {
+	const dir = mkdtempSync(TEMP_FIXTURE_PREFIX);
+	try {
+		await createPostsTable(db);
+		const router = await buildRouter(db, dialect, dir);
+		await send(router, 'POST', '/api/posts', { id: 1, title: 'b' });
+		await send(router, 'POST', '/api/posts', { id: 2, title: 'a' });
+		await send(router, 'POST', '/api/posts', { id: 3, title: 'c' });
+
+		const ascending = await toEnvelope(await send(router, 'GET', '/api/posts?sort=title'));
+		expect((ascending.data as { title: string }[]).map((row) => row.title)).toEqual([
+			'a',
+			'b',
+			'c',
+		]);
+
+		const descending = await toEnvelope(
+			await send(router, 'GET', '/api/posts?sort=title&order=desc'),
+		);
+		expect((descending.data as { title: string }[]).map((row) => row.title)).toEqual([
+			'c',
+			'b',
+			'a',
+		]);
+	} finally {
+		rmSync(dir, { recursive: true, force: true });
+	}
+});
+
+matrixTest('rejects an unusable sort or filter instead of ignoring it', async ({ db, dialect }) => {
+	const dir = mkdtempSync(TEMP_FIXTURE_PREFIX);
+	try {
+		await createPostsTable(db);
+		const router = await buildRouter(db, dialect, dir);
+		await send(router, 'POST', '/api/posts', { id: 1, title: 'only' });
+
+		// Silently ignoring these would return MORE rows than asked for — a failure that looks like success.
+		const rejected = [
+			'?sort=nope',
+			'?order=sideways',
+			'?filter[nope]=1',
+			'?filter[id][bogus]=1',
+			'?filter[id]=abc',
+			'?limit=0.5',
+			'?limit=abc',
+			'?offset=-5',
+		];
+		const responses = await Promise.all(
+			rejected.map((query) => send(router, 'GET', `/api/posts${query}`)),
+		);
+		const envelopes = await Promise.all(responses.map(toEnvelope));
+
+		expect(responses.map((response) => response.status)).toEqual(rejected.map(() => 422));
+		expect(envelopes.map((envelope) => envelope.error?.code)).toEqual(
+			rejected.map(() => 'VALIDATION'),
+		);
+	} finally {
+		rmSync(dir, { recursive: true, force: true });
+	}
+});
+
+matrixTest('serves the content model at the entities route', async ({ db, dialect }) => {
+	const dir = mkdtempSync(TEMP_FIXTURE_PREFIX);
+	try {
+		await createPostsTable(db);
+		const router = await buildRouter(db, dialect, dir);
+
+		const response = await send(router, 'GET', '/api/entities');
+		expect(response.status).toBe(200);
+
+		const schema = (await toEnvelope(response)).data as {
+			entities: {
+				name: string;
+				displayField: string | null;
+				capabilities: { byId: boolean };
+				fields: { name: string; fieldType: string; fieldTypeSource: string }[];
+			}[];
+		};
+		expect(schema.entities).toHaveLength(1);
+		expect(schema.entities[0]?.name).toBe('posts');
+		expect(schema.entities[0]?.capabilities.byId).toBe(true);
+		expect(schema.entities[0]?.displayField).toBe('title');
+
+		const title = schema.entities[0]?.fields.find((field) => field.name === 'title');
+		expect(title?.fieldType).toBe('shortText');
+		// Every presentation key is present and marked inferred, so the shape is final before overrides.
+		expect(title?.fieldTypeSource).toBe('inferred');
+	} finally {
+		rmSync(dir, { recursive: true, force: true });
+	}
+});
+
+matrixTest('gates the entities route behind a session', async ({ db, dialect }) => {
+	const dir = mkdtempSync(TEMP_FIXTURE_PREFIX);
+	try {
+		await createPostsTable(db);
+		const router = await buildRouter(db, dialect, dir, { session: null });
+
+		const response = await send(router, 'GET', '/api/entities');
+		expect(response.status).toBe(401);
+		expect((await toEnvelope(response)).error?.code).toBe('UNAUTHORIZED');
+	} finally {
+		rmSync(dir, { recursive: true, force: true });
+	}
+});
+
+matrixTest('never lets a prototype property pass as a column', async ({ db, dialect }) => {
+	const dir = mkdtempSync(TEMP_FIXTURE_PREFIX);
+	try {
+		await createPostsTable(db);
+		const router = await buildRouter(db, dialect, dir);
+		await send(router, 'POST', '/api/posts', { id: 1, title: 'only' });
+
+		// `getTableColumns` returns a plain object, so `columns['constructor']` is a truthy function that
+		// sails past an `if (!column)` guard and into the query builder — a 500, and an authenticated
+		// client emitting unbounded stack traces at request rate.
+		const hostile = ['constructor', 'toString', 'hasOwnProperty', '__proto__', 'valueOf'];
+		const filters = await Promise.all(
+			hostile.map((name) => send(router, 'GET', `/api/posts?filter[${name}]=1`)),
+		);
+		const sorts = await Promise.all(
+			hostile.map((name) => send(router, 'GET', `/api/posts?sort=${name}`)),
+		);
+
+		expect(filters.map((response) => response.status)).toEqual(hostile.map(() => 422));
+		expect(sorts.map((response) => response.status)).toEqual(hostile.map(() => 422));
+	} finally {
+		rmSync(dir, { recursive: true, force: true });
+	}
+});
+
+matrixTest('ignores query parameters that are not filters', async ({ db, dialect }) => {
+	const dir = mkdtempSync(TEMP_FIXTURE_PREFIX);
+	try {
+		await createPostsTable(db);
+		const router = await buildRouter(db, dialect, dir);
+		await send(router, 'POST', '/api/posts', { id: 1, title: 'only' });
+
+		// A CDN, a WAF, jQuery's cache-buster and any shared link carrying utm_* all append parameters.
+		// Hard-failing them would break a content API for reasons that have nothing to do with the query.
+		const benign = ['?_=1699999', '?utm_source=newsletter', '?fbclid=abc', '?v=2'];
+		const responses = await Promise.all(
+			benign.map((query) => send(router, 'GET', `/api/posts${query}`)),
+		);
+		expect(responses.map((response) => response.status)).toEqual(benign.map(() => 200));
+	} finally {
+		rmSync(dir, { recursive: true, force: true });
+	}
+});
+
+matrixTest('coerces filter values identically on both dialects', async ({ db, dialect }) => {
+	const dir = mkdtempSync(TEMP_FIXTURE_PREFIX);
+	try {
+		await createPostsTable(db);
+		const router = await buildRouter(db, dialect, dir);
+		await send(router, 'POST', '/api/posts', { id: 1, title: 'only' });
+
+		// Each of these previously returned 200-with-wrong-answer on SQLite and 500 on Postgres. A value
+		// that silently becomes a different number selects a row the caller did not ask for.
+		const malformed = [
+			'?filter[id]=1.5',
+			'?filter[id]=9007199254740993',
+			'?filter[id]=0x10',
+			'?filter[id]=%201',
+			'?filter[id][gt]=1e3',
+		];
+		const responses = await Promise.all(
+			malformed.map((query) => send(router, 'GET', `/api/posts${query}`)),
+		);
+		expect(responses.map((response) => response.status)).toEqual(malformed.map(() => 422));
+
+		// The id route already held this line; the filter path must not be looser than it.
+		expect((await send(router, 'GET', '/api/posts/0x10')).status).toBe(400);
+	} finally {
+		rmSync(dir, { recursive: true, force: true });
+	}
+});
+
+matrixTest('searches text without exposing wildcards or collation', async ({ db, dialect }) => {
+	const dir = mkdtempSync(TEMP_FIXTURE_PREFIX);
+	try {
+		await createPostsTable(db);
+		const router = await buildRouter(db, dialect, dir);
+		await send(router, 'POST', '/api/posts', { id: 1, title: 'Hello World' });
+		await send(router, 'POST', '/api/posts', { id: 2, title: '50% off' });
+		await send(router, 'POST', '/api/posts', { id: 3, title: 'unrelated' });
+
+		// Case must not depend on the engine: Postgres LIKE matches case, SQLite's does not.
+		const lower = await toEnvelope(
+			await send(router, 'GET', '/api/posts?filter[title][contains]=hello'),
+		);
+		expect(lower.data).toHaveLength(1);
+
+		// A caller's `%` is a literal, not a wildcard — otherwise searching for it matches everything.
+		const literal = await toEnvelope(
+			await send(router, 'GET', '/api/posts?filter[title][contains]=50%25'),
+		);
+		expect(literal.data).toHaveLength(1);
+
+		const anchored = await toEnvelope(
+			await send(router, 'GET', '/api/posts?filter[title][startsWith]=Hello'),
+		);
+		expect(anchored.data).toHaveLength(1);
+
+		// Text search against a number is a caller error, and errors at the driver on Postgres.
+		expect((await send(router, 'GET', '/api/posts?filter[id][contains]=1')).status).toBe(422);
+	} finally {
+		rmSync(dir, { recursive: true, force: true });
+	}
+});
+
+matrixTest(
+	'bounds an in-filter so one request cannot exhaust the driver',
+	async ({ db, dialect }) => {
+		const dir = mkdtempSync(TEMP_FIXTURE_PREFIX);
+		try {
+			await createPostsTable(db);
+			const router = await buildRouter(db, dialect, dir);
+
+			// Postgres caps a statement at 65535 bind parameters; an unbounded list is a cheap 500.
+			const huge = Array.from({ length: 500 }, (_, index) => index).join(',');
+			expect((await send(router, 'GET', `/api/posts?filter[id][in]=${huge}`)).status).toBe(422);
+			// An empty list would otherwise mean "the empty string" on text and 422 on numbers.
+			expect((await send(router, 'GET', '/api/posts?filter[id][in]=')).status).toBe(422);
 		} finally {
 			rmSync(dir, { recursive: true, force: true });
 		}

@@ -6,17 +6,42 @@
 
 import { status } from 'elysia';
 
-import type { ApiResponse, GlazeError, GlazeErrorCode } from '#types';
+import type {
+	ApiListResponse,
+	ApiResponse,
+	GlazeError,
+	GlazeErrorCode,
+	ResponseMetadata,
+} from '#types';
 
 /**
  * Wraps a payload as a successful response envelope (HTTP 200 by default; wrap in `status(201, …)` for a
- * created resource).
+ * created resource). Pass `meta` for a list response; omitting it leaves the key absent, so non-list
+ * bodies carry exactly `{ success, data, error }`.
  *
  * @param data - The payload.
+ * @param meta - Optional pagination detail for a list response.
  * @returns The success envelope.
  */
-export function buildSuccessResponse<T>(data: T): { success: true; data: T; error: null } {
-	return { success: true, data, error: null };
+export function buildSuccessResponse<T>(data: T): Extract<ApiResponse<T>, { success: true }> {
+	return { success: true, data, error: null } satisfies ApiResponse<T>;
+}
+
+/**
+ * Wraps a page of rows as a successful list envelope, carrying its {@link ResponseMetadata}.
+ *
+ * Separate from {@link buildSuccessResponse} so `meta` is required by the type rather than optional —
+ * a list response that forgot it would otherwise compile.
+ *
+ * @param data - The page of rows.
+ * @param meta - The pagination detail describing the page.
+ * @returns The success envelope.
+ */
+export function buildListResponse<T>(
+	data: T[],
+	meta: ResponseMetadata,
+): Extract<ApiListResponse<T>, { success: true }> {
+	return { success: true, data, error: null, meta } satisfies ApiListResponse<T>;
 }
 
 /**

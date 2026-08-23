@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { resolveConfig } from '#config';
 import { expect, test } from '#harness';
 
-import { loadCollections } from './schema.ts';
+import { loadEntities } from './loader.ts';
 
 import type { GlazeConfig } from '#config';
 import type { Dialect } from '#dialect';
@@ -58,7 +58,7 @@ function buildConfig(dialect: Dialect, schema: string | undefined) {
 	return resolveConfig(schema === undefined ? base : { ...base, schema });
 }
 
-test('loadCollections derives a collection with columns and a single-column PK', async () => {
+test('loadEntities derives an entity with columns and a single-column PK', async () => {
 	const dir = mkdtempSync(TEMP_FIXTURE_PREFIX);
 	try {
 		const schema = writeSchema(
@@ -67,18 +67,18 @@ test('loadCollections derives a collection with columns and a single-column PK',
 			'posts',
 			"id: integer('id').primaryKey(), title: text('title')",
 		);
-		const collections = await loadCollections(buildConfig('sqlite', schema));
+		const entities = await loadEntities(buildConfig('sqlite', schema));
 
-		expect(collections).toHaveLength(1);
-		expect(collections[0]?.name).toBe('posts');
-		expect(Object.keys(collections[0]?.columns ?? {})).toEqual(['id', 'title']);
-		expect(collections[0]?.pk?.name).toBe('id');
+		expect(entities).toHaveLength(1);
+		expect(entities[0]?.name).toBe('posts');
+		expect(Object.keys(entities[0]?.columns ?? {})).toEqual(['id', 'title']);
+		expect(entities[0]?.pk?.name).toBe('id');
 	} finally {
 		rmSync(dir, { recursive: true, force: true });
 	}
 });
 
-test('loadCollections derives a table-level single-column PK', async () => {
+test('loadEntities derives a table-level single-column PK', async () => {
 	const dir = mkdtempSync(TEMP_FIXTURE_PREFIX);
 	try {
 		// A PK declared table-level via `primaryKey({ columns })` does NOT set `column.primary`; the
@@ -90,51 +90,51 @@ test('loadCollections derives a table-level single-column PK', async () => {
 				"export const posts = sqliteTable('posts', { id: integer('id'), title: text('title') }, " +
 				'(t) => [primaryKey({ columns: [t.id] })]);\n',
 		);
-		const collections = await loadCollections(buildConfig('sqlite', path));
+		const entities = await loadEntities(buildConfig('sqlite', path));
 
-		expect(collections[0]?.pk?.name).toBe('id');
+		expect(entities[0]?.pk?.name).toBe('id');
 	} finally {
 		rmSync(dir, { recursive: true, force: true });
 	}
 });
 
-test('loadCollections leaves a table without a single-column PK unkeyed', async () => {
+test('loadEntities leaves a table without a single-column PK unkeyed', async () => {
 	const dir = mkdtempSync(TEMP_FIXTURE_PREFIX);
 	try {
 		const schema = writeSchema(dir, 'sqlite', 'tags', "a: text('a'), b: text('b')");
-		const collections = await loadCollections(buildConfig('sqlite', schema));
+		const entities = await loadEntities(buildConfig('sqlite', schema));
 
-		expect(collections).toHaveLength(1);
-		expect(collections[0]?.pk).toEqual(undefined);
+		expect(entities).toHaveLength(1);
+		expect(entities[0]?.pk).toEqual(undefined);
 	} finally {
 		rmSync(dir, { recursive: true, force: true });
 	}
 });
 
-test('loadCollections returns nothing when no schema is configured', async () => {
-	expect(await loadCollections(buildConfig('sqlite', undefined))).toHaveLength(0);
+test('loadEntities returns nothing when no schema is configured', async () => {
+	expect(await loadEntities(buildConfig('sqlite', undefined))).toHaveLength(0);
 });
 
-test('loadCollections expands a directory glob to every module', async () => {
+test('loadEntities expands a directory glob to every module', async () => {
 	const dir = mkdtempSync(TEMP_FIXTURE_PREFIX);
 	try {
 		writeSchema(dir, 'sqlite', 'posts', "id: integer('id').primaryKey()");
 		writeSchema(dir, 'sqlite', 'tags', "id: integer('id').primaryKey()");
-		const collections = await loadCollections(buildConfig('sqlite', join(dir, '*.mjs')));
+		const entities = await loadEntities(buildConfig('sqlite', join(dir, '*.mjs')));
 
-		expect(collections.map((collection) => collection.name).toSorted()).toEqual(['posts', 'tags']);
+		expect(entities.map((entity) => entity.name).toSorted()).toEqual(['posts', 'tags']);
 	} finally {
 		rmSync(dir, { recursive: true, force: true });
 	}
 });
 
-test('loadCollections keeps only the active dialect tables', async () => {
+test('loadEntities keeps only the active dialect tables', async () => {
 	const dir = mkdtempSync(TEMP_FIXTURE_PREFIX);
 	try {
 		const schema = writeSchema(dir, 'postgres', 'posts', "id: integer('id').primaryKey()");
-		expect(await loadCollections(buildConfig('postgres', schema))).toHaveLength(1);
+		expect(await loadEntities(buildConfig('postgres', schema))).toHaveLength(1);
 		// The same Postgres table module, read as SQLite, matches no SQLite table.
-		expect(await loadCollections(buildConfig('sqlite', schema))).toHaveLength(0);
+		expect(await loadEntities(buildConfig('sqlite', schema))).toHaveLength(0);
 	} finally {
 		rmSync(dir, { recursive: true, force: true });
 	}
