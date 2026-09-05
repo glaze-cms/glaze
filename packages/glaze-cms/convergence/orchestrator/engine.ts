@@ -18,10 +18,10 @@
  * `out` up front, so if the apply is declined or fails, that migration is removed — keeping the
  * snapshot in lockstep with the database.
  *
- * See `specs/design/convergence.md`. This covers unaudited convergence. With `audit`, it returns
- * `pending` but **also rolls the migration back** (no durable pending-approvals record exists yet),
- * so it never leaves the snapshot ahead of the database; the full pending lifecycle is a later,
- * contained increment (`specs/design/pending-approvals.md`).
+ * See `specs/design/convergence.md`. With `audit`, it probes the live database, fingerprints the
+ * change, and returns `pending` **after rolling the migration back**, so it never leaves the
+ * snapshot ahead of the database. The caller records that as a pending approval; approving it is
+ * what applies the change (`specs/design/pending-approvals.md`).
  */
 
 import { readdirSync, readFileSync, rmSync } from 'node:fs';
@@ -29,6 +29,7 @@ import { join } from 'node:path';
 
 import { applyMigration } from '../apply/index.ts';
 import { createGenerateCompute } from './generate.ts';
+import { computeChangeHash, readParentSnapshotId } from './hash.ts';
 import { runPreflight } from './preflight.ts';
 import { resolveWithDecisions } from './resolution.ts';
 
@@ -90,7 +91,14 @@ export type ConvergeResult =
 	| { readonly status: 'data_loss_declined'; readonly losses: readonly UnexpectedRowLoss[] }
 	| { readonly status: 'unexpected_data_loss'; readonly losses: readonly UnexpectedRowLoss[] }
 	| { readonly status: 'unsafe_change'; readonly findings: readonly DataLossFinding[] }
-	| { readonly status: 'pending'; readonly statements: readonly string[] }
+	| {
+			readonly status: 'pending';
+			readonly statements: readonly string[];
+			/** Fingerprint of this change; the dedupe key at boot and the guard at approval. */
+			readonly changeHash: string;
+			/** What layer-1 found in the live database — the row counts a person is shown. */
+			readonly findings: readonly DataLossFinding[];
+	  }
 	| { readonly status: 'error'; readonly code: ConvergenceErrorCode; readonly detail?: string };
 
 /** A resolved rename, captured so the apply oracle can match the table across the rename. */
@@ -151,11 +159,37 @@ export async function converge(options: ConvergeOptions): Promise<ConvergeResult
 		const statements = readMigrationStatements(migrationDir);
 
 		if (audit) {
-			// No durable pending-approvals record exists yet, so an audit must not leave the snapshot ahead
-			// of the DB: roll the migration back and return the SQL for review only. The next converge
-			// regenerates it.
+			// Layer-1 runs BEFORE the rollback: its findings are live row counts read from the database,
+			// and once the migration dir is gone there is no snapshot to diff against. They are what the
+			// approver is shown ("1,204 rows hold data"), so a request without them is a request nobody
+			// can make an informed decision about.
+			const preflight = await runPreflight(
+				(sql) => db.raw(sql),
+				dialect,
+				migrationDir,
+				out,
+				deriveRenamedColumns(renames),
+			);
+			if (preflight.status === 'error') {
+				rmSync(migrationDir, { recursive: true, force: true });
+				return { status: 'error', code: 'internal', detail: preflight.detail };
+			}
+			// `audit` decides WHO says yes, never WHETHER the safety rule applies. A blocking finding is
+			// one the database itself would reject, so it must fail boot here exactly as it does on the
+			// unaudited path — filing it as a pending approval would put an approve button on a change
+			// that can never succeed, and turn a clean refusal into a mid-migration failure later.
+			const findings = preflight.status === 'unsafe' ? preflight.findings : [];
+			if (findings.some((finding) => !isConfirmable(finding))) {
+				rmSync(migrationDir, { recursive: true, force: true });
+				return { status: 'unsafe_change', findings };
+			}
+
+			const changeHash = computeChangeHash(statements, readParentSnapshotId(migrationDir));
+
+			// An audit must not leave the snapshot ahead of the database: roll the migration back and
+			// return the change for review only. Approval regenerates it and verifies this hash.
 			rmSync(migrationDir, { recursive: true, force: true });
-			return { status: 'pending', statements };
+			return { status: 'pending', statements, changeHash, findings };
 		}
 
 		const result = await guardAndApply({
@@ -237,6 +271,18 @@ async function guardAndApply(args: GuardAndApplyArgs): Promise<ConvergeResult> {
 }
 
 /**
+ * Whether a pre-flight finding is one a person may agree to. Only a populated column drop is: it is
+ * valid SQL that destroys data, so it is a decision. Every other code describes a change the
+ * database would refuse outright, which is not a decision anybody can take.
+ *
+ * @param finding - A layer-1 pre-flight finding.
+ * @returns `true` when the finding can be confirmed rather than blocked.
+ */
+function isConfirmable(finding: DataLossFinding): boolean {
+	return finding.code === 'column_has_data';
+}
+
+/**
  * Decides whether pre-flight findings clear the way to apply. Only a `column_has_data` finding (a
  * valid-but-destructive column drop) is confirmable; every other code is a hard block the DB would
  * reject, so a single one fails the whole batch. Each confirmable finding must be individually
@@ -251,7 +297,7 @@ async function allDropsConfirmed(
 	confirmDrop: DropConfirmer | undefined,
 ): Promise<boolean> {
 	for (const finding of findings) {
-		if (finding.code !== 'column_has_data') return false;
+		if (!isConfirmable(finding)) return false;
 		// oxlint-disable-next-line no-await-in-loop
 		const confirmed = confirmDrop ? await confirmDrop(finding) : false;
 		if (!confirmed) return false;

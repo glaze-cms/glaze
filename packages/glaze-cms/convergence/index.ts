@@ -1,4 +1,5 @@
 export { applyMigration, captureRowCounts, findUnexpectedLosses } from './apply/index.ts';
+export { computeChangeHash, readParentSnapshotId } from './orchestrator/index.ts';
 export {
 	CONVERGENCE_ERROR_CODES,
 	decodeEnvelope,

@@ -10,9 +10,18 @@
 
 import { converge, createInteractiveResolver } from '#convergence';
 
+import {
+	buildApprovalSchema,
+	createTrailId,
+	findOpenRequest,
+	recordEvent,
+} from '../approvals/index.ts';
+
 import type { ConvergeResult, InteractiveResolver } from '#convergence';
 import type { Logger } from '#logger';
 import type { GlazeContext } from '../app/context.ts';
+import type { ApprovalDb } from '../approvals/index.ts';
+import type { Table } from 'drizzle-orm';
 
 /** Guidance appended to every blocked-boot error — how the developer unblocks it. */
 const REMEDIATION =
@@ -81,12 +90,12 @@ function reportConvergence(logger: Logger, result: ConvergeResult): void {
 			logger.info(`Glaze converged the schema (${result.statements.length} statement(s)).`);
 			return;
 		case 'pending':
-			// An audited change is held for approval, so the database does NOT yet match the schema. No
-			// durable pending-approvals record exists yet, so this recurs every boot — warn (not info) so
-			// the drift is visible rather than silently normal.
+			// An audited change is held for approval, so the database does NOT yet match the schema. The
+			// change is on file as a pending approval, but nothing applies until a person decides — warn
+			// (not info) so the gap between schema and database stays visible rather than silently normal.
 			logger.warn(
 				`Glaze detected ${result.statements.length} pending schema change(s) held for approval; the ` +
-					'database does not yet match the schema. Apply them via an approved migration.',
+					'database does not yet match the schema. Approve them in the admin to apply them.',
 			);
 			return;
 		default: {
@@ -95,6 +104,68 @@ function reportConvergence(logger: Logger, result: ConvergeResult): void {
 			throw new Error(`Convergence blocked: ${reason}. ${REMEDIATION}`);
 		}
 	}
+}
+
+/**
+ * Records what boot found, against the pending-approvals trail. Runs only when the project audits;
+ * without it, `converge` never returns `pending` and there is nothing to file.
+ *
+ * Four cases, and the hash decides between them:
+ *
+ * - **Nothing to do, nothing on file** — silence is correct.
+ * - **Nothing to do, a request on file** — the schema went back to what the database already has, so
+ *   the request describes a change nobody is proposing any more: `withdrawn`.
+ * - **A change matching the open request** — the same change, still waiting. Recording it again would
+ *   turn one decision into a queue of identical ones.
+ * - **A change that does not match** — the schema moved while the request was open. The old request is
+ *   `superseded` and a new one filed, rather than repositioned onto a change its approver never saw.
+ *
+ * @param context - The Glaze context (database handle, resolved config).
+ * @param result - What convergence just found.
+ * @returns Resolves once the trail reflects this boot.
+ */
+async function recordApprovalOutcome(context: GlazeContext, result: ConvergeResult): Promise<void> {
+	if (result.status !== 'pending' && result.status !== 'no_changes') return;
+
+	const schema = buildApprovalSchema(context.config.dialect);
+	const events = schema.approvalEvents as Table;
+	const outcome = result;
+
+	// Read and write in one transaction: closing a request and filing its successor is one decision,
+	// and a crash between them would leave the trail claiming a change was superseded by nothing.
+	await (context.db.db as ApprovalDb).transaction(async (db) => {
+		const open = await findOpenRequest(db, events);
+
+		if (outcome.status === 'no_changes') {
+			if (open) {
+				await recordEvent(db, events, {
+					requestId: open.requestId,
+					type: 'withdrawn',
+					actorKind: 'system',
+				});
+			}
+			return;
+		}
+
+		if (open?.changeHash === outcome.changeHash) return;
+
+		if (open) {
+			await recordEvent(db, events, {
+				requestId: open.requestId,
+				type: 'superseded',
+				actorKind: 'system',
+				payload: { supersededBy: outcome.changeHash },
+			});
+		}
+
+		await recordEvent(db, events, {
+			requestId: createTrailId(),
+			type: 'requested',
+			changeHash: outcome.changeHash,
+			actorKind: 'system',
+			payload: { origin: 'dev', statements: outcome.statements, findings: outcome.findings },
+		});
+	});
 }
 
 /**
@@ -127,6 +198,8 @@ export async function runConvergence(
 		confirmDrop,
 		audit: config.workflow.audit,
 	});
+
+	if (config.workflow.audit) await recordApprovalOutcome(context, result);
 
 	reportConvergence(logger, result);
 }

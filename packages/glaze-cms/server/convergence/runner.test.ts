@@ -7,6 +7,7 @@ import { expect, matrixTest } from '#harness';
 import { createLogger } from '#logger';
 import { resolveRuntime } from '#runtime';
 
+import { materializeApprovalTables } from '../approvals/index.ts';
 import { materializeAuthTables } from '../auth/index.ts';
 import { resolveOptions } from '../options/index.ts';
 import { runConvergence } from './runner.ts';
@@ -64,6 +65,16 @@ function writeSchema(dir: string, dialect: Dialect, columns: string): string {
 		`import { ${table}, integer, text } from 'drizzle-orm/${core}';\n` +
 			`export const posts = ${table}('posts', { ${columns} });\n`,
 	);
+	return path;
+}
+
+/**
+ * Writes a schema file declaring no tables, on a fresh path for the same reason {@link writeSchema}
+ * uses one. Stands for a developer reverting the change they were proposing.
+ */
+function writeEmptySchema(dir: string): string {
+	const path = join(dir, `schema-${schemaFileCounter++}.ts`);
+	writeFileSync(path, 'export const nothing = 1;\n');
 	return path;
 }
 
@@ -267,6 +278,22 @@ matrixTest(
 	},
 );
 
+/** The DB-qualified approvals-trail table for the dialect. */
+function trailTable(dialect: Dialect): string {
+	return dialect === 'postgres' ? 'glaze.approval_events' : 'zz__glaze_approval_events';
+}
+
+/** Renders a nullable text column, which arrives as `string | null` from either dialect. */
+function stringify(value: unknown): string {
+	return typeof value === 'string' ? value : '';
+}
+
+/** Reads the trail oldest-first as `[type, changeHash]` pairs. */
+async function readTrail(db: DatabaseHandle, dialect: Dialect): Promise<[string, string][]> {
+	const rows = await db.raw(`select id, type, change_hash from ${trailTable(dialect)} order by id`);
+	return rows.map((row) => [String(row['type']), stringify(row['change_hash'])]);
+}
+
 matrixTest(
 	'an audited change is detected as pending without being applied',
 	async ({ db, dialect }) => {
@@ -279,11 +306,10 @@ matrixTest(
 				"id: integer('id').primaryKey(), title: text('title')",
 			);
 			// `audit` is the team default: converge returns `pending` and rolls back — boot continues, but
-			// the table is NOT created (no durable record yet, so this is a deliberate no-op-that-continues).
-			await runConvergence(
-				buildContext(db, dialect, schema, migrations, { mode: 'team' }),
-				decliningResolver(),
-			);
+			// the table is NOT created; the change is filed for a person instead.
+			const context = buildContext(db, dialect, schema, migrations, { mode: 'team' });
+			await materializeApprovalTables(context);
+			await runConvergence(context, decliningResolver());
 			expect(await userTableExists(db, dialect, 'posts')).toBe(false);
 		} finally {
 			rmSync(dir, { recursive: true, force: true });
@@ -301,10 +327,12 @@ matrixTest('auditing is configurable independently of the mode', async ({ db, di
 		);
 
 		// solo + audit: alone, but every structural change is still held for review.
-		await runConvergence(
-			buildContext(db, dialect, schema, join(dir, 'audited'), { mode: 'solo', audit: true }),
-			decliningResolver(),
-		);
+		const audited = buildContext(db, dialect, schema, join(dir, 'audited'), {
+			mode: 'solo',
+			audit: true,
+		});
+		await materializeApprovalTables(audited);
+		await runConvergence(audited, decliningResolver());
 		expect(await userTableExists(db, dialect, 'posts')).toBe(false);
 
 		// A team audits by default, so opting out of it must actually reach the apply path.
@@ -330,3 +358,128 @@ matrixTest('skips convergence entirely when no schema is configured', async ({ d
 	await runConvergence(context, decliningResolver());
 	expect(await userTableExists(db, dialect, 'posts')).toBe(false);
 });
+
+matrixTest(
+	'files one request per distinct change, and never a duplicate',
+	async ({ db, dialect }) => {
+		const dir = mkdtempSync(TEMP_FIXTURE_PREFIX);
+		const migrations = join(dir, 'migrations');
+		try {
+			const schema = writeSchema(
+				dir,
+				dialect,
+				"id: integer('id').primaryKey(), title: text('title')",
+			);
+			const context = buildContext(db, dialect, schema, migrations, { audit: true });
+			await materializeApprovalTables(context);
+
+			await runConvergence(context, decliningResolver());
+			const [filed] = await readTrail(db, dialect);
+			expect(filed?.[0]).toBe('requested');
+			expect(filed?.[1] === '').toBe(false);
+
+			// A second boot finds the same change. It is already on file and waiting for the same person,
+			// so filing it again would turn one decision into a queue of identical ones.
+			await runConvergence(context, decliningResolver());
+			expect(await readTrail(db, dialect)).toHaveLength(1);
+		} finally {
+			rmSync(dir, { recursive: true, force: true });
+		}
+	},
+);
+
+matrixTest(
+	'supersedes the open request when the schema moves under it',
+	async ({ db, dialect }) => {
+		const dir = mkdtempSync(TEMP_FIXTURE_PREFIX);
+		const migrations = join(dir, 'migrations');
+		try {
+			const v1 = writeSchema(dir, dialect, "id: integer('id').primaryKey(), title: text('title')");
+			const first = buildContext(db, dialect, v1, migrations, { audit: true });
+			await materializeApprovalTables(first);
+			await runConvergence(first, decliningResolver());
+
+			const v2 = writeSchema(
+				dir,
+				dialect,
+				"id: integer('id').primaryKey(), title: text('title'), body: text('body')",
+			);
+			await runConvergence(
+				buildContext(db, dialect, v2, migrations, { audit: true }),
+				decliningResolver(),
+			);
+
+			// The first request is closed rather than repositioned: nobody approved the change it now
+			// describes, so it is superseded and the new change filed on its own.
+			const trail = await readTrail(db, dialect);
+			expect(trail.map(([type]) => type)).toEqual(['requested', 'superseded', 'requested']);
+			expect(trail[0]?.[1] === trail[2]?.[1]).toBe(false);
+		} finally {
+			rmSync(dir, { recursive: true, force: true });
+		}
+	},
+);
+
+matrixTest('withdraws the open request when the schema is reverted', async ({ db, dialect }) => {
+	const dir = mkdtempSync(TEMP_FIXTURE_PREFIX);
+	const migrations = join(dir, 'migrations');
+	try {
+		const v1 = writeSchema(dir, dialect, "id: integer('id').primaryKey(), title: text('title')");
+		const context = buildContext(db, dialect, v1, migrations, { audit: true });
+		await materializeApprovalTables(context);
+		await runConvergence(context, decliningResolver());
+
+		// Back to a schema the database already satisfies: there is no longer a change to decide on.
+		const reverted = writeEmptySchema(dir);
+		await runConvergence(
+			buildContext(db, dialect, reverted, migrations, { audit: true }),
+			decliningResolver(),
+		);
+
+		expect((await readTrail(db, dialect)).map(([type]) => type)).toEqual([
+			'requested',
+			'withdrawn',
+		]);
+	} finally {
+		rmSync(dir, { recursive: true, force: true });
+	}
+});
+
+// `audit` decides who says yes, never whether the safety rule applies. A blocking finding is one the
+// database itself would reject, so filing it as a pending approval would put an approve button on a
+// change that can never succeed — and turn a clean refusal at boot into a failed migration later.
+matrixTest(
+	'an audited blocking change fails boot instead of being filed',
+	async ({ db, dialect }) => {
+		const dir = mkdtempSync(TEMP_FIXTURE_PREFIX);
+		const migrations = join(dir, 'migrations');
+		try {
+			// Apply v1 unaudited, so the snapshot and the database both hold `posts` with a nullable title.
+			const v1 = writeSchema(dir, dialect, "id: integer('id').primaryKey(), title: text('title')");
+			await runConvergence(buildContext(db, dialect, v1, migrations), decliningResolver());
+			await db.raw('insert into posts (id, title) values (1, null)');
+
+			// Now demand NOT NULL, audited. The existing NULL makes this a change the database refuses.
+			const v2 = writeSchema(
+				dir,
+				dialect,
+				"id: integer('id').primaryKey(), title: text('title').notNull()",
+			);
+			const context = buildContext(db, dialect, v2, migrations, { audit: true });
+			await materializeApprovalTables(context);
+
+			let threw = false;
+			try {
+				await runConvergence(context, decliningResolver());
+			} catch {
+				threw = true;
+			}
+
+			expect(threw).toBe(true);
+			// Nothing on the trail: the change was refused, not offered to an approver.
+			expect(await readTrail(db, dialect)).toHaveLength(0);
+		} finally {
+			rmSync(dir, { recursive: true, force: true });
+		}
+	},
+);

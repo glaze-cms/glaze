@@ -1,3 +1,4 @@
+export { computeChangeHash, readParentSnapshotId } from './hash.ts';
 export { converge } from './engine.ts';
 export { createGenerateCompute } from './generate.ts';
 export { resolveWithDecisions } from './resolution.ts';
