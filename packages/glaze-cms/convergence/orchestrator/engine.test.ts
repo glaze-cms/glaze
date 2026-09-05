@@ -95,84 +95,33 @@ matrixTest(
 );
 
 matrixTest(
-	'audit holds a destructive change as pending, and never desyncs',
+	'converge in audit mode returns the SQL as pending without applying, and never desyncs',
 	async ({ db, dialect }) => {
 		const p = tempProject();
 		try {
-			const setup = await convergeSchema(db, dialect, p.dir, p.out, 'a', {
-				people: ['id', 'email'],
-			});
-			expect(setup.status).toBe('applied');
-			await db.raw("insert into people (id, email) values (1, 'a@b.c')");
-
-			// Dropping a populated column destroys data, so audit holds it with the counts attached.
 			const pending = await convergeSchema(
 				db,
 				dialect,
 				p.dir,
 				p.out,
-				'b',
-				{ people: ['id'] },
+				'a',
+				{ widgets: ['id'] },
 				{ audit: true },
 			);
 			expect(pending.status).toBe('pending');
-			if (pending.status === 'pending') {
-				expect(pending.findings).toHaveLength(1);
-				expect(pending.changeHash.length).toBe(64);
-			}
-			// The column and its data survive — nothing was applied.
-			expect(await db.raw('select email from people')).toHaveLength(1);
+			// The DB was not touched — the table does not exist.
+			expect(await tableExists(db, 'widgets')).toBe(false);
 
-			// No snapshot desync: because the migration was rolled back, the next converge still sees the
-			// change rather than reporting a false `no_changes`.
-			const confirmed = await convergeSchema(
-				db,
-				dialect,
-				p.dir,
-				p.out,
-				'c',
-				{ people: ['id'] },
-				{ confirmDrop: () => true },
-			);
-			expect(confirmed.status).toBe('applied');
+			// No snapshot desync: because audit rolled the migration back, a subsequent auto converge
+			// still sees the change and applies it (rather than reporting a false `no_changes`).
+			const applied = await convergeSchema(db, dialect, p.dir, p.out, 'b', { widgets: ['id'] });
+			expect(applied.status).toBe('applied');
+			expect(await tableExists(db, 'widgets')).toBe(true);
 		} finally {
 			p.cleanup();
 		}
 	},
 );
-
-// `audit` says who answers for a destructive change; it does not put a person in front of a change
-// that destroys nothing. Holding an added column would stop the schema and the database agreeing for
-// no gain, and every read of that entity would fail until somebody clicked approve.
-matrixTest('audit applies a change that destroys nothing', async ({ db, dialect }) => {
-	const p = tempProject();
-	try {
-		const created = await convergeSchema(
-			db,
-			dialect,
-			p.dir,
-			p.out,
-			'a',
-			{ widgets: ['id'] },
-			{ audit: true },
-		);
-		expect(created.status).toBe('applied');
-		expect(await tableExists(db, 'widgets')).toBe(true);
-
-		const added = await convergeSchema(
-			db,
-			dialect,
-			p.dir,
-			p.out,
-			'b',
-			{ widgets: ['id', 'note'] },
-			{ audit: true },
-		);
-		expect(added.status).toBe('applied');
-	} finally {
-		p.cleanup();
-	}
-});
 
 matrixTest(
 	'converge blocks a populated column drop, then applies it once confirmed',
