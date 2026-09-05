@@ -346,10 +346,18 @@ Public types must read like docs in editor hover/autocomplete.
 2. **Postgres end-to-end:** server, auth, convergence, content CRUD.
 3. **SQLite** behind the same seam + harness — both dialects, both runtimes.
 
-**Next — open.** The substrate is built; what is not is the surface where the thesis (§1) becomes
-visible. Convergence is real but invisible today: a developer sees a boot log. It becomes the
-product only when a person is shown _"this change drops `subtitle`; 1,204 rows hold data"_ and can
-decide. Sequencing that against the proposal/review layer is a live decision — see §12.
+**Next — the first vertical slice** (decided 2026-09-05). The substrate is built; what is not is the
+surface where the thesis (§1) becomes visible. Convergence is real but invisible today: a developer
+sees a boot log. It becomes the product only when a person is shown _"this change drops `subtitle`;
+1,204 rows hold data"_ and can decide.
+
+So: the **pending ledger** (step 2 of `specs/design/convergence.md`'s build order) **plus the one
+admin screen** that shows a pending change and lets a human approve or reject it — a vertical slice,
+not another horizontal backend step. It also closes a live dead end: `gate: 'audit'` returns
+`pending` but rolls the migration back, and `server/convergence/runner.ts` maps
+`workflow: { mode: 'team' }` → `audit`, so team mode today detects changes, never applies them, and
+offers no way to approve. **Spec the pending record — table, integrity hash, lifecycle — before
+building any screen**, so the UI does not shape the data model.
 
 **Constraint on everything after:** born type-checked for completeness and behavior-tested across
 all targets (§7).
@@ -361,8 +369,5 @@ outside the convergence core.
 
 ## 12. Open / deferred
 
-- **Next milestone — undecided.** The admin surface that renders convergence decisions, versus the
-  proposal/suggestion layer (§1). Both are "make the thesis visible"; the order is not settled.
 - **Admin-stack dependency survey** (Better Auth, React 19 / React Compiler, Base UI 1.0,
   TanStack Router/Start) — deferred until we build admin; doesn't touch seams/convergence/gate.
-- **Elysia 2 swap** — tracked, seam-contained; flip when `@elysiajs/node` + cors + Better Auth are ready.
