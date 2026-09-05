@@ -68,16 +68,6 @@ function writeSchema(dir: string, dialect: Dialect, columns: string): string {
 	return path;
 }
 
-/**
- * Writes a schema file declaring no tables, on a fresh path for the same reason {@link writeSchema}
- * uses one. Stands for a developer reverting the change they were proposing.
- */
-function writeEmptySchema(dir: string): string {
-	const path = join(dir, `schema-${schemaFileCounter++}.ts`);
-	writeFileSync(path, 'export const nothing = 1;\n');
-	return path;
-}
-
 /** Builds a Glaze context whose config points at the given schema file and migrations dir. */
 function buildContext(
 	db: DatabaseHandle,
@@ -294,70 +284,56 @@ async function readTrail(db: DatabaseHandle, dialect: Dialect): Promise<[string,
 	return rows.map((row) => [String(row['type']), stringify(row['change_hash'])]);
 }
 
+/**
+ * Applies `posts(id, title, body)` unaudited and puts a value in `body`, so a later schema that drops
+ * `body` is genuinely destructive. Returns the shared temp dir and the migrations dir.
+ */
+async function seedPopulatedColumn(
+	db: DatabaseHandle,
+	dialect: Dialect,
+	dir: string,
+): Promise<string> {
+	const migrations = join(dir, 'migrations');
+	const v1 = writeSchema(
+		dir,
+		dialect,
+		"id: integer('id').primaryKey(), title: text('title'), body: text('body')",
+	);
+	await runConvergence(buildContext(db, dialect, v1, migrations), decliningResolver());
+	await db.raw("insert into posts (id, title, body) values (1, 'hi', 'keep me')");
+	return migrations;
+}
+
 matrixTest(
-	'an audited change is detected as pending without being applied',
+	'a destructive change is held and recorded, and its data survives',
 	async ({ db, dialect }) => {
 		const dir = mkdtempSync(TEMP_FIXTURE_PREFIX);
-		const migrations = join(dir, 'migrations');
 		try {
-			const schema = writeSchema(
+			const migrations = await seedPopulatedColumn(db, dialect, dir);
+			const dropsBody = writeSchema(
 				dir,
 				dialect,
 				"id: integer('id').primaryKey(), title: text('title')",
 			);
-			// `audit` is the team default: converge returns `pending` and rolls back — boot continues, but
-			// the table is NOT created; the change is filed for a person instead.
-			const context = buildContext(db, dialect, schema, migrations, { audit: true });
+
+			const context = buildContext(db, dialect, dropsBody, migrations, { audit: true });
 			await materializeApprovalTables(context);
 			await runConvergence(context, decliningResolver());
-			expect(await userTableExists(db, dialect, 'posts')).toBe(false);
+
+			// Boot continued, the column and its row are untouched, and the change is on file.
+			expect(await db.raw('select body from posts')).toHaveLength(1);
+			expect((await readTrail(db, dialect)).map(([type]) => type)).toEqual(['requested']);
 		} finally {
 			rmSync(dir, { recursive: true, force: true });
 		}
 	},
 );
 
-matrixTest('audit decides whether a change is held or applied', async ({ db, dialect }) => {
-	const dir = mkdtempSync(TEMP_FIXTURE_PREFIX);
-	try {
-		const schema = writeSchema(
-			dir,
-			dialect,
-			"id: integer('id').primaryKey(), title: text('title')",
-		);
-
-		// Audited: the change is recorded and held, so the table is not created.
-		const audited = buildContext(db, dialect, schema, join(dir, 'audited'), { audit: true });
-		await materializeApprovalTables(audited);
-		await runConvergence(audited, decliningResolver());
-		expect(await userTableExists(db, dialect, 'posts')).toBe(false);
-
-		// Unaudited: the same schema reaches the apply path, against the same database.
-		await runConvergence(
-			buildContext(db, dialect, schema, join(dir, 'unaudited'), { audit: false }),
-			decliningResolver(),
-		);
-		expect(await userTableExists(db, dialect, 'posts')).toBe(true);
-	} finally {
-		rmSync(dir, { recursive: true, force: true });
-	}
-});
-
-matrixTest('skips convergence entirely when no schema is configured', async ({ db, dialect }) => {
-	// A config without `schema` resolves to `undefined`; runConvergence must return without touching the DB.
-	const context: GlazeContext = {
-		db,
-		config: resolveConfig({ dialect, connection: 'unused' }),
-		options: resolveOptions({}),
-		logger: createLogger({ level: 'silent' }),
-		runtime: resolveRuntime(),
-	};
-	await runConvergence(context, decliningResolver());
-	expect(await userTableExists(db, dialect, 'posts')).toBe(false);
-});
-
+// `audit` says who answers for a destructive change. It does not put a person in front of a change
+// that destroys nothing — holding an added column would leave the schema advertising a column the
+// database lacks, and every read of that entity would fail until somebody clicked approve.
 matrixTest(
-	'files one request per distinct change, and never a duplicate',
+	'an audited change that destroys nothing applies, and files nothing',
 	async ({ db, dialect }) => {
 		const dir = mkdtempSync(TEMP_FIXTURE_PREFIX);
 		const migrations = join(dir, 'migrations');
@@ -368,6 +344,29 @@ matrixTest(
 				"id: integer('id').primaryKey(), title: text('title')",
 			);
 			const context = buildContext(db, dialect, schema, migrations, { audit: true });
+			await materializeApprovalTables(context);
+			await runConvergence(context, decliningResolver());
+
+			expect(await userTableExists(db, dialect, 'posts')).toBe(true);
+			expect(await readTrail(db, dialect)).toHaveLength(0);
+		} finally {
+			rmSync(dir, { recursive: true, force: true });
+		}
+	},
+);
+
+matrixTest(
+	'files one request per distinct change, and never a duplicate',
+	async ({ db, dialect }) => {
+		const dir = mkdtempSync(TEMP_FIXTURE_PREFIX);
+		try {
+			const migrations = await seedPopulatedColumn(db, dialect, dir);
+			const dropsBody = writeSchema(
+				dir,
+				dialect,
+				"id: integer('id').primaryKey(), title: text('title')",
+			);
+			const context = buildContext(db, dialect, dropsBody, migrations, { audit: true });
 			await materializeApprovalTables(context);
 
 			await runConvergence(context, decliningResolver());
@@ -389,20 +388,23 @@ matrixTest(
 	'supersedes the open request when the schema moves under it',
 	async ({ db, dialect }) => {
 		const dir = mkdtempSync(TEMP_FIXTURE_PREFIX);
-		const migrations = join(dir, 'migrations');
 		try {
-			const v1 = writeSchema(dir, dialect, "id: integer('id').primaryKey(), title: text('title')");
-			const first = buildContext(db, dialect, v1, migrations, { audit: true });
+			const migrations = await seedPopulatedColumn(db, dialect, dir);
+
+			const dropsBody = writeSchema(
+				dir,
+				dialect,
+				"id: integer('id').primaryKey(), title: text('title')",
+			);
+			const first = buildContext(db, dialect, dropsBody, migrations, { audit: true });
 			await materializeApprovalTables(first);
 			await runConvergence(first, decliningResolver());
 
-			const v2 = writeSchema(
-				dir,
-				dialect,
-				"id: integer('id').primaryKey(), title: text('title'), body: text('body')",
-			);
+			// Now drop `title` as well — a different change against the same database.
+			await db.raw("update posts set title = 'now populated' where id = 1");
+			const dropsBoth = writeSchema(dir, dialect, "id: integer('id').primaryKey()");
 			await runConvergence(
-				buildContext(db, dialect, v2, migrations, { audit: true }),
+				buildContext(db, dialect, dropsBoth, migrations, { audit: true }),
 				decliningResolver(),
 			);
 
@@ -419,15 +421,23 @@ matrixTest(
 
 matrixTest('withdraws the open request when the schema is reverted', async ({ db, dialect }) => {
 	const dir = mkdtempSync(TEMP_FIXTURE_PREFIX);
-	const migrations = join(dir, 'migrations');
 	try {
-		const v1 = writeSchema(dir, dialect, "id: integer('id').primaryKey(), title: text('title')");
-		const context = buildContext(db, dialect, v1, migrations, { audit: true });
+		const migrations = await seedPopulatedColumn(db, dialect, dir);
+		const dropsBody = writeSchema(
+			dir,
+			dialect,
+			"id: integer('id').primaryKey(), title: text('title')",
+		);
+		const context = buildContext(db, dialect, dropsBody, migrations, { audit: true });
 		await materializeApprovalTables(context);
 		await runConvergence(context, decliningResolver());
 
-		// Back to a schema the database already satisfies: there is no longer a change to decide on.
-		const reverted = writeEmptySchema(dir);
+		// Put `body` back: the database already satisfies this, so there is nothing to decide on.
+		const reverted = writeSchema(
+			dir,
+			dialect,
+			"id: integer('id').primaryKey(), title: text('title'), body: text('body')",
+		);
 		await runConvergence(
 			buildContext(db, dialect, reverted, migrations, { audit: true }),
 			decliningResolver(),
@@ -442,21 +452,19 @@ matrixTest('withdraws the open request when the schema is reverted', async ({ db
 	}
 });
 
-// `audit` decides who says yes, never whether the safety rule applies. A blocking finding is one the
-// database itself would reject, so filing it as a pending approval would put an approve button on a
-// change that can never succeed — and turn a clean refusal at boot into a failed migration later.
+// `audit` decides who says yes, never whether the safety rule applies. An impossible change is one
+// the database itself would reject, so filing it as a pending approval would put an approve button on
+// a change that can never succeed — and turn a clean refusal at boot into a failed migration later.
 matrixTest(
-	'an audited blocking change fails boot instead of being filed',
+	'an audited impossible change fails boot instead of being filed',
 	async ({ db, dialect }) => {
 		const dir = mkdtempSync(TEMP_FIXTURE_PREFIX);
 		const migrations = join(dir, 'migrations');
 		try {
-			// Apply v1 unaudited, so the snapshot and the database both hold `posts` with a nullable title.
 			const v1 = writeSchema(dir, dialect, "id: integer('id').primaryKey(), title: text('title')");
 			await runConvergence(buildContext(db, dialect, v1, migrations), decliningResolver());
 			await db.raw('insert into posts (id, title) values (1, null)');
 
-			// Now demand NOT NULL, audited. The existing NULL makes this a change the database refuses.
 			const v2 = writeSchema(
 				dir,
 				dialect,

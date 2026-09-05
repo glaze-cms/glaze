@@ -357,10 +357,6 @@ Written down because each is the kind of decision that gets silently re-reverted
 
 ## Still to build
 
-- **Holding only what destroys data.** The code committed so far holds _every_ structural change when
-  `audit` is on — the earlier model. It already refuses blocking changes correctly; what it does not
-  yet do is let a safe change through. This is the smallest of the corrections and the one that makes
-  the content-API problem disappear.
 - **The apply path for kept files.** `drizzle-orm/postgres-js/migrator` and `drizzle-orm/bun-sqlite/migrator`
   read the committed chain, compare it to the journal, and apply what is missing. Glaze must apply
   the statements **itself** rather than delegating: drizzle's migrator owns its own transaction, and

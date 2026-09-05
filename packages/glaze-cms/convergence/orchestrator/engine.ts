@@ -18,10 +18,11 @@
  * `out` up front, so if the apply is declined or fails, that migration is removed — keeping the
  * snapshot in lockstep with the database.
  *
- * See `specs/design/convergence.md`. With `audit`, it probes the live database, fingerprints the
- * change, and returns `pending` **after rolling the migration back**, so it never leaves the
- * snapshot ahead of the database. The caller records that as a pending approval; approving it is
- * what applies the change (`specs/design/pending-approvals.md`).
+ * See `specs/design/convergence.md`. A change that destroys data is held for a person; one that does
+ * not applies. With `audit`, holding means returning `pending` **after rolling the migration back**,
+ * so the snapshot never runs ahead of the database while the change waits. The caller records that as
+ * a pending approval, and approving it is what applies the change
+ * (`specs/design/pending-approvals.md`).
  */
 
 import { readdirSync, readFileSync, rmSync } from 'node:fs';
@@ -77,8 +78,9 @@ export interface ConvergeOptions {
 	/** Confirms a destructive-but-valid layer-1 change (a populated column drop). Absent ⇒ declined (blocked). */
 	readonly confirmDrop?: DropConfirmer;
 	/**
-	 * Hold the change for a person instead of applying it: returns `pending` with the SQL for review.
-	 * @default false — apply when safe.
+	 * Send a **destructive** change to a person instead of to the confirm seam: returns `pending` with
+	 * the SQL and the live row counts. A change that destroys nothing applies either way.
+	 * @default false — ask the confirm seam, which declines when there is no terminal.
 	 */
 	readonly audit?: boolean;
 }
@@ -158,40 +160,6 @@ export async function converge(options: ConvergeOptions): Promise<ConvergeResult
 	try {
 		const statements = readMigrationStatements(migrationDir);
 
-		if (audit) {
-			// Layer-1 runs BEFORE the rollback: its findings are live row counts read from the database,
-			// and once the migration dir is gone there is no snapshot to diff against. They are what the
-			// approver is shown ("1,204 rows hold data"), so a request without them is a request nobody
-			// can make an informed decision about.
-			const preflight = await runPreflight(
-				(sql) => db.raw(sql),
-				dialect,
-				migrationDir,
-				out,
-				deriveRenamedColumns(renames),
-			);
-			if (preflight.status === 'error') {
-				rmSync(migrationDir, { recursive: true, force: true });
-				return { status: 'error', code: 'internal', detail: preflight.detail };
-			}
-			// `audit` decides WHO says yes, never WHETHER the safety rule applies. A blocking finding is
-			// one the database itself would reject, so it must fail boot here exactly as it does on the
-			// unaudited path — filing it as a pending approval would put an approve button on a change
-			// that can never succeed, and turn a clean refusal into a mid-migration failure later.
-			const findings = preflight.status === 'unsafe' ? preflight.findings : [];
-			if (findings.some((finding) => !isConfirmable(finding))) {
-				rmSync(migrationDir, { recursive: true, force: true });
-				return { status: 'unsafe_change', findings };
-			}
-
-			const changeHash = computeChangeHash(statements, readParentSnapshotId(migrationDir));
-
-			// An audit must not leave the snapshot ahead of the database: roll the migration back and
-			// return the change for review only. Approval regenerates it and verifies this hash.
-			rmSync(migrationDir, { recursive: true, force: true });
-			return { status: 'pending', statements, changeHash, findings };
-		}
-
 		const result = await guardAndApply({
 			db,
 			dialect,
@@ -202,6 +170,7 @@ export async function converge(options: ConvergeOptions): Promise<ConvergeResult
 			out,
 			confirmLoss,
 			confirmDrop,
+			audit,
 		});
 		if (result.status !== 'applied') rmSync(migrationDir, { recursive: true, force: true });
 		return result;
@@ -226,13 +195,14 @@ interface GuardAndApplyArgs {
 	readonly out: string;
 	readonly confirmLoss: LossResolver | undefined;
 	readonly confirmDrop: DropConfirmer | undefined;
+	/** Hold a destructive change for a person rather than asking the confirm seam here. */
+	readonly audit: boolean;
 }
 
 /**
- * Runs layer-1 pre-flight, then the layer-2 apply oracle. Pre-flight catches the count-preserving loss
- * the oracle cannot see (a populated column drop): a blocking finding (the DB would reject the change)
- * stops here as `unsafe_change`; a confirmable finding (a valid but destructive drop) proceeds only
- * once every one is confirmed. This does not roll the snapshot back — the caller does on non-`applied`.
+ * Runs layer-1 pre-flight, decides what the findings mean, then runs the layer-2 apply oracle.
+ * Pre-flight catches the count-preserving loss the oracle cannot see (a populated column drop). This
+ * does not roll the snapshot back — the caller does on any non-`applied` result, `pending` included.
  *
  * @param args - The database, dialect, migration, output dir, and injected confirm seams.
  * @returns The converge result.
@@ -248,6 +218,7 @@ async function guardAndApply(args: GuardAndApplyArgs): Promise<ConvergeResult> {
 		out,
 		confirmLoss,
 		confirmDrop,
+		audit,
 	} = args;
 
 	const preflight = await runPreflight(
@@ -260,13 +231,34 @@ async function guardAndApply(args: GuardAndApplyArgs): Promise<ConvergeResult> {
 	if (preflight.status === 'error') {
 		return { status: 'error', code: 'internal', detail: preflight.detail };
 	}
-	if (
-		preflight.status === 'unsafe' &&
-		!(await allDropsConfirmed(preflight.findings, confirmDrop))
-	) {
-		return { status: 'unsafe_change', findings: preflight.findings };
+
+	const findings = preflight.status === 'unsafe' ? preflight.findings : [];
+
+	// An impossible change is one the database itself would refuse. Nobody can agree to it, so it
+	// fails closed here whether or not the project audits — offering it for approval would put an
+	// approve button on a change that can never succeed.
+	if (findings.some((finding) => !isConfirmable(finding))) {
+		return { status: 'unsafe_change', findings };
 	}
 
+	// A destructive change is the one thing a person decides. Under `audit` the person is not here,
+	// so it is held with the live counts attached; the caller rolls the migration back, which is what
+	// keeps the snapshot level with the database while the change waits.
+	if (findings.length > 0 && audit) {
+		return {
+			status: 'pending',
+			statements,
+			changeHash: computeChangeHash(statements, readParentSnapshotId(migrationDir)),
+			findings,
+		};
+	}
+
+	// Destructive and unaudited: the confirm seam answers, at a terminal or not at all.
+	if (findings.length > 0 && !(await allDropsConfirmed(findings, confirmDrop))) {
+		return { status: 'unsafe_change', findings };
+	}
+
+	// Nothing destroys data. Waiting buys nothing, so it applies — audited or not.
 	return applyWithLossConfirmation(db, dialect, statements, renamedTables, confirmLoss);
 }
 
