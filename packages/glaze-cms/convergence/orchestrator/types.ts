@@ -8,7 +8,7 @@ import type { OperationResult, SchemaDecision } from '../envelope/index.ts';
 
 /**
  * A reply Glaze sends back to drizzle to resolve one decision. Mirrors drizzle's `Hint` shape (see
- * `docs/research/drizzle-kit-rc-1.0-sdk.md` §3); written to a hints file when re-invoking `generate`.
+ * `specs/research/drizzle-kit-rc-1.0-sdk.md` §3); written to a hints file when re-invoking `generate`.
  */
 export type Hint =
 	| {

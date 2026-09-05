@@ -1,7 +1,7 @@
 /**
  * Glaze's convergence result model — the clean, translatable signal the Admin UI and collaboration
  * WebSocket consume. It is decoded from drizzle-kit's raw `--output json` / SDK envelope (see
- * `docs/research/drizzle-kit-rc-1.0-sdk.md` §2–3) so Glaze's surface stays decoupled from drizzle's
+ * `specs/research/drizzle-kit-rc-1.0-sdk.md` §2–3) so Glaze's surface stays decoupled from drizzle's
  * exact (rc-versioned) shapes: the UI translates a Glaze `code`, never a scraped string.
  */
 

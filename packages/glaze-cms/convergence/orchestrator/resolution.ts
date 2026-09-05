@@ -138,7 +138,7 @@ function toHint(decision: SchemaDecision, resolution: DecisionResolution): Hint 
 	if (decision.type === 'rename_or_create') {
 		if (resolution.action === 'rename') {
 			// from = the deleted entity the human chose; to = the new entity. Empirically verified against
-			// drizzle rc.4 (RENAME COLUMN <from> TO <to>); see docs/research/drizzle-kit-rc-1.0-sdk.md §3.
+			// drizzle rc.4 (RENAME COLUMN <from> TO <to>); see specs/research/drizzle-kit-rc-1.0-sdk.md §3.
 			return {
 				type: 'rename',
 				kind: decision.entityKind,

@@ -6,7 +6,7 @@
  * against drizzle-kit 1.0.0-rc.4: e.g. `SET NOT NULL` over existing NULLs is emitted and fails as a
  * runtime `query_error`). Glaze detects them **before** applying so the change becomes a clean,
  * translatable decision instead of a mid-migration failure. See
- * `docs/research/drizzle-kit-rc-1.0-sdk.md` §3.
+ * `specs/research/drizzle-kit-rc-1.0-sdk.md` §3.
  *
  * This is a data-safety gate, so it **fails closed**: when a probe cannot determine safety (a
  * missing object, an unreadable result, a bad descriptor), it reports `could_not_verify` — never a

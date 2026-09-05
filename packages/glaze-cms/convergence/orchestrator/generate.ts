@@ -5,7 +5,7 @@
  * (no DB driver), so it runs Bun-native with no SQLite driver at all.
  *
  * Hints are passed via a temp `hintsFile` because rc.4's inline `hints:` option is bugged (returns
- * `missing_required_params_error`) — see `docs/research/drizzle-kit-rc-1.0-sdk.md` §3.
+ * `missing_required_params_error`) — see `specs/research/drizzle-kit-rc-1.0-sdk.md` §3.
  */
 
 import { randomUUID } from 'node:crypto';

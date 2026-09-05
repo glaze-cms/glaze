@@ -3,7 +3,7 @@
  * data-loss scenarios the targeted checks (layer 1) and drizzle-kit both miss: it applies a
  * migration inside a transaction, verifies real before/after row counts, and rolls back if a table
  * that should have survived unexpectedly lost rows. See CLAUDE.md §7 and
- * `docs/research/drizzle-kit-rc-1.0-sdk.md` §3.
+ * `specs/research/drizzle-kit-rc-1.0-sdk.md` §3.
  */
 
 import type { Dialect } from '../../dialect/index.ts';

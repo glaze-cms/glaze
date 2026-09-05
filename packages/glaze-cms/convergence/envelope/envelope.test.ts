@@ -2,7 +2,7 @@ import { expect, test } from '../../harness/index.ts';
 import { decodeEnvelope } from './index.ts';
 
 // These specs are pure JSON → JSON (no DB, runtime-independent). The inputs mirror the real
-// drizzle-kit 1.0-rc envelopes captured in docs/research/drizzle-kit-rc-1.0-sdk.md.
+// drizzle-kit 1.0-rc envelopes captured in specs/research/drizzle-kit-rc-1.0-sdk.md.
 
 test('decodes an ok generate envelope with a migration path', () => {
 	const result = decodeEnvelope({

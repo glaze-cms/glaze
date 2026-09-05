@@ -2,7 +2,7 @@
  * Maps drizzle-kit's open-string `error.code` onto Glaze's closed {@link ConvergenceErrorCode} set.
  * drizzle does not expose a literal union of codes (the type is `string`), so this table covers the
  * documented codes and everything else falls back to `unknown` — the UI always has a code to
- * translate. See `docs/research/drizzle-kit-rc-1.0-sdk.md` §2.
+ * translate. See `specs/research/drizzle-kit-rc-1.0-sdk.md` §2.
  */
 
 import type { ConvergenceErrorCode } from './types.ts';

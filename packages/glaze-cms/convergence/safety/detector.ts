@@ -3,7 +3,7 @@
  * does not flag. Given proposed schema changes, the target dialect, and a live database, it runs the
  * matching probe for each and returns every confirmed problem — so the change becomes a translatable
  * decision surfaced to the user, never a mid-migration SQL failure. See
- * `docs/research/drizzle-kit-rc-1.0-sdk.md` §3.
+ * `specs/research/drizzle-kit-rc-1.0-sdk.md` §3.
  *
  * It **fails closed and per-change**: a probe that errors (missing object, unreadable result, bad
  * descriptor) yields a `could_not_verify` finding for that change only — it never throws away the
