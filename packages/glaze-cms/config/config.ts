@@ -18,7 +18,7 @@ import type { GlazeConfig } from './types.ts';
  * 	dialect: 'postgres',
  * 	connection: process.env.DATABASE_URL!,
  * 	schema: './schema/*.ts',
- * 	workflow: { mode: 'solo' },
+ * 	migrations: { enabled: true, path: './drizzle' },
  * });
  * ```
  */

@@ -1,10 +1,11 @@
 export type {
 	Dialect,
 	GlazeConfig,
+	MigrationsConfig,
 	ResolvedGlazeConfig,
+	ResolvedMigrationsConfig,
 	ResolvedWorkflowConfig,
 	WorkflowConfig,
-	WorkflowMode,
 } from '../config/index.ts';
 export type {
 	ApiResponse,

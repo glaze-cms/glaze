@@ -27,27 +27,31 @@ what will be destroyed.**
 Four things decide what happens to a schema change. Only the first two are workflow config; the
 third is per machine and the fourth is a permission.
 
-| Setting     | Values             | Decides                                                         |
-| ----------- | ------------------ | --------------------------------------------------------------- |
-| `mode`      | `solo` / `team`    | push, or committed migrations                                   |
-| `audit`     | `false` / `true`   | a held change is answered at a terminal, or on the admin screen |
-| `autoApply` | `false` / `true`   | does this machine apply anything at boot                        |
-| role        | `admin` / `editor` | who may approve                                                 |
+| Setting              | Values             | Decides                                                         |
+| -------------------- | ------------------ | --------------------------------------------------------------- |
+| `migrations.enabled` | `true` / `false`   | is a file kept for every schema change                          |
+| `audit`              | `false` / `true`   | a held change is answered at a terminal, or on the admin screen |
+| `autoApply`          | `false` / `true`   | does this machine apply anything at boot                        |
+| role                 | `admin` / `editor` | who may approve                                                 |
 
-**`mode` is behavioural.** Keeping the migration files is not a filing preference: a committed chain
-is a thing you _apply_. With `solo`, every machine diffs the schema against the database and applies
-directly, keeping no files — a deployed server does what the laptop does. With `team`, the developer
+**Keeping the files is behavioural.** It is not a filing preference: a committed chain is a thing a
+machine _applies_. With `enabled: false`, every machine diffs the schema against the database and
+applies directly — a deployed server does what the laptop does. With `enabled: true`, the developer
 generates and commits, and every other machine runs the committed chain, with drizzle's own journal
 recording which migrations this database has already run.
+
+The setting says nothing about how many people you are. A developer working alone who wants a history
+of every change writes `migrations: { enabled: true }` and is done; the old `solo`/`team` pair made
+that person declare a team to get a file format.
 
 **`audit` does not decide whether a dangerous change is held.** It is always held. A safety promise
 with an off switch is not a promise. `audit` decides where the answer comes from: `false` asks at the
 terminal and fails closed when there is no terminal; `true` files a pending approval and lets a
 person answer on a screen.
 
-Defaults: `solo → audit false` (you are at a terminal, so answer), `team → audit true` (other people
-are not at your terminal). `autoApply` follows the old `autoRun`: on for a developer, off for
-production.
+Defaults: `audit` is `false` — you are at a terminal, so answer there. A project that deploys sets it
+`true` so the question reaches a screen instead. `autoApply` follows the old `autoRun`: on for a
+developer, off for production.
 
 ## What is held, and what is not
 
@@ -155,16 +159,16 @@ sees its own numbers. The same committed migration is therefore approved more th
 
 ### Why the migration is not the record
 
-This holds **when nothing tracks what has been applied**, which is the `solo` case and was the only
-case earlier drafts considered.
+This holds **when nothing tracks what has been applied**, which is the no-files case and was the only
+one earlier drafts considered.
 
 Keeping a generated-but-unapplied migration on disk advances the snapshot past the database. The next
 boot then diffs the schema against a snapshot that already contains the change, reports `no_changes`,
 and the drift goes invisible — fail-open, and in the direction that hides exactly what this feature
-exists to show. So under `solo` the change is generated to learn what it does, discarded, and its
+exists to show. So without files the change is generated to learn what it does, discarded, and its
 statements plus a fingerprint recorded; the migration is regenerated at approval.
 
-**Under `team` this reverses.** Drizzle's journal (`drizzle.__drizzle_migrations`) records which
+**With files kept this reverses.** Drizzle's journal (`drizzle.__drizzle_migrations`) records which
 migrations this database has run, so a committed unapplied migration is an ordinary, detectable
 state rather than drift. There the committed migration _is_ the record, drizzle's own per-migration
 hash is the fingerprint, and Glaze's own change hash is redundant. Approval does not regenerate
@@ -219,10 +223,10 @@ this table without moving anything else.
 
 ## Integrity
 
-**The change hash** identifies a change under `solo`, where nothing else does. It covers the ordered
+**The change hash** identifies a change when no file does. It covers the ordered
 migration statements, NUL-separated, plus the parent snapshot id. NUL rather than a printable
 separator for the same reason the differ uses it: a space-joined key collides on identifiers that
-contain spaces, and that collision fails open. Under `team` the fingerprint is drizzle's own
+contain spaces, and that collision fails open. With files kept, the fingerprint is drizzle's own
 per-migration hash of the committed file, and this one is not used.
 
 **The findings do not hash.** "1,204 rows hold data" is a live count that legitimately moves between
@@ -233,8 +237,8 @@ those as one decision is the silent error the oracle exists to prevent.
 
 ## At boot
 
-1. Work out what the change is — diff against the snapshot (`solo`), or read the unapplied committed
-   migrations from the journal (`team`).
+1. Work out what the change is — diff against the snapshot, or read the unapplied committed
+   migrations from the journal when files are kept.
 2. **Nothing to do** — reconcile any open request (below).
 3. **Safe** — apply it, if this machine applies at all (`autoApply`).
 4. **Blocking** — fail closed with an actionable error. Audited or not.
@@ -253,9 +257,9 @@ is the worst failure an audit trail has: it asserts a retraction of a change tha
 
 Glaze must therefore work out which happened rather than assume:
 
-- **`team`** — read the journal. If the migration is there, it ran. This is a fact, not an inference.
+- **Files kept** — read the journal. If the migration is there, it ran. A fact, not an inference.
   Record `applied`, noting that it happened outside Glaze.
-- **`solo`** — probe for the change the request describes. Its target gone means it was applied; its
+- **No files** — probe for the change the request describes. Its target gone means it was applied; its
   target still present means the schema was reverted, which is the only case `withdrawn` is true for.
 - **Partially applied** — real drift, and dangerous. Fail closed rather than pick a story.
 
@@ -303,7 +307,7 @@ step. Without it, a developer who is impatient with a screen built for non-techn
 apply the migration by hand, and the trail will be left to infer what happened after the fact. With
 it, the fast path and the honest record are the same path.
 
-This also covers the deploy step of a `team` project, where `autoApply` is off and applying is a
+This also covers the deploy step of a project that keeps files, where `autoApply` is off and applying is a
 deliberate act by a person who is shown the counts at the moment they matter.
 
 ## Notification
@@ -322,17 +326,20 @@ Written down because each is the kind of decision that gets silently re-reverted
    to `GET /schema/pending` for visibility. AGENTS.md §1 requires that a non-technical person can
    approve a schema change without touching migrations, which overrides that. The CLI is a
    first-class second path, not an escape hatch.
-2. **The pending record is not the generated migration — under `solo`.** Supersedes
-   `convergence.md`'s "Pending = a generated-but-unapplied migration". Under `team`, where the
+2. **The pending record is not the generated migration — when no file is kept.** Supersedes
+   `convergence.md`'s "Pending = a generated-but-unapplied migration". Where files are kept and the
    journal tracks what has been applied, it is.
 3. **`audit` is config, not derived from `mode`.** `glaze-cms-old` had `{ mode, audit }` as
    independent settings; this repo fused them into a derived `gate`. Restored, under the old name.
 4. **A change is held for what it does, not for a flag.** An earlier draft of this document held every
    structural change when `audit` was on. That is more ceremony than the promise needs, less
    protection than it implies, and it created the content-API problem that section used to solve.
-5. **`mode` is behavioural after all.** The matrix here previously said it "only decides whether the
-   migration file is kept". Keeping the files is what makes a machine apply a chain rather than
-   re-derive a diff, which is the largest behavioural split in the system.
+5. **`solo` / `team` is gone.** It named a team size and meant a file format, so a developer working
+   alone had to declare a team to get a history. Replaced by `migrations: { enabled, path }`, which
+   says what it does. The old implementation also made the move irreversible; this one goes back and
+   forth, because the setting is a preference rather than a project's identity. Turning it **on**
+   against a database that already has tables needs a baseline first — the one asymmetry, and drizzle
+   supplies most of it (below).
 6. **A deployed server does not generate.** Re-deriving the change on a machine with nobody at it
    makes the change depend on who booted: the same schema file yields a rename on a developer's
    terminal and a drop-plus-create on a server, because the non-interactive answer to
@@ -354,13 +361,26 @@ Written down because each is the kind of decision that gets silently re-reverted
   `audit` is on — the earlier model. It already refuses blocking changes correctly; what it does not
   yet do is let a safe change through. This is the smallest of the corrections and the one that makes
   the content-API problem disappear.
-- **The `team` apply path.** `drizzle-orm/postgres-js/migrator` and `drizzle-orm/bun-sqlite/migrator`
+- **The apply path for kept files.** `drizzle-orm/postgres-js/migrator` and `drizzle-orm/bun-sqlite/migrator`
   read the committed chain, compare it to the journal, and apply what is missing. Glaze must apply
   the statements **itself** rather than delegating: drizzle's migrator owns its own transaction, and
   the layer-2 oracle has to be able to roll back on a row loss nobody declared. That means Glaze also
   writes the journal row, which is a compatibility promise — the hash is a sha256 of the whole
   `migration.sql` text — so that someone running `drizzle-kit migrate` does not re-apply everything.
-- **`autoApply`**, and the `.glaze/` cache that makes `solo` actually keep no files.
+- **`autoApply`**, and the `.glaze/` cache that makes `migrations.enabled: false` real. Until it
+  exists the setting is inert and defaults to `true`, which is what the code actually does.
+- **Baselining, for turning the files on against a database that already has tables.** Drizzle does
+  the recording: `migrate(db, { migrationsFolder, init: true })` writes the journal row **without
+  running the SQL**, on both dialects, and refuses if the journal already has rows or if more than one
+  migration is present. `drizzle-kit pull` is CLI-only and not needed — `pull --init` is for someone
+  with a database and no schema file, while this case is the opposite: the schema file already matches
+  the database, which is why there is nothing to apply.
+
+  The step drizzle cannot do is the one that matters: **verify the database really does match** before
+  recording anything. Our own introspection answers that, and it must fail closed on a mismatch —
+  baselining a database that does not match marks real work as already done, silently, in the
+  direction that loses data later.
+
 - **`glaze migrate`.**
 - **A third internal namespace.** Drizzle's journal claims a `drizzle` Postgres schema alongside
   `glaze` and `glaze_auth`. The oracle's idea of which tables hold user data must know that;

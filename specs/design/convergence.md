@@ -36,17 +36,17 @@ trigger → drizzle computes diff → decode envelope → resolve decisions → 
    - **Admin (UI):** an **atomic change hits the API** (POST/PATCH). Granular. Intent is _explicit_
      (they clicked "rename") → mostly only data-loss confirmations → **the administrator resolves**,
      synchronously, in the API response.
-2. **Mode (`solo` / `team`) — are the migration files kept?**
-   - **No (solo / prototyping):** working snapshot lives in a **gitignored `.glaze/` cache**; commit
+2. **`migrations.enabled` — is a file kept for every schema change?**
+   - **No (prototyping):** working snapshot lives in a **gitignored `.glaze/` cache**; commit
      nothing. `db:push`-fast loop, zero repo artifacts.
-   - **Yes (team / prod):** the migration + snapshot chain is **committed** — shareable, reviewable
+   - **Yes (shared / prod):** the migration + snapshot chain is **committed** — shareable, reviewable
      history.
 3. **Audit (`audit: true` / `false`):** where a held change is answered — on the admin screen, or at
    the terminal. It does not decide _whether_ a change is held: a change that destroys data always is.
    See [`pending-approvals.md`](./pending-approvals.md).
 
 Plus: **conflict resolution comes free** — divergent edits are only possible on a shared, persisted
-history, so it exists exactly in `team` mode and is structurally impossible in solo.
+history, so it exists exactly when the files are kept and is structurally impossible without them.
 
 ## Source of truth: the snapshot
 

@@ -5,10 +5,11 @@ export { glaze } from './server/index.ts';
 export type {
 	Dialect,
 	GlazeConfig,
+	MigrationsConfig,
 	ResolvedGlazeConfig,
+	ResolvedMigrationsConfig,
 	ResolvedWorkflowConfig,
 	WorkflowConfig,
-	WorkflowMode,
 } from './config/index.ts';
 export type { Logger, LoggerOptions } from './logger/index.ts';
 export type { GlazeApp, GlazeContext, GlazeOptions } from './server/index.ts';

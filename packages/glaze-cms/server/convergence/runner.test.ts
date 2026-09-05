@@ -92,7 +92,7 @@ function buildContext(
 			dialect,
 			connection: 'unused',
 			schema,
-			migrations,
+			migrations: { path: migrations },
 			workflow,
 		}),
 		options: resolveOptions({}),
@@ -307,7 +307,7 @@ matrixTest(
 			);
 			// `audit` is the team default: converge returns `pending` and rolls back — boot continues, but
 			// the table is NOT created; the change is filed for a person instead.
-			const context = buildContext(db, dialect, schema, migrations, { mode: 'team' });
+			const context = buildContext(db, dialect, schema, migrations, { audit: true });
 			await materializeApprovalTables(context);
 			await runConvergence(context, decliningResolver());
 			expect(await userTableExists(db, dialect, 'posts')).toBe(false);
@@ -317,7 +317,7 @@ matrixTest(
 	},
 );
 
-matrixTest('auditing is configurable independently of the mode', async ({ db, dialect }) => {
+matrixTest('audit decides whether a change is held or applied', async ({ db, dialect }) => {
 	const dir = mkdtempSync(TEMP_FIXTURE_PREFIX);
 	try {
 		const schema = writeSchema(
@@ -326,18 +326,15 @@ matrixTest('auditing is configurable independently of the mode', async ({ db, di
 			"id: integer('id').primaryKey(), title: text('title')",
 		);
 
-		// solo + audit: alone, but every structural change is still held for review.
-		const audited = buildContext(db, dialect, schema, join(dir, 'audited'), {
-			mode: 'solo',
-			audit: true,
-		});
+		// Audited: the change is recorded and held, so the table is not created.
+		const audited = buildContext(db, dialect, schema, join(dir, 'audited'), { audit: true });
 		await materializeApprovalTables(audited);
 		await runConvergence(audited, decliningResolver());
 		expect(await userTableExists(db, dialect, 'posts')).toBe(false);
 
-		// A team audits by default, so opting out of it must actually reach the apply path.
+		// Unaudited: the same schema reaches the apply path, against the same database.
 		await runConvergence(
-			buildContext(db, dialect, schema, join(dir, 'unaudited'), { mode: 'team', audit: false }),
+			buildContext(db, dialect, schema, join(dir, 'unaudited'), { audit: false }),
 			decliningResolver(),
 		);
 		expect(await userTableExists(db, dialect, 'posts')).toBe(true);

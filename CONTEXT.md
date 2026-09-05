@@ -43,9 +43,10 @@ honestly.
 
 ## Workflow
 
-**Mode** (`solo` / `team`):
-Whether generated migration files are kept and shared. It decides nothing else.
-_Avoid_: persist, workflow
+**Migrations** (`{ enabled, path }`):
+Whether a file is kept for every schema change, and where. Keeping them is what lets a deployed
+machine apply a chain instead of working the change out again for itself.
+_Avoid_: solo, team, mode, persist — those named a team size and meant a file format.
 
 **Audit** (`true` / `false`):
 Where a held change is answered: on the admin screen, or at the terminal. It does not decide whether

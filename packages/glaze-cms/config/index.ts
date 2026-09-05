@@ -5,8 +5,9 @@ export { resolveConfig } from './resolver.ts';
 export type {
 	Dialect,
 	GlazeConfig,
+	MigrationsConfig,
 	ResolvedGlazeConfig,
+	ResolvedMigrationsConfig,
 	ResolvedWorkflowConfig,
 	WorkflowConfig,
-	WorkflowMode,
 } from './types.ts';

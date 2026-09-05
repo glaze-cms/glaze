@@ -192,7 +192,7 @@ export async function runConvergence(
 		db,
 		dialect: config.dialect,
 		schema: config.schema,
-		out: config.migrations,
+		out: config.migrations.path,
 		resolve,
 		confirmLoss,
 		confirmDrop,

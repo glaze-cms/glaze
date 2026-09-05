@@ -96,7 +96,7 @@ Glaze has no edge.
 
 ## 4. Convergence — the collaboration engine
 
-Convergence keeps the DB schema in sync with code and Admin-UI changes across **solo/team ×
+Convergence keeps the DB schema in sync with code and Admin-UI changes across **kept-files ×
 auto/audit** workflows. Its whole reason to exist is producing a **clean, structured,
 translatable signal** about (a) _what a schema change will do_ and (b) _why something can't
 proceed_ — so non-technical users can approve/resolve changes safely.
@@ -135,9 +135,9 @@ CLI import the **same** module — one source of truth. This also **removes** th
 juggling (glaze-old merged it into a temp config at runtime): the user writes one file and Glaze
 derives the drizzle config internally from it.
 
-| `glaze.config.ts` (tooling-loadable, no side effects)                                                               | Code — `glaze({…})` (runtime behavior)                                                                   |
-| ------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| `dialect` · `connection`/DB creds (env ref) · `schema` path · `migrations` dir · `workflow` (solo/team, auto/audit) | plugins · security (CORS/rate-limit) · admin/api prefixes · health · auth (Better Auth) · hooks · logger |
+| `glaze.config.ts` (tooling-loadable, no side effects)                                                                | Code — `glaze({…})` (runtime behavior)                                                                   |
+| -------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `dialect` · `connection`/DB creds (env ref) · `schema` path · `migrations` (`enabled`/`path`) · `workflow` (`audit`) | plugins · security (CORS/rate-limit) · admin/api prefixes · health · auth (Better Auth) · hooks · logger |
 
 `connection` + `schema` are needed by tooling **and** runtime, so they live in the file as the single
 source; the runtime reads them from there (no drift-prone second copy). `glaze()` auto-loads
@@ -360,9 +360,9 @@ admin screen** that shows a pending change and lets a human approve or reject it
 not another horizontal backend step. It also closes a live dead end: an audited change returns
 `pending` but rolls the migration back, so an audited project detects changes, never applies them,
 and offers no way to approve. Designed in full in `specs/design/pending-approvals.md` — spec'd
-before any screen, so the UI does not shape the data model. `audit` is now its own config axis
-(`workflow: { mode, audit }`), no longer derived from `mode`; what remains is the durable record and
-the screen.
+before any screen, so the UI does not shape the data model. A change is now held for what it does —
+destructive holds, safe applies, impossible fails closed — and `audit` only decides whether the answer
+comes from a terminal or a screen. What remains is the apply path and the screen.
 
 **Constraint on everything after:** born type-checked for completeness and behavior-tested across
 all targets (§7).

@@ -85,7 +85,7 @@ export default defineGlazeConfig({
 	connection: process.env.DATABASE_URL!, // or a SQLite file path / ':memory:'
 	schema: './schema.ts', // a file, or './schema/*.ts'
 	migrations: './drizzle',
-	workflow: { mode: 'solo' },
+	migrations: { enabled: true, path: './drizzle' },
 });
 ```
 

@@ -3,31 +3,50 @@ import type { Dialect } from '../dialect/types.ts';
 export type { Dialect } from '../dialect/types.ts';
 
 /**
- * Whether the generated migration files are kept. `solo` treats them as a disposable cache;
- * `team` commits them so the chain is shared. It does **not** decide whether a change is held for
- * review — that is `audit`.
+ * Whether Glaze keeps a file for every schema change, and where.
  *
- * Not yet wired: both modes currently write to the configured `migrations` directory.
+ * Keeping them is not a filing preference: a committed chain is a thing a deployed machine
+ * **applies**, while with no files every machine re-derives the diff for itself. See
+ * `specs/design/pending-approvals.md`.
  */
-export type WorkflowMode = 'solo' | 'team';
-
-/** Collaboration workflow. Both axes are optional and default independently. */
-export interface WorkflowConfig {
-	/** @default 'solo' */
-	mode?: WorkflowMode;
+export interface MigrationsConfig {
 	/**
-	 * Hold every structural change for a person: nothing applies until someone approves it, and the
-	 * decision is recorded. Independent of {@link WorkflowMode} — committing the migrations and
-	 * reviewing them are separate choices (see `specs/design/pending-approvals.md`).
+	 * Keep a file per schema change, committed and shared.
 	 *
-	 * @default false when `mode` is `'solo'`, true when it is `'team'`
+	 * Not yet honoured — the gitignored cache that makes `false` real is not built, so every project
+	 * currently writes to {@link MigrationsConfig.path}.
+	 *
+	 * @default true
+	 */
+	enabled?: boolean;
+	/**
+	 * Directory for the migration files and their snapshots.
+	 * @default './drizzle'
+	 */
+	path?: string;
+}
+
+/** A {@link MigrationsConfig} with both fields resolved. */
+export interface ResolvedMigrationsConfig {
+	enabled: boolean;
+	path: string;
+}
+
+/** Collaboration workflow. */
+export interface WorkflowConfig {
+	/**
+	 * Where a held change is answered: `true` files a pending approval for the admin screen, `false`
+	 * asks at the terminal and fails closed when there is no terminal.
+	 *
+	 * It does **not** decide whether a change is held — one that destroys data always is.
+	 *
+	 * @default false
 	 */
 	audit?: boolean;
 }
 
-/** A {@link WorkflowConfig} with both axes resolved to concrete values. */
+/** A {@link WorkflowConfig} with every field resolved. */
 export interface ResolvedWorkflowConfig {
-	mode: WorkflowMode;
 	audit: boolean;
 }
 
@@ -48,13 +67,13 @@ export interface GlazeConfig {
 	 */
 	schema?: string;
 	/**
-	 * Directory for generated migration files (the snapshot chain).
-	 * @default './drizzle'
+	 * Whether a file is kept for every schema change, and where.
+	 * @default { enabled: true, path: './drizzle' }
 	 */
-	migrations?: string;
+	migrations?: MigrationsConfig;
 	/**
 	 * Collaboration workflow.
-	 * @default { mode: 'solo', audit: false }
+	 * @default { audit: false }
 	 */
 	workflow?: WorkflowConfig;
 }
@@ -65,6 +84,6 @@ export interface ResolvedGlazeConfig {
 	connection: string;
 	/** The schema path/glob, or `undefined` when the project has no user schema yet. */
 	schema: string | undefined;
-	migrations: string;
+	migrations: ResolvedMigrationsConfig;
 	workflow: ResolvedWorkflowConfig;
 }

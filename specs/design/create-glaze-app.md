@@ -6,7 +6,7 @@
 ## Why it is deferred
 
 The scaffolder is **not blocked by the team/audit flow**, which is the intuitive assumption. Its only
-contact with that flow is one line, `workflow: { mode: 'solo' }`; when pending approvals land, the change
+contact with that flow is one line, `migrations: { enabled: false }`; when pending approvals land, the change
 is turning a constant into a prompt.
 
 It is blocked by **distribution**. The scaffolder exists to onboard people who aren't the maintainer, and

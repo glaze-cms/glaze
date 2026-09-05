@@ -1,36 +1,49 @@
 import type {
 	GlazeConfig,
+	MigrationsConfig,
 	ResolvedGlazeConfig,
+	ResolvedMigrationsConfig,
 	ResolvedWorkflowConfig,
 	WorkflowConfig,
-	WorkflowMode,
 } from './types.ts';
 
-/** Default directory for generated migration files. */
-const DEFAULT_MIGRATIONS_DIR = './drizzle';
-
-/** Default collaboration mode: alone, migrations disposable. */
-const DEFAULT_WORKFLOW_MODE: WorkflowMode = 'solo';
+/** Default directory for the migration files and their snapshots. */
+const DEFAULT_MIGRATIONS_PATH = './drizzle';
 
 /**
- * Whether each mode audits when the project does not say. Working alone, a change applies as you
- * make it; working as a team, it waits for a person. Both are overridable — the two axes are
- * independent (see `specs/design/pending-approvals.md`).
+ * Keep the files unless told otherwise. This matches what Glaze actually does today: the gitignored
+ * cache that would make `false` real is not built yet, so a default of `false` would describe
+ * behaviour the code does not have.
  */
-const DEFAULT_AUDIT_FOR_MODE: Readonly<Record<WorkflowMode, boolean>> = {
-	solo: false,
-	team: true,
-};
+const DEFAULT_MIGRATIONS_ENABLED = true;
 
 /**
- * Resolves the workflow axes, defaulting `audit` from the mode when it is not set explicitly.
+ * Answer a held change at the terminal by default. A project that deploys sets `audit: true` so the
+ * question reaches a screen instead; either way a change that destroys data is held.
+ */
+const DEFAULT_AUDIT = false;
+
+/**
+ * Resolves the migrations settings.
+ *
+ * @param migrations - The user-provided migrations config, if any.
+ * @returns The settings with `enabled` and `path` both concrete.
+ */
+function resolveMigrations(migrations: MigrationsConfig | undefined): ResolvedMigrationsConfig {
+	return {
+		enabled: migrations?.enabled ?? DEFAULT_MIGRATIONS_ENABLED,
+		path: migrations?.path ?? DEFAULT_MIGRATIONS_PATH,
+	};
+}
+
+/**
+ * Resolves the workflow settings.
  *
  * @param workflow - The user-provided workflow config, if any.
- * @returns The workflow with `mode` and `audit` both concrete.
+ * @returns The workflow with every field concrete.
  */
 function resolveWorkflow(workflow: WorkflowConfig | undefined): ResolvedWorkflowConfig {
-	const mode = workflow?.mode ?? DEFAULT_WORKFLOW_MODE;
-	return { mode, audit: workflow?.audit ?? DEFAULT_AUDIT_FOR_MODE[mode] };
+	return { audit: workflow?.audit ?? DEFAULT_AUDIT };
 }
 
 /**
@@ -45,7 +58,7 @@ export function resolveConfig(config: GlazeConfig): ResolvedGlazeConfig {
 		dialect: config.dialect,
 		connection: config.connection,
 		schema: config.schema,
-		migrations: config.migrations ?? DEFAULT_MIGRATIONS_DIR,
+		migrations: resolveMigrations(config.migrations),
 		workflow: resolveWorkflow(config.workflow),
 	};
 }

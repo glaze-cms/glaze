@@ -5,6 +5,5 @@ export default defineGlazeConfig({
 	dialect: 'sqlite',
 	connection: './blog.db',
 	schema: './schema.ts',
-	migrations: './drizzle',
-	workflow: { mode: 'solo' },
+	migrations: { enabled: true, path: './drizzle' },
 });
