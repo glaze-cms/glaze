@@ -108,8 +108,9 @@ admin UI / dev CLI; in tests it's a deterministic stub. **Designing the orchestr
 `resolve`/`approve`/`persist`/`gate` as injected seams makes it fully testable today — before the
 Elysia API and admin frontend exist — and makes the real UI just another caller later.**
 
-Driver note: **no libSQL is forced.** `bun:sqlite` covers apply and introspection; drizzle's
-high-level `push`/`pull` (the only thing that hardcodes `better-sqlite3`) is avoided on the hot path.
+Driver note: **no extra SQLite driver is needed.** `bun:sqlite` covers apply and introspection;
+drizzle's high-level `push`/`pull` (the only thing that hardcodes `better-sqlite3`) is avoided on the
+hot path.
 
 ## Build order
 

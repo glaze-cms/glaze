@@ -128,7 +128,7 @@ Loop: call → if `missing_hints`, map each `unresolved[i]` to exactly one `Hint
 - **`confirm_data_loss` reasons & where they can be known:**
   - `non_empty` (target has ≥1 row) — **data-derived, needs a live DB** → push-time only.
   - `type_change` — column SQL type changed — data/DB-derived → push-time.
-  - `table_recreate` — **sqlite/turso only**; adding `NOT NULL` has no in-place path → confirming
+  - `table_recreate` — **sqlite only**; adding `NOT NULL` has no in-place path → confirming
     recreates the table and wipes rows.
 - **Verified:** a rename ambiguity (`nickname`→`handle`) surfaced as `missing_hints`
   (`rename_or_create`, kind `column`) from **file-only `generate`** under Bun; resolving it as
@@ -175,18 +175,11 @@ rows). High-level `push` with **`dialect: 'sqlite'`** hardcodes `better-sqlite3`
 The low-level `pushSchema` runs on Bun (bun:sqlite adapter) but **does no gating** (verified: it
 silently dropped a populated column, `hints: []`).
 
-**→ Use `dialect: 'turso'` (libSQL) for SQLite convergence on Bun.** rc.4 treats **`turso` as a
-first-class dialect**, `@libsql/client` **is Bun-compatible** (no native better-sqlite3), and it
-speaks plain local `file:` SQLite. **Verified end-to-end on Bun 1.3.14:**
-
-- `push({ dialect: 'turso', url: 'file:app.db', schema })` creates the schema → `{ status: 'ok',
-dialect: 'turso' }`.
-- Dropping a **populated** column returns the full gate:
-  `{ status: 'missing_hints', unresolved: [{ type: 'confirm_data_loss', kind: 'column',
-entity: ['public','users','nickname'], reason: 'non_empty' }] }`.
-- Resolving via **`hintsFile`** applies it (column actually dropped).
-  This closes the gap: **full high-level envelope + full data-loss gating, native on Bun, zero
-  better-sqlite3.** Glaze does **not** need to reimplement the gating taxonomy.
+**→ Superseded.** The original conclusion here was to route SQLite convergence through a second
+driver to borrow drizzle's high-level gate. Glaze does not do that: it builds its **own** data-loss
+oracle (`convergence/safety/`), which covers cases drizzle misses either way (see §3 and
+`../design/convergence.md`). The evidence above stands and is the *reason* the oracle exists — the
+recommendation does not. Convergence uses `dialect: 'sqlite'` with `bun:sqlite`, no extra driver.
 
 **⚠️ rc.4 bug (reproducible, verified):** passing the reply hints as an **inline `hints:` array** to
 the SDK returns `{ status: 'error', error: { code: 'missing_required_params_error',
@@ -194,20 +187,7 @@ params: ['dialect','schema'] } }` even when `dialect` + `schema` are both suppli
 (path to a JSON file) works.** → Glaze resolves decisions via `hintsFile` (write the `Hint[]` to a
 temp JSON, pass the path); report the inline-`hints` bug upstream. (Re-test on each rc bump.)
 
-**Positioning tradeoff (maintainer's call):** this makes **`@libsql/client` the convergence-time
-SQLite driver on Bun**. CLAUDE.md currently frames libSQL as a "future opt-in." Two shapes:
-
-- **Split driver:** runtime content queries keep **`bun:sqlite`** (fast, the marketed Bun-native
-  primitive, `drizzle-orm/bun-sqlite`); only _convergence push_ uses libSQL/`turso`. Two connections
-  to one `file:` db — SQLite/WAL handles this; convergence is infrequent. Best marketing story.
-- **Unify on libSQL:** one driver for runtime + convergence. Simpler; loses the `bun:sqlite`
-  headline. Also nudges the Turso/edge story from "future" toward "built-in."
-- **Verify later:** whether a `dialect: 'turso'` snapshot is interchangeable with a `dialect:
-'sqlite'` snapshot (snapshot records the dialect); the emitted migration DDL is plain SQLite.
-  Standardize convergence on one dialect string to avoid snapshot-dialect drift.
-
-**Node runtime** keeps the simple path: `dialect: 'sqlite'` + `better-sqlite3` works there (or use
-libSQL uniformly across runtimes to collapse the seam).
+**Node runtime** keeps the simple path: `dialect: 'sqlite'` + `better-sqlite3` works there.
 
 **Postgres push on Bun — VERIFIED.** `push({ dialect: 'postgresql', url })` runs under Bun with
 node-postgres (`pg`) installed and returns the envelope fast. **Rough edge:** if `pg` is _missing_,
@@ -223,8 +203,8 @@ internally regardless of Glaze's own `postgres.js` runtime choice (only inside d
   `query_error`** (DB rejected mid-migration). This is exactly the case glaze-old's
   `checkNotNullConstraint` pre-empts — proven, not hypothesized.
 
-> **Open items still to verify (at convergence start):** (a) is a `turso` snapshot interchangeable
-> with a `sqlite` snapshot? (b) does the inline-`hints` bug persist on the next rc? (c) full
+> **Open items still to verify (at convergence start):** (a) does the inline-`hints` bug persist on
+> the next rc? (b) full
 > before/after transaction-atomicity behavior of `push` on a multi-statement migration where a later
 > statement fails (does anything partially apply)?
 

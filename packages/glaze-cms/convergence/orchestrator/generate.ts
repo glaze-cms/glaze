@@ -2,7 +2,7 @@
  * The real {@link EnvelopeCompute}, backed by `drizzle-kit/cli generate`. drizzle computes the diff
  * and writes the migration + snapshot to `out` (a persistent, committed directory); Glaze decodes the
  * returned envelope. This is the "drizzle computes; Glaze applies" boundary — `generate` is file-only
- * (no DB driver), so it runs Bun-native with no libSQL.
+ * (no DB driver), so it runs Bun-native with no SQLite driver at all.
  *
  * Hints are passed via a temp `hintsFile` because rc.4's inline `hints:` option is bugged (returns
  * `missing_required_params_error`) — see `docs/research/drizzle-kit-rc-1.0-sdk.md` §3.
