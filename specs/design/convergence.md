@@ -24,7 +24,7 @@ not separate flows — they are toggles and input adapters over the same pipelin
 
 ```
 trigger → drizzle computes diff → decode envelope → resolve decisions → layer-1 pre-flight
-        → audit hold → apply via layer-2 oracle → persist toggle → (conflicts) → converged
+        → audit hold → apply via layer-2 oracle → keep or discard (mode) → (conflicts) → converged
 ```
 
 ## Three orthogonal axes
@@ -36,7 +36,7 @@ trigger → drizzle computes diff → decode envelope → resolve decisions → 
    - **Admin (UI):** an **atomic change hits the API** (POST/PATCH). Granular. Intent is _explicit_
      (they clicked "rename") → mostly only data-loss confirmations → **the administrator resolves**,
      synchronously, in the API response.
-2. **Persist migrations? — this _is_ the solo/team axis:**
+2. **Mode (`solo` / `team`) — are the migration files kept?**
    - **No (solo / prototyping):** working snapshot lives in a **gitignored `.glaze/` cache**; commit
      nothing. `db:push`-fast loop, zero repo artifacts.
    - **Yes (team / prod):** the migration + snapshot chain is **committed** — shareable, reviewable
@@ -44,7 +44,7 @@ trigger → drizzle computes diff → decode envelope → resolve decisions → 
 3. **Audit (`audit: true` / `false`):** hold for explicit approval, or apply as soon as it's safe.
 
 Plus: **conflict resolution comes free** — divergent edits are only possible on a shared, persisted
-history, so it exists exactly when `persist = yes` and is structurally impossible in solo.
+history, so it exists exactly in `team` mode and is structurally impossible in solo.
 
 ## Source of truth: the snapshot
 
@@ -93,7 +93,7 @@ origin, since the whole-schema `dev` origin can only ever have one open request.
 The axes look combinatorial (origin × solo/team × auto/audit × dialect × runtime) but are **not** —
 they are independent toggles over one pipeline, so the suite is **linear**, not the product:
 
-- **Origin** = an input adapter (schema-file → snapshot, or collection-model → snapshot); test each,
+- **Origin** = an input adapter (schema-file → snapshot, or entity-model → snapshot); test each,
   then both feed the identical envelope.
 - **Decision resolution** = a pure state machine (`missing_hints` → hints → re-invoke); pure tests.
 - **Gate** = a branch at apply (auto applies / audit pends); 2 tests.
@@ -106,7 +106,8 @@ real (the ephemeral harness DB is the oracle — assert observed state, not inte
 injected thing is the **human-in-the-loop as a function** — `resolve(decisions) → hints` and
 `approve(pending) → yes/no`. That is a genuine seam, not a mock-of-reality: in production it's the
 admin UI / dev CLI; in tests it's a deterministic stub. **Designing the orchestrator to take
-`resolve`/`approve`/`persist`/`audit` as injected seams makes it fully testable today — before the
+`resolve`/`approve` as injected seams, with `mode` and `audit` as configuration, makes it fully
+testable today — before the
 Elysia API and admin frontend exist — and makes the real UI just another caller later.**
 
 Driver note: **no extra SQLite driver is needed.** `bun:sqlite` covers apply and introspection;
@@ -116,8 +117,8 @@ hot path.
 ## Build order
 
 1. **Orchestrator core** — the synchronous happy path covering **solo + team-auto**: trigger →
-   compute (drizzle) → decode → resolve-by-origin → layer-1 → apply via the oracle → persist toggle.
-   Injection seams (`resolve`/`persist`/`audit`) baked in from line one. Reuses the envelope decoder,
+   compute (drizzle) → decode → resolve-by-origin → layer-1 → apply via the oracle → keep or discard.
+   Injection seams (`resolve`/`approve`) and the `mode`/`audit` toggles baked in from line one. Reuses the envelope decoder,
    safety layers, apply oracle, and transaction seam already built + reviewed. Through the §8 loop.
 2. **Team+audit pending approvals** — the append-only `approval_events` table, async
    approve/reject, integrity hash, notification. See [`pending-approvals.md`](./pending-approvals.md).
@@ -169,7 +170,7 @@ Still out of scope for now (each has a follow-up task):
   lowercased names — the common case — match fine.)
 - **`__drizzle_migrations` is not written by converge's apply.** Harmless within converge (it diffs
   against the snapshot), but a double-apply hazard if `drizzle-kit migrate` ever runs the same DB.
-  Handle when the team/persist path lands, alongside a lock serializing convergence on a shared `out`.
+  Handle when the `team` mode path lands, alongside a lock serializing convergence on a shared `out`.
 
 ## Full-codebase adversarial hunt (2026-07-21)
 

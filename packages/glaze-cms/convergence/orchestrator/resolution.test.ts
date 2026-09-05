@@ -96,7 +96,7 @@ test('a rejected decision aborts with that decision', async () => {
 	expect(outcome.status).toBe('rejected');
 	if (outcome.status === 'rejected') {
 		expect(outcome.decision.type).toBe('confirm_data_loss');
-		expect(outcome.decision.entity).toEqual(['public', 'users', 'nickname']);
+		expect(outcome.decision.target).toEqual(['public', 'users', 'nickname']);
 	}
 });
 

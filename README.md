@@ -115,7 +115,7 @@ cp .env.example .env      # set DATABASE_URL and (in prod) GLAZE_AUTH_SECRET
 bun server.ts
 ```
 
-**4. Use it.** Every table becomes a gated REST collection under `/api/{table}`. Authenticate once, then
+**4. Use it.** Every table becomes a gated REST endpoint under `/api/{table}`. Authenticate once, then
 CRUD:
 
 ```sh
@@ -130,7 +130,7 @@ curl -X POST localhost:4000/api/posts -b cookies.txt \
 curl localhost:4000/api/posts -b cookies.txt
 ```
 
-Per collection you get: `GET /api/posts` (list, `?limit=&offset=`), `POST /api/posts` (create),
+Per entity you get: `GET /api/posts` (list, `?limit=&offset=`), `POST /api/posts` (create),
 and — when the table has a single-column primary key — `GET|PATCH|DELETE /api/posts/:id`. Every content
 route requires a valid session; request bodies are validated against your schema (TypeBox) and unknown
 fields are dropped; every response is a `{ success, data, error }` envelope. Database constraint

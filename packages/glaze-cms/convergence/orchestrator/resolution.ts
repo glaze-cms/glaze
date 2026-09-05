@@ -137,23 +137,23 @@ async function collectHints(
 function toHint(decision: SchemaDecision, resolution: DecisionResolution): Hint | null {
 	if (decision.type === 'rename_or_create') {
 		if (resolution.action === 'rename') {
-			// from = the deleted entity the human chose; to = the new entity. Empirically verified against
+			// from = the deleted target the human chose; to = the new target. Empirically verified against
 			// drizzle rc.4 (RENAME COLUMN <from> TO <to>); see specs/research/drizzle-kit-rc-1.0-sdk.md §3.
 			return {
 				type: 'rename',
-				kind: decision.entityKind,
+				kind: decision.targetKind,
 				from: resolution.from,
-				to: decision.entity,
+				to: decision.target,
 			};
 		}
 		if (resolution.action === 'create') {
-			return { type: 'create', kind: decision.entityKind, entity: decision.entity };
+			return { type: 'create', kind: decision.targetKind, entity: decision.target };
 		}
 		return null;
 	}
 
 	if (resolution.action === 'confirm') {
-		return { type: 'confirm_data_loss', kind: decision.entityKind, entity: decision.entity };
+		return { type: 'confirm_data_loss', kind: decision.targetKind, entity: decision.target };
 	}
 	return null;
 }

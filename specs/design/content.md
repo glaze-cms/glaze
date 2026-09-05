@@ -194,7 +194,7 @@ The database is **not** the authority for structure, and four reasons hold it th
 3. **Drizzle's diff engine is snapshot→snapshot.** "drizzle computes the change · Glaze applies and
    guards it" means adopting drizzle's model. DB-as-truth would mean `pull` on every hot path — slow,
    and the one API that hardcodes `better-sqlite3`.
-4. **Shared reviewable history.** With `persist = yes` the migration + snapshot chain is committed,
+4. **Shared reviewable history.** In `team` mode the migration + snapshot chain is committed,
    and conflict resolution comes free only because that shared history exists.
 
 **None of these reach layers 2 or 3.** They are all about recovering intent for a destructive,

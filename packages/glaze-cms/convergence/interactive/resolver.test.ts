@@ -29,14 +29,14 @@ function scriptedIo(answer: string, isTty = true): { io: ResolverIo; prompts: st
 
 const RENAME_DECISION: SchemaDecision = {
 	type: 'rename_or_create',
-	entityKind: 'column',
-	entity: ['public', 'users', 'handle'],
+	targetKind: 'column',
+	target: ['public', 'users', 'handle'],
 };
 
 const DATA_LOSS_DECISION: SchemaDecision = {
 	type: 'confirm_data_loss',
-	entityKind: 'table',
-	entity: ['public', 'users'],
+	targetKind: 'table',
+	target: ['public', 'users'],
 	reason: 'non_empty',
 };
 
@@ -48,7 +48,7 @@ const COLUMN_DROP: DataLossFinding = {
 	affectedRows: 5,
 };
 
-test('resolve treats a typed name as a rename, swapping it into the entity namespace', async () => {
+test('resolve treats a typed name as a rename, swapping it into the target namespace', async () => {
 	const { io } = scriptedIo('login');
 	const resolution = await createInteractiveResolver(io).resolve(RENAME_DECISION);
 	expect(resolution.action).toBe('rename');
@@ -115,7 +115,7 @@ test('confirmDrop declines when non-interactive, without prompting', async () =>
 	expect(prompts).toHaveLength(0);
 });
 
-test('prompts render the entity and never leak the underlying tool name', async () => {
+test('prompts render the target and never leak the underlying tool name', async () => {
 	const { io, prompts } = scriptedIo('n');
 	await createInteractiveResolver(io).resolve(DATA_LOSS_DECISION);
 	expect(prompts[0]).toContain('public.users');
@@ -127,8 +127,8 @@ test('an unknown data-loss reason shows no reason detail line', async () => {
 	const { io, prompts } = scriptedIo('n');
 	const unknownReason: SchemaDecision = {
 		type: 'confirm_data_loss',
-		entityKind: 'table',
-		entity: ['public', 'users'],
+		targetKind: 'table',
+		target: ['public', 'users'],
 		reason: 'unknown',
 	};
 	await createInteractiveResolver(io).resolve(unknownReason);

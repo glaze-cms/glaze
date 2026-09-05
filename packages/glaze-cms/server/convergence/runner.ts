@@ -29,7 +29,7 @@ function blockedReason(
 	result: Exclude<ConvergeResult, { status: 'applied' | 'no_changes' | 'pending' }>,
 ): string {
 	if (result.status === 'rejected') {
-		return `a schema change was declined (${result.decision.entity.join('.')})`;
+		return `a schema change was declined (${result.decision.target.join('.')})`;
 	}
 	if (result.status === 'data_loss_declined') {
 		return `a data-loss change was declined for ${listTables(result.losses)}`;

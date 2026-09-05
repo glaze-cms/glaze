@@ -241,7 +241,7 @@ Written down because each is the kind of decision that gets silently re-reverted
   design pass.
 - **The WebSocket** — next increment.
 - **Queueing** — arrives with the `ui` origin.
-- **The persist axis.** `mode` currently does nothing: the gitignored `.glaze/` cache was never built,
+- **The `mode` axis.** `mode` currently does nothing: the gitignored `.glaze/` cache was never built,
   so solo and team both write to the committed migrations dir. Pre-existing, unchanged here, and worth
   fixing before `solo` is claimed to mean "no migration files".
 

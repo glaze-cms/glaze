@@ -100,12 +100,12 @@ function decodeMissingHints(unresolved: unknown): OperationResult {
 function decodeDecision(item: unknown): SchemaDecision | null {
 	if (!isRecord(item) || typeof item.kind !== 'string') return null;
 
-	const entity = decodeEntity(item.entity);
-	if (entity === null) return null;
-	const entityKind = item.kind;
+	const target = decodeTarget(item.entity);
+	if (target === null) return null;
+	const targetKind = item.kind;
 
 	if (item.type === 'rename_or_create') {
-		return { type: 'rename_or_create', entityKind, entity };
+		return { type: 'rename_or_create', targetKind, target };
 	}
 
 	if (item.type === 'confirm_data_loss') {
@@ -113,10 +113,10 @@ function decodeDecision(item: unknown): SchemaDecision | null {
 		if (reason === 'type_change') {
 			const details = asReasonDetails(item.reason_details);
 			return details === null
-				? { type: 'confirm_data_loss', entityKind, entity, reason }
-				: { type: 'confirm_data_loss', entityKind, entity, reason, reasonDetails: details };
+				? { type: 'confirm_data_loss', targetKind, target, reason }
+				: { type: 'confirm_data_loss', targetKind, target, reason, reasonDetails: details };
 		}
-		return { type: 'confirm_data_loss', entityKind, entity, reason };
+		return { type: 'confirm_data_loss', targetKind, target, reason };
 	}
 
 	return null;
@@ -208,14 +208,14 @@ function asReasonDetails(value: unknown): { from: string; to: string } | null {
 }
 
 /**
- * Decodes an entity identifier tuple, requiring a non-empty array of strings. Returns `null` for
+ * Decodes an target identifier tuple, requiring a non-empty array of strings. Returns `null` for
  * anything else — the tuple is load-bearing (it targets a hint), so a malformed one fails the
  * decision rather than being silently truncated.
  *
- * @param value - The raw `entity` value.
+ * @param value - The raw `target` value.
  * @returns The string tuple, or `null` when malformed.
  */
-function decodeEntity(value: unknown): readonly string[] | null {
+function decodeTarget(value: unknown): readonly string[] | null {
 	if (!Array.isArray(value) || value.length === 0) return null;
 	return value.every((element): element is string => typeof element === 'string') ? value : null;
 }

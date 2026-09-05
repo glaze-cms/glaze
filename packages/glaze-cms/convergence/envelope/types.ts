@@ -41,18 +41,18 @@ export type DataLossReason = 'non_empty' | 'table_recreate' | 'type_change';
  */
 export type SchemaDecision =
 	| {
-			/** The diff is ambiguous: the new entity could be a rename of a deleted one, or a create. */
+			/** The diff is ambiguous: the new target could be a rename of a deleted one, or a create. */
 			readonly type: 'rename_or_create';
-			/** The entity kind (`table`, `column`, …) as drizzle reports it. */
-			readonly entityKind: string;
-			/** The entity's namespaced identifier tuple (e.g. `['public', 'users', 'handle']`). */
-			readonly entity: readonly string[];
+			/** The target kind (`table`, `column`, …) as drizzle reports it. */
+			readonly targetKind: string;
+			/** The target's namespaced identifier tuple (e.g. `['public', 'users', 'handle']`). */
+			readonly target: readonly string[];
 	  }
 	| {
 			/** The change would drop or rewrite data and needs explicit confirmation. */
 			readonly type: 'confirm_data_loss';
-			readonly entityKind: string;
-			readonly entity: readonly string[];
+			readonly targetKind: string;
+			readonly target: readonly string[];
 			/**
 			 * Why confirmation is required. `'unknown'` when drizzle sent a reason Glaze doesn't
 			 * recognize (a future rc) — surfaced honestly, never relabeled as a known reason.

@@ -2,7 +2,8 @@
 
 Guidance for coding agents working in this repository. **This file is the source of truth.**
 Tool-specific notes live alongside it (e.g. `CLAUDE.md` for Claude Code) and never restate what is
-here.
+here. [`CONTEXT.md`](./CONTEXT.md) is the glossary — the word this project uses for each concept,
+and the ones it has retired. Use its vocabulary in code, comments, docs and UI copy.
 
 > **Status:** greenfield rewrite of Glaze CMS. The previous implementation lives at
 > `../glaze-cms-old` (reference for _design intent only_ — do not copy its package/publishing
@@ -38,10 +39,13 @@ collaboration engine.** See §4.
 
 **What the thesis commits us to:**
 
-- **One principal model** — user, agent, or token. "What can this actor do" is a permissions
-  question, so RBAC is designed in from the start, not retrofitted. Full policy model, minimal
-  management UI; three built-in roles (`admin`, `editor`, `agent`) so day one needs no config.
-- **`propose` and `approve` are first-class actions**, distinct from CRUD's `update`. An actor
+- **One principal model** — a person, an agent and a machine client sit on the same list and carry
+  the same kind of permissions; there is no side door for API access. "What can this principal do"
+  is a permissions question, so RBAC is designed in from the start, not retrofitted. Full policy
+  model, minimal management UI; two built-in roles (`admin`, `editor`) so day one needs no config.
+  What a principal **is** (`user` / `agent` / `system`) is its kind, and is never its role: an agent
+  that may edit is not an agent that may approve.
+- **`propose` and `approve` are first-class actions**, distinct from CRUD's `update`. A principal
   granted `propose` and never `approve` cannot write to production **by policy**, not by a rule
   buried in code. Approving a pending _structural_ change is a permission too.
 - **Accept per suggestion, not per document.** Reviewing someone else's long set of edits is not an

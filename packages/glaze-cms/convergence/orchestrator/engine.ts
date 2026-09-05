@@ -375,15 +375,15 @@ function fromApplyFailure(failure: ApplyFailure): ConvergeResult {
 function deriveRenamedTables(renames: readonly CapturedRename[]): TableRename[] {
 	return renames
 		.filter(
-			({ decision }) => decision.type === 'rename_or_create' && decision.entityKind === 'table',
+			({ decision }) => decision.type === 'rename_or_create' && decision.targetKind === 'table',
 		)
-		.map(({ decision, from }) => ({ from: tableName(from), to: tableName(decision.entity) }));
+		.map(({ decision, from }) => ({ from: tableName(from), to: tableName(decision.target) }));
 }
 
 /**
- * Extracts the table name (the last slot) from a namespaced entity tuple.
+ * Extracts the table name (the last slot) from a namespaced target tuple.
  *
- * @param tuple - An entity identifier tuple (e.g. `['public', 'users']`).
+ * @param tuple - An target identifier tuple (e.g. `['public', 'users']`).
  * @returns The table name.
  */
 function tableName(tuple: readonly string[]): string {
@@ -401,20 +401,20 @@ function tableName(tuple: readonly string[]): string {
 function deriveRenamedColumns(renames: readonly CapturedRename[]): ColumnRename[] {
 	return renames
 		.filter(
-			({ decision }) => decision.type === 'rename_or_create' && decision.entityKind === 'column',
+			({ decision }) => decision.type === 'rename_or_create' && decision.targetKind === 'column',
 		)
 		.map(({ decision, from }) => ({
-			table: tableSlot(decision.entity),
+			table: tableSlot(decision.target),
 			from: tableName(from),
-			to: tableName(decision.entity),
+			to: tableName(decision.target),
 		}))
 		.filter((rename) => rename.table !== '' && rename.from !== '' && rename.to !== '');
 }
 
 /**
- * Extracts the table name (the second-to-last slot) from a column entity tuple `[…, table, column]`.
+ * Extracts the table name (the second-to-last slot) from a column target tuple `[…, table, column]`.
  *
- * @param tuple - A column entity identifier tuple (e.g. `['public', 'users', 'handle']`).
+ * @param tuple - A column target identifier tuple (e.g. `['public', 'users', 'handle']`).
  * @returns The table name, or `''` when the tuple is too short.
  */
 function tableSlot(tuple: readonly string[]): string {

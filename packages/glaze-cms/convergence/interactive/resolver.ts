@@ -2,7 +2,7 @@ import { createInterface } from 'node:readline/promises';
 
 import { isEnvFlagEnabled } from '#utils';
 
-import { describeReason, formatEntity, formatPanel, isAffirmative, renameFrom } from './utils.ts';
+import { describeReason, formatTarget, formatPanel, isAffirmative, renameFrom } from './utils.ts';
 
 import type { UnexpectedRowLoss } from '../apply/index.ts';
 import type { SchemaDecision } from '../envelope/index.ts';
@@ -61,8 +61,8 @@ async function askYesNo(io: ResolverIo, panel: string, question: string): Promis
 }
 
 /**
- * Asks whether a newly-appeared entity is a rename of an existing one. Non-TTY ⇒ create (additive,
- * never destructive). A blank answer ⇒ create; any name ⇒ rename, carrying the entity's namespace
+ * Asks whether a newly-appeared target is a rename of an existing one. Non-TTY ⇒ create (additive,
+ * never destructive). A blank answer ⇒ create; any name ⇒ rename, carrying the target's namespace
  * and swapping in the typed old name.
  *
  * @param io - The terminal I/O port.
@@ -75,19 +75,19 @@ async function resolveRenameOrCreate(
 ): Promise<DecisionResolution> {
 	if (!io.isTty()) return { action: 'create' };
 
-	const { entityKind, entity } = decision;
+	const { targetKind, target } = decision;
 	const panel = formatPanel('Schema change', [
-		`A new ${entityKind} appeared that isn't in the database yet:`,
+		`A new ${targetKind} appeared that isn't in the database yet:`,
 		'',
-		`    ${formatEntity(entity)}`,
+		`    ${formatTarget(target)}`,
 		'',
-		`If you renamed an existing ${entityKind}, type its current name so its`,
+		`If you renamed an existing ${targetKind}, type its current name so its`,
 		'data carries over. Otherwise press Enter to create it new.',
 	]);
 	const answer = (await io.ask(`${panel}\nRename from (or Enter to create): `)).trim();
 
 	if (answer === '') return { action: 'create' };
-	return { action: 'rename', from: renameFrom(entity, answer) };
+	return { action: 'rename', from: renameFrom(target, answer) };
 }
 
 /**
@@ -106,7 +106,7 @@ async function resolveDataLoss(
 	if (!io.isTty()) return { action: 'reject' };
 
 	const reason = describeReason(decision);
-	const lines = [`This change to ${formatEntity(decision.entity)} will discard existing data.`];
+	const lines = [`This change to ${formatTarget(decision.target)} will discard existing data.`];
 	if (reason) lines.push('', `    ${reason}`);
 
 	const confirmed = await askYesNo(io, formatPanel('Confirm data loss', lines), 'Proceed?');

@@ -53,8 +53,8 @@ test('decodes a confirm_data_loss (non_empty) decision', () => {
 		decisions: [
 			{
 				type: 'confirm_data_loss',
-				entityKind: 'column',
-				entity: ['public', 'users', 'nickname'],
+				targetKind: 'column',
+				target: ['public', 'users', 'nickname'],
 				reason: 'non_empty',
 			},
 		],
@@ -71,7 +71,7 @@ test('decodes a rename_or_create decision', () => {
 	expect(result).toEqual({
 		status: 'needs_decision',
 		decisions: [
-			{ type: 'rename_or_create', entityKind: 'column', entity: ['public', 'users', 'handle'] },
+			{ type: 'rename_or_create', targetKind: 'column', target: ['public', 'users', 'handle'] },
 		],
 	});
 });
@@ -94,8 +94,8 @@ test('decodes a type_change decision with from/to details', () => {
 		decisions: [
 			{
 				type: 'confirm_data_loss',
-				entityKind: 'column',
-				entity: ['public', 't', 'c'],
+				targetKind: 'column',
+				target: ['public', 't', 'c'],
 				reason: 'type_change',
 				reasonDetails: { from: 'text', to: 'integer' },
 			},

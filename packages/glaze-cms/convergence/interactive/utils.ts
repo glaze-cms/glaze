@@ -22,25 +22,25 @@ export function isAffirmative(answer: string): boolean {
 }
 
 /**
- * Builds the `from` tuple for a rename: the new entity's namespace with the typed old name swapped
+ * Builds the `from` tuple for a rename: the new target's namespace with the typed old name swapped
  * into the final (leaf) slot — e.g. `['public','users','handle']` + `login` ⇒ `['public','users','login']`.
  *
- * @param entity - The new entity's namespaced identifier tuple.
- * @param oldName - The existing entity's leaf name the operator typed.
- * @returns The old entity's namespaced identifier tuple.
+ * @param target - The new target's namespaced identifier tuple.
+ * @param oldName - The existing target's leaf name the operator typed.
+ * @returns The old target's namespaced identifier tuple.
  */
-export function renameFrom(entity: readonly string[], oldName: string): readonly string[] {
-	return [...entity.slice(0, -1), oldName.trim()];
+export function renameFrom(target: readonly string[], oldName: string): readonly string[] {
+	return [...target.slice(0, -1), oldName.trim()];
 }
 
 /**
- * Renders an entity's namespaced tuple as a dotted path for display (`public.users.handle`).
+ * Renders a target's namespaced tuple as a dotted path for display (`public.users.handle`).
  *
- * @param entity - The namespaced identifier tuple.
+ * @param target - The namespaced identifier tuple.
  * @returns The dotted path.
  */
-export function formatEntity(entity: readonly string[]): string {
-	return entity.join('.');
+export function formatTarget(target: readonly string[]): string {
+	return target.join('.');
 }
 
 /**
