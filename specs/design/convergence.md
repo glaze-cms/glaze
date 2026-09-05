@@ -67,25 +67,26 @@ it purely to "notify Admin UI", marked _Optional_). It is **out of the convergen
 deferred; the one place a notification is genuinely needed is the async return in team+audit (below),
 where polling is an acceptable fallback.
 
-## The hard nucleus: Team + Audit (pending lifecycle)
+## The hard nucleus: Team + Audit — see `pending-approvals.md`
 
-The **only** quadrant where the approver ≠ the originator and approval is asynchronous. An admin's
-atomic change can't apply immediately, so it must live as **pending** until a developer approves it.
+The quadrant where approval is asynchronous and the change must be held, recorded, and shown to a
+person before it applies. **Designed in full in [`pending-approvals.md`](./pending-approvals.md)**;
+that document is the design of record for it and is not restated here.
 
-- **Pending = a generated-but-unapplied migration.** drizzle's `generate` (write) vs `migrate`
-  (apply) split _is_ pending state; `__drizzle_migrations` is the applied-ledger — a migration not in
-  it is pending. No bespoke store for the change itself.
-- **A Glaze pending-request record** (in a **DB table**, so it's shared/queryable across the team)
-  carries the human layer: requester, status, **expected hash** (integrity: the applied migration
-  must match what was approved), and the target migration.
-- **Lifecycle:** `requested → pending → (approved → applied | rejected)`; the requesting admin is
-  **notified** on approval (field goes live) _and_ on rejection (with the reason) — WebSocket if
-  connected, poll otherwise.
-- **Watch:** stacked pending changes must queue/compose and apply in order; the admin UI shows
-  "pending" fields (known to the CMS, not yet live in the DB); hash reconciliation guards integrity.
+Two things this document said about it are **superseded** there:
 
-This complexity is **fully contained to team+audit** and is a deferred, bolt-on extension of the
-"await approval" node — the core pipeline (solo + team-auto) needs none of it.
+- **The pending record is not the generated migration.** Keeping the migration on disk advances the
+  snapshot past the database, so the next boot diffs against the advanced snapshot, reports
+  `no_changes`, and the drift goes invisible — fail-open. The change is instead generated to learn
+  what it does, discarded, and its statements plus an integrity hash recorded; the migration is
+  regenerated and hash-verified at approval.
+- **`gate` is configuration, not a consequence of `mode`.** The two are independent axes (as the
+  three-axes section above already says); `mode` only decides whether the migration file is kept.
+  `team` defaults to `audit` and `solo` to `auto`, both overridable.
+
+What stands: the DB-table record shared across the team, the expected hash, notification on approval
+and rejection, and the watch on stacked changes — which `pending-approvals.md` scopes to the `ui`
+origin, since the whole-schema `dev` origin can only ever have one open request.
 
 ## Testability (the reason this is tractable)
 
@@ -118,8 +119,8 @@ hot path.
    compute (drizzle) → decode → resolve-by-origin → layer-1 → apply via the oracle → persist toggle.
    Injection seams (`resolve`/`persist`/`gate`) baked in from line one. Reuses the envelope decoder,
    safety layers, apply oracle, and transaction seam already built + reviewed. Through the §8 loop.
-2. **Team+audit pending lifecycle** — the pending-request ledger table, async approve/reject,
-   integrity hash, notification. Contained extension.
+2. **Team+audit pending approvals** — the append-only `approval_events` table, async
+   approve/reject, integrity hash, notification. See [`pending-approvals.md`](./pending-approvals.md).
 3. **WebSocket** — optional team real-time sync. Deferred; polling is the fallback.
 
 ## Known gaps (adversarially reviewed, deferred — 2026-07-20)
@@ -127,7 +128,8 @@ hot path.
 The `converge()` facade passed a §8 review (1 implementer : 2 parallel reviewers). Fixed on the spot:
 surviving-vs-vanished loss (a **surviving** table that lost rows is `unexpected_data_loss`, never
 confirmable/exempted — only a **vanished** table is a confirmable drop); the `gate: audit` snapshot
-desync (audit now rolls the migration back — no durable pending ledger exists yet); apply-failure
+desync (audit rolled the migration back, there being no durable pending record yet —
+`pending-approvals.md` replaces that rollback with a recorded request); apply-failure
 fidelity (preserve the failing statement + distinguish `verification_error` as internal); a
 concurrent-`out` fail-closed guard; non-`ok` migration sweep; and the `hintsFile` temp-file leak.
 
