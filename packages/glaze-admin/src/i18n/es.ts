@@ -18,8 +18,8 @@ export const es: Translations = {
 		search: 'Buscar',
 		collections: 'Colecciones',
 		noCollections: 'Aún no hay colecciones',
-		newSchema: 'Nuevo esquema',
-		newSchemaUnavailable: 'La edición de esquemas aún no está disponible',
+		newEntity: 'Nueva colección',
+		newEntityNotAvailable: 'La edición de entidades aún no está disponible',
 		signOut: 'Cerrar sesión',
 	},
 	auth: {
