@@ -62,19 +62,61 @@ structural change behind a boolean, which is both more ceremony than the promise
 protection than it implies. Adding a column is not dangerous and buys nothing by waiting. Dropping a
 populated one is the entire reason this feature exists.
 
-"Destroys data" is not a judgement call — the layer-1 oracle already probes what a change would do
-to the rows that are actually there, and this reuses that answer exactly:
+### The classifier must account for every operation
 
-- **Safe** (no findings): nothing that exists stops existing. Applies.
-- **Destructive** (`column_has_data`): dropping a column that holds values. Perfectly valid SQL — the
-  database will do it without complaint, so the only question is whether you want it. Held for a
-  person.
-- **Impossible** (everything else): `NOT NULL` on a column holding nulls, a unique index over
-  duplicates, a probe that could not answer. The database refuses it outright, so there is nothing to
-  say yes to. Fails closed at boot, audited or not.
+**A classifier reads the snapshot diff and must have something to say about every operation in it. An
+operation it does not model is held.**
 
-The code calls the middle one _confirmable_ and the last one _blocking_, after the seam that asks
-(`confirmDrop`) and what the engine does with it. Those name the plumbing; these name the change.
+This is the load-bearing sentence, and getting it wrong is what makes the feature unsafe. A first
+attempt keyed "destructive" off the layer-1 findings alone, so a diff producing no findings read as
+"this destroys nothing" — when what it means is "layer-1 had nothing to say about this". Collapsing
+those two applied a populated table drop, a rename-plus-column-drop, and a `numeric(10,4)` →
+`numeric(10,2)` narrowing without holding any of them. Proven on both dialects during review, each
+one silent.
+
+So the classifier returns three buckets, not a list of findings:
+
+- **Additive** — provably destroys nothing: add a table, add a nullable column, widen a type, add an
+  index. Applies.
+- **Destructive in shape** — removes or rewrites stored values: drop a column, drop a table, narrow
+  or coerce a type. Then probe the live database, because dropping an _empty_ column destroys nothing
+  and should stop nobody. Held only when the target actually holds values.
+- **Unclassified** — the differ has no model for this operation. **Held**, and reported as
+  unclassified rather than as a data-loss finding, because it is not one. It is an admission.
+
+The third bucket is the point. It inverts what a gap in the differ costs: today a gap costs data,
+silently; under this rule it costs an unnecessary approval. Glaze becomes annoying where it is
+ignorant and never unsafe — and the annoyance is self-correcting, because somebody goes and teaches
+the differ.
+
+The cost is real and worth stating plainly: on a first version that bucket catches a great deal —
+indexes, defaults, foreign keys, enums, everything not yet modelled. Bucket one has to be seeded with
+the additive operations we already understand, or an audited project is unusable on contact.
+
+### Impossible is separate, and fails closed
+
+`NOT NULL` on a column holding nulls, a unique index over duplicates, a probe that could not answer.
+The database refuses these outright, so there is nothing to say yes to and nobody to say it: they fail
+closed at boot, audited or not. Filing one as a pending approval would put an approve button on a
+change that can never succeed.
+
+### Layer-2 does not decide
+
+The two oracles divide the work and say so. Layer-1 owns column-level, count-preserving loss and
+delegates whole-table drops to layer-2 — "a whole-table drop is the oracle's job"
+(`orchestrator/preflight.ts`). Layer-2 states in its own documentation that it does **not** see
+count-preserving corruption: a column drop, a precision truncation, a SQLite rebuild landing values in
+the wrong columns.
+
+That division is right for verification and fatal for deciding. Layer-2 runs _around the apply_, so a
+decision resting on it cannot hold anything — which is exactly how a populated table drop escaped: it
+reached `confirmLoss` during the apply, where `audit` has no say.
+
+So deciding happens **once, before anything runs**, over the whole diff. Layer-2 returns to what its
+own documentation describes: an independent check that the apply did what was predicted.
+
+An unreadable parent snapshot is unclassified, not an empty string. Failing to read the thing a change
+is relative to is not a weaker fingerprint — it is not knowing what the change is.
 
 ### Why Glaze probes when drizzle already asks
 
@@ -357,10 +399,16 @@ Written down because each is the kind of decision that gets silently re-reverted
 
 ## Still to build
 
-- **Holding only what destroys data.** The code committed so far holds _every_ structural change when
-  `audit` is on — the earlier model. It already refuses blocking changes correctly; what it does not
-  yet do is let a safe change through. This is the smallest of the corrections and the one that makes
-  the content-API problem disappear.
+- **The classifier, with its three buckets.** `deriveUnsafeChanges` returns only the operations it
+  knows are dangerous; it must instead account for every operation in the diff and report the ones it
+  cannot model. Until it does, `audit` holds every structural change — clumsy, and the only reason the
+  gaps described above are not live. Attempted once and reverted (`a63653e`), because narrowing the
+  hold to layer-1's findings removed a blanket that was covering layer-1's blind spots.
+- **Boot reconciliation.** [Reconciling a request that resolved itself](#reconciling-a-request-that-resolved-itself)
+  is design of record with nothing behind it: `no_changes` plus an open request records `withdrawn`
+  unconditionally, with no journal read, no probe and no partial-apply branch. The case it gets wrong
+  is the one that section calls the worst failure an audit trail has.
+- **`pending: drop` on the descriptor**, so the admin can show a column as on its way out.
 - **The apply path for kept files.** `drizzle-orm/postgres-js/migrator` and `drizzle-orm/bun-sqlite/migrator`
   read the committed chain, compare it to the journal, and apply what is missing. Glaze must apply
   the statements **itself** rather than delegating: drizzle's migrator owns its own transaction, and
