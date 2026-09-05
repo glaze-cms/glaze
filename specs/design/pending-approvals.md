@@ -14,7 +14,7 @@ the team.
 Git already reviews the change as _written_ — same diff for every environment, before merge.
 Convergence reviews the change as _applied_, against one database's real contents, at deploy. A
 reviewer reading a pull request cannot see that `posts.subtitle` holds 1,204 rows; that fact does not
-exist until the migration is about to run. The two gates catch different things, and the dangerous
+exist until the migration is about to run. The two reviews catch different things, and the dangerous
 sequence is the reviewed, approved, merged change that boots against production and takes the rows
 with it.
 
@@ -23,37 +23,38 @@ what will be destroyed.**
 
 ## Three axes
 
-`mode` and `gate` are independent settings that were previously fused in code (`runner.ts` derived
-`team → audit`, and `WorkflowConfig` carried no gate at all).
+`mode` and `audit` are independent settings. They were fused in code until this design landed
+(`runner.ts` derived `team → audit`, and `WorkflowConfig` carried no audit flag at all);
+`WorkflowConfig` now carries both.
 
 | Axis       | Values           | Answers                             |
 | ---------- | ---------------- | ----------------------------------- |
 | **mode**   | `solo` / `team`  | Do we keep the migration file?      |
-| **gate**   | `auto` / `audit` | Do we ask a person before applying? |
+| **audit**  | `true` / `false` | Do we ask a person before applying? |
 | **origin** | `dev` / `ui`     | Where did the change come from?     |
 
-Defaults: `solo → auto`, `team → audit`. Both overridable — `workflow: { mode: 'team', gate: 'auto' }`
-is a legitimate way to work (commit migrations, apply on boot) and is currently inexpressible.
+Defaults: `solo → false`, `team → true`. Both overridable — `workflow: { mode: 'team', audit: false }`
+is a legitimate way to work (commit migrations, apply on boot).
 
 ### The matrix
 
-| mode | gate  | origin | What happens                                                                       | Status                       |
+| mode | audit | origin | What happens                                                                       | Status                       |
 | ---- | ----- | ------ | ---------------------------------------------------------------------------------- | ---------------------------- |
-| solo | auto  | dev    | Boot detects the change and applies it. No migration file kept.                    | Works today                  |
-| solo | auto  | ui     | The click applies immediately; data loss is confirmed inline.                      | Needs the `ui` origin        |
-| solo | audit | dev    | Boot detects it, does not apply, files a pending approval.                         | This slice                   |
-| solo | audit | ui     | The click files a pending approval; the same person approves it, recorded as such. | Needs the `ui` origin        |
-| team | auto  | dev    | Boot generates the migration, commits it, applies it.                              | **Inexpressible today**      |
-| team | auto  | ui     | The click applies immediately and writes a migration file.                         | Needs the `ui` origin        |
-| team | audit | dev    | Boot files a pending approval; on approval it applies and writes the migration.    | **This slice.** Team default |
-| team | audit | ui     | The click files a pending approval; an admin approves it.                          | Needs the `ui` origin        |
+| solo | false | dev    | Boot detects the change and applies it. No migration file kept.                    | Works today                  |
+| solo | false | ui     | The click applies immediately; data loss is confirmed inline.                      | Needs the `ui` origin        |
+| solo | true  | dev    | Boot detects it, does not apply, files a pending approval.                         | This slice                   |
+| solo | true  | ui     | The click files a pending approval; the same person approves it, recorded as such. | Needs the `ui` origin        |
+| team | false | dev    | Boot generates the migration, commits it, applies it.                              | Works today                  |
+| team | false | ui     | The click applies immediately and writes a migration file.                         | Needs the `ui` origin        |
+| team | true  | dev    | Boot files a pending approval; on approval it applies and writes the migration.    | **This slice.** Team default |
+| team | true  | ui     | The click files a pending approval; an admin approves it.                          | Needs the `ui` origin        |
 
 Reading across: **`mode` is not a behavioural axis.** It only decides whether the migration file is
-kept. Behaviour comes from `gate × origin`.
+kept. Behaviour comes from `audit × origin`.
 
 ### `audit` means audit
 
-The gate applies **uniformly across origins and actors**. There is no bypass — not for an admin, not
+Auditing applies **uniformly across origins and actors**. There is no bypass — not for an admin, not
 for the person who made the change. With `audit` on, every structural change becomes a pending
 approval and is recorded, even when the same person approves it seconds later. An admin approving
 their own change is permitted and recorded **as** a self-approval; what is not permitted is a change
@@ -64,7 +65,7 @@ Permission answers only **"may you approve?"** — never "may you skip?".
 
 **Distinct from this:** drizzle's own decisions (`rename_or_create`, `confirm_data_loss`) still
 resolve **synchronously**, as `convergence.md` requires — they must be answered before a migration
-can be generated at all. The gate then holds the generated result. Two different moments.
+can be generated at all. Auditing then holds the generated result. Two different moments.
 
 ## Lifecycle
 
@@ -82,7 +83,7 @@ schema change detected
 Generating writes a migration to `out`, and that migration carries the new snapshot — so keeping it
 advances the snapshot past the database. The next boot then diffs the schema file against the
 _advanced_ snapshot, finds them equal, reports `no_changes`, and the drift becomes invisible. That is
-fail-open, and it is why the current `gate: 'audit'` path rolls the migration back.
+fail-open, and it is why the current audited path rolls the migration back.
 
 So: **generate to learn what the change does, then discard it, and keep the knowledge.** The
 statements and their hash go on the `requested` event. The snapshot never runs ahead of the database,
@@ -155,7 +156,7 @@ those as one decision is the silent error the oracle exists to prevent.
 
 ## At boot
 
-1. Compute the diff with the gate applied.
+1. Compute the diff, audited.
 2. **No changes** — if an open request exists, the schema was reverted: record `withdrawn`.
 3. **Changes, same `changeHash` as the open request** — already pending, do nothing.
 4. **Changes, different hash** — record `superseded` on the open request, file a new `requested`.
@@ -229,8 +230,8 @@ Written down because each is the kind of decision that gets silently re-reverted
    escape hatch.
 2. **The pending record is not the generated migration.** Supersedes `convergence.md`'s "Pending = a
    generated-but-unapplied migration … no bespoke store for the change itself." See above.
-3. **`gate` is config, not derived from `mode`.** `glaze-cms-old` had `{ mode, audit }` as independent
-   settings; this repo fused them. Restored.
+3. **`audit` is config, not derived from `mode`.** `glaze-cms-old` had `{ mode, audit }` as
+   independent settings; this repo fused them into a derived `gate`. Restored, under the old name.
 
 ## Out of scope
 

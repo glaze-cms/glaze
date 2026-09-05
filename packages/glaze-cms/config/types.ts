@@ -3,14 +3,32 @@ import type { Dialect } from '../dialect/types.ts';
 export type { Dialect } from '../dialect/types.ts';
 
 /**
- * Which collaboration workflow the project runs. Expanded during the convergence step
+ * Whether the generated migration files are kept. `solo` treats them as a disposable cache;
+ * `team` commits them so the chain is shared. It does **not** decide whether a change is held for
+ * review — that is `audit`.
+ *
+ * Not yet wired: both modes currently write to the configured `migrations` directory.
  */
 export type WorkflowMode = 'solo' | 'team';
 
-/** Workflow configuration. */
+/** Collaboration workflow. Both axes are optional and default independently. */
 export interface WorkflowConfig {
 	/** @default 'solo' */
+	mode?: WorkflowMode;
+	/**
+	 * Hold every structural change for a person: nothing applies until someone approves it, and the
+	 * decision is recorded. Independent of {@link WorkflowMode} — committing the migrations and
+	 * reviewing them are separate choices (see `specs/design/pending-approvals.md`).
+	 *
+	 * @default false when `mode` is `'solo'`, true when it is `'team'`
+	 */
+	audit?: boolean;
+}
+
+/** A {@link WorkflowConfig} with both axes resolved to concrete values. */
+export interface ResolvedWorkflowConfig {
 	mode: WorkflowMode;
+	audit: boolean;
 }
 
 /**
@@ -36,7 +54,7 @@ export interface GlazeConfig {
 	migrations?: string;
 	/**
 	 * Collaboration workflow.
-	 * @default { mode: 'solo' }
+	 * @default { mode: 'solo', audit: false }
 	 */
 	workflow?: WorkflowConfig;
 }
@@ -48,5 +66,5 @@ export interface ResolvedGlazeConfig {
 	/** The schema path/glob, or `undefined` when the project has no user schema yet. */
 	schema: string | undefined;
 	migrations: string;
-	workflow: WorkflowConfig;
+	workflow: ResolvedWorkflowConfig;
 }

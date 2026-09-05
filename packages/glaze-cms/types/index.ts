@@ -2,6 +2,7 @@ export type {
 	Dialect,
 	GlazeConfig,
 	ResolvedGlazeConfig,
+	ResolvedWorkflowConfig,
 	WorkflowConfig,
 	WorkflowMode,
 } from '../config/index.ts';

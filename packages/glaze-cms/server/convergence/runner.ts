@@ -10,7 +10,6 @@
 
 import { converge, createInteractiveResolver } from '#convergence';
 
-import type { WorkflowMode } from '#config';
 import type { ConvergeResult, InteractiveResolver } from '#convergence';
 import type { Logger } from '#logger';
 import type { GlazeContext } from '../app/context.ts';
@@ -18,22 +17,6 @@ import type { GlazeContext } from '../app/context.ts';
 /** Guidance appended to every blocked-boot error — how the developer unblocks it. */
 const REMEDIATION =
 	'Run Glaze in an interactive terminal to resolve it, or reconcile the schema change manually.';
-
-/**
- * Derives the convergence gate from the collaboration mode: solo applies changes automatically
- * (`auto`); team defers them for approval (`audit`, which detects changes without applying).
- *
- * @param mode - The workflow mode from the resolved config.
- * @returns The gate to pass to {@link converge}.
- */
-function deriveGate(mode: WorkflowMode): 'auto' | 'audit' {
-	if (mode === 'solo') return 'auto';
-	if (mode === 'team') return 'audit';
-	// Exhaustive over WorkflowMode: a new mode fails to compile here rather than silently defaulting
-	// to `auto` (the less safe direction — it applies changes).
-	const unreachable: never = mode;
-	throw new Error(`unhandled workflow mode: ${String(unreachable)}`);
-}
 
 /**
  * Summarizes a blocked convergence result in one operator-facing line — which change could not
@@ -98,12 +81,12 @@ function reportConvergence(logger: Logger, result: ConvergeResult): void {
 			logger.info(`Glaze converged the schema (${result.statements.length} statement(s)).`);
 			return;
 		case 'pending':
-			// Team mode defers changes for approval, so the database does NOT yet match the schema. There
-			// is no durable pending ledger yet, so this recurs every boot — warn (not info) so the drift is
-			// visible rather than silently normal.
+			// An audited change is held for approval, so the database does NOT yet match the schema. No
+			// durable pending-approvals record exists yet, so this recurs every boot — warn (not info) so
+			// the drift is visible rather than silently normal.
 			logger.warn(
-				`Glaze detected ${result.statements.length} pending schema change(s) that team mode does not ` +
-					'apply at boot; the database does not yet match the schema. Apply them via an approved migration.',
+				`Glaze detected ${result.statements.length} pending schema change(s) held for approval; the ` +
+					'database does not yet match the schema. Apply them via an approved migration.',
 			);
 			return;
 		default: {
@@ -116,9 +99,9 @@ function reportConvergence(logger: Logger, result: ConvergeResult): void {
 
 /**
  * Converges the live database to the developer's Drizzle schema at boot. A no-op when the config
- * declares no `schema`. Solo mode applies safe changes automatically and prompts (in a TTY) for
- * decisions; team mode detects changes without applying. Any declined/unsafe/errored result throws,
- * failing boot closed.
+ * declares no `schema`. Without `audit` it applies a detected change, prompting (in a TTY) for any
+ * rename/data-loss decision; with `audit` it holds the change for approval and applies nothing. Any
+ * declined/unsafe/errored result throws, failing boot closed.
  *
  * @param context - The Glaze context (database handle, resolved config, logger).
  * @param resolver - The human seams for decisions. Defaults to the interactive terminal resolver;
@@ -142,7 +125,7 @@ export async function runConvergence(
 		resolve,
 		confirmLoss,
 		confirmDrop,
-		gate: deriveGate(config.workflow.mode),
+		audit: config.workflow.audit,
 	});
 
 	reportConvergence(logger, result);

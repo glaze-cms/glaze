@@ -11,7 +11,7 @@ import { materializeAuthTables } from '../auth/index.ts';
 import { resolveOptions } from '../options/index.ts';
 import { runConvergence } from './runner.ts';
 
-import type { WorkflowMode } from '#config';
+import type { WorkflowConfig } from '#config';
 import type { InteractiveResolver } from '#convergence';
 import type { DatabaseHandle, Dialect } from '#dialect';
 import type { GlazeContext } from '../app/context.ts';
@@ -73,7 +73,7 @@ function buildContext(
 	dialect: Dialect,
 	schema: string,
 	migrations: string,
-	mode: WorkflowMode = 'solo',
+	workflow: WorkflowConfig = {},
 ): GlazeContext {
 	return {
 		db,
@@ -82,7 +82,7 @@ function buildContext(
 			connection: 'unused',
 			schema,
 			migrations,
-			workflow: { mode },
+			workflow,
 		}),
 		options: resolveOptions({}),
 		logger: createLogger({ level: 'silent' }),
@@ -268,7 +268,7 @@ matrixTest(
 );
 
 matrixTest(
-	'team mode detects changes as pending without applying them',
+	'an audited change is detected as pending without being applied',
 	async ({ db, dialect }) => {
 		const dir = mkdtempSync(TEMP_FIXTURE_PREFIX);
 		const migrations = join(dir, 'migrations');
@@ -278,10 +278,10 @@ matrixTest(
 				dialect,
 				"id: integer('id').primaryKey(), title: text('title')",
 			);
-			// Team mode gates on `audit`: converge returns `pending` and rolls back — boot continues, but
-			// the table is NOT created (no durable ledger yet, so this is a deliberate no-op-that-continues).
+			// `audit` is the team default: converge returns `pending` and rolls back — boot continues, but
+			// the table is NOT created (no durable record yet, so this is a deliberate no-op-that-continues).
 			await runConvergence(
-				buildContext(db, dialect, schema, migrations, 'team'),
+				buildContext(db, dialect, schema, migrations, { mode: 'team' }),
 				decliningResolver(),
 			);
 			expect(await userTableExists(db, dialect, 'posts')).toBe(false);
@@ -290,6 +290,33 @@ matrixTest(
 		}
 	},
 );
+
+matrixTest('auditing is configurable independently of the mode', async ({ db, dialect }) => {
+	const dir = mkdtempSync(TEMP_FIXTURE_PREFIX);
+	try {
+		const schema = writeSchema(
+			dir,
+			dialect,
+			"id: integer('id').primaryKey(), title: text('title')",
+		);
+
+		// solo + audit: alone, but every structural change is still held for review.
+		await runConvergence(
+			buildContext(db, dialect, schema, join(dir, 'audited'), { mode: 'solo', audit: true }),
+			decliningResolver(),
+		);
+		expect(await userTableExists(db, dialect, 'posts')).toBe(false);
+
+		// A team audits by default, so opting out of it must actually reach the apply path.
+		await runConvergence(
+			buildContext(db, dialect, schema, join(dir, 'unaudited'), { mode: 'team', audit: false }),
+			decliningResolver(),
+		);
+		expect(await userTableExists(db, dialect, 'posts')).toBe(true);
+	} finally {
+		rmSync(dir, { recursive: true, force: true });
+	}
+});
 
 matrixTest('skips convergence entirely when no schema is configured', async ({ db, dialect }) => {
 	// A config without `schema` resolves to `undefined`; runConvergence must return without touching the DB.

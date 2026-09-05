@@ -9,7 +9,7 @@ written and what ceremony it earns.**
 
 | Layer            | Example                                                                | Source of truth                           | Ceremony                        |
 | ---------------- | ---------------------------------------------------------------------- | ----------------------------------------- | ------------------------------- |
-| **Structure**    | column exists · is `TEXT` · `NOT NULL` · FK to `authors`               | the **snapshot** (see `./convergence.md`) | migration + approval gate       |
+| **Structure**    | column exists · is `TEXT` · `NOT NULL` · FK to `authors`               | the **snapshot** (see `./convergence.md`) | migration + approval            |
 | **Presentation** | label `"Article body"` · field order · hidden-in-form · select options | the **DB** (`glaze` namespace)            | none — applies immediately      |
 | **View state**   | sort column · visible columns · density · page size                    | the **client** (`localStorage`)           | none — never leaves the browser |
 
@@ -250,7 +250,7 @@ felt in practice.
 ### Precedent
 
 This is the existing rule applied consistently, not an exception to it. `./convergence.md` already
-puts the **pending-request ledger** — requester, status, expected hash, target migration — in a DB
+puts the **pending-approvals record** — requester, status, expected hash, target migration — in a DB
 table "so it's shared/queryable across the team", while structure stays on the snapshot. Structure →
 snapshot; human/collaboration layer → DB. Presentation is unambiguously the second category.
 
@@ -273,14 +273,14 @@ localStorage cannot express it, and it belongs in the DB when it arrives. Not V1
 on opposite sides of the layer boundary. This is the operational rule the admin's "change field
 type" action must implement.
 
-| Change                               | Storage effect               | Layer        | Flow                               |
-| ------------------------------------ | ---------------------------- | ------------ | ---------------------------------- |
-| `text` → `richText`                  | `VARCHAR` → `JSONB`          | structure    | migration · data conversion · gate |
-| `number` → `text`                    | `INTEGER` → `VARCHAR`, lossy | structure    | migration · data-loss oracle       |
-| add / drop / rename a field          | column DDL                   | structure    | migration · gate                   |
-| `text` → `select`                    | none — stays `VARCHAR`       | presentation | immediate                          |
-| add / remove select options          | none, absent a `CHECK`       | presentation | immediate                          |
-| relabel · reorder · hide · help text | none                         | presentation | immediate                          |
+| Change                               | Storage effect               | Layer        | Flow                                |
+| ------------------------------------ | ---------------------------- | ------------ | ----------------------------------- |
+| `text` → `richText`                  | `VARCHAR` → `JSONB`          | structure    | migration · data conversion · audit |
+| `number` → `text`                    | `INTEGER` → `VARCHAR`, lossy | structure    | migration · data-loss oracle        |
+| add / drop / rename a field          | column DDL                   | structure    | migration · audit                   |
+| `text` → `select`                    | none — stays `VARCHAR`       | presentation | immediate                           |
+| add / remove select options          | none, absent a `CHECK`       | presentation | immediate                           |
+| relabel · reorder · hide · help text | none                         | presentation | immediate                           |
 
 The storage half is Drizzle's and is already governed by convergence — **it needs nothing new.** The
 semantic half plus options is the new metadata. An admin field-type change therefore _routes_: pure
@@ -479,6 +479,5 @@ and binary → `unknown`, because guessing `richText` would put a document edito
 - **Bulk operations** — publish / unpublish / delete over a selection. Needs endpoints with
   partial-failure semantics.
 - **Export / seed** — the escape hatch for presentation not travelling between environments.
-- **Whether presentation overrides respect the `workflow` gate** in team/audit, or always apply
-  immediately. Leaning immediate: no data risk, and convergence's ceremony is earned by data-loss
-  risk.
+- **Whether presentation overrides respect `workflow.audit`**, or always apply immediately. Leaning
+  immediate: no data risk, and convergence's ceremony is earned by data-loss risk.

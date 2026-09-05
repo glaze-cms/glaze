@@ -24,7 +24,7 @@ not separate flows — they are toggles and input adapters over the same pipelin
 
 ```
 trigger → drizzle computes diff → decode envelope → resolve decisions → layer-1 pre-flight
-        → apply gate → apply via layer-2 oracle → persist toggle → (conflicts) → converged
+        → audit hold → apply via layer-2 oracle → persist toggle → (conflicts) → converged
 ```
 
 ## Three orthogonal axes
@@ -41,7 +41,7 @@ trigger → drizzle computes diff → decode envelope → resolve decisions → 
      nothing. `db:push`-fast loop, zero repo artifacts.
    - **Yes (team / prod):** the migration + snapshot chain is **committed** — shareable, reviewable
      history.
-3. **Apply gate (auto / audit):** apply as soon as it's safe, or hold for explicit approval.
+3. **Audit (`audit: true` / `false`):** hold for explicit approval, or apply as soon as it's safe.
 
 Plus: **conflict resolution comes free** — divergent edits are only possible on a shared, persisted
 history, so it exists exactly when `persist = yes` and is structurally impossible in solo.
@@ -80,9 +80,9 @@ Two things this document said about it are **superseded** there:
   `no_changes`, and the drift goes invisible — fail-open. The change is instead generated to learn
   what it does, discarded, and its statements plus an integrity hash recorded; the migration is
   regenerated and hash-verified at approval.
-- **`gate` is configuration, not a consequence of `mode`.** The two are independent axes (as the
+- **`audit` is configuration, not a consequence of `mode`.** The two are independent axes (as the
   three-axes section above already says); `mode` only decides whether the migration file is kept.
-  `team` defaults to `audit` and `solo` to `auto`, both overridable.
+  `team` defaults to auditing and `solo` to not, both overridable.
 
 What stands: the DB-table record shared across the team, the expected hash, notification on approval
 and rejection, and the watch on stacked changes — which `pending-approvals.md` scopes to the `ui`
@@ -106,7 +106,7 @@ real (the ephemeral harness DB is the oracle — assert observed state, not inte
 injected thing is the **human-in-the-loop as a function** — `resolve(decisions) → hints` and
 `approve(pending) → yes/no`. That is a genuine seam, not a mock-of-reality: in production it's the
 admin UI / dev CLI; in tests it's a deterministic stub. **Designing the orchestrator to take
-`resolve`/`approve`/`persist`/`gate` as injected seams makes it fully testable today — before the
+`resolve`/`approve`/`persist`/`audit` as injected seams makes it fully testable today — before the
 Elysia API and admin frontend exist — and makes the real UI just another caller later.**
 
 Driver note: **no extra SQLite driver is needed.** `bun:sqlite` covers apply and introspection;
@@ -117,7 +117,7 @@ hot path.
 
 1. **Orchestrator core** — the synchronous happy path covering **solo + team-auto**: trigger →
    compute (drizzle) → decode → resolve-by-origin → layer-1 → apply via the oracle → persist toggle.
-   Injection seams (`resolve`/`persist`/`gate`) baked in from line one. Reuses the envelope decoder,
+   Injection seams (`resolve`/`persist`/`audit`) baked in from line one. Reuses the envelope decoder,
    safety layers, apply oracle, and transaction seam already built + reviewed. Through the §8 loop.
 2. **Team+audit pending approvals** — the append-only `approval_events` table, async
    approve/reject, integrity hash, notification. See [`pending-approvals.md`](./pending-approvals.md).
@@ -127,7 +127,7 @@ hot path.
 
 The `converge()` facade passed a §8 review (1 implementer : 2 parallel reviewers). Fixed on the spot:
 surviving-vs-vanished loss (a **surviving** table that lost rows is `unexpected_data_loss`, never
-confirmable/exempted — only a **vanished** table is a confirmable drop); the `gate: audit` snapshot
+confirmable/exempted — only a **vanished** table is a confirmable drop); the `audit` snapshot
 desync (audit rolled the migration back, there being no durable pending record yet —
 `pending-approvals.md` replaces that rollback with a recorded request); apply-failure
 fidelity (preserve the failing statement + distinguish `verification_error` as internal); a

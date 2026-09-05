@@ -351,13 +351,14 @@ surface where the thesis (§1) becomes visible. Convergence is real but invisibl
 sees a boot log. It becomes the product only when a person is shown _"this change drops `subtitle`;
 1,204 rows hold data"_ and can decide.
 
-So: the **pending ledger** (step 2 of `specs/design/convergence.md`'s build order) **plus the one
+So: **pending approvals** (step 2 of `specs/design/convergence.md`'s build order) **plus the one
 admin screen** that shows a pending change and lets a human approve or reject it — a vertical slice,
-not another horizontal backend step. It also closes a live dead end: `gate: 'audit'` returns
-`pending` but rolls the migration back, and `server/convergence/runner.ts` maps
-`workflow: { mode: 'team' }` → `audit`, so team mode today detects changes, never applies them, and
-offers no way to approve. **Spec the pending record — table, integrity hash, lifecycle — before
-building any screen**, so the UI does not shape the data model.
+not another horizontal backend step. It also closes a live dead end: an audited change returns
+`pending` but rolls the migration back, so an audited project detects changes, never applies them,
+and offers no way to approve. Designed in full in `specs/design/pending-approvals.md` — spec'd
+before any screen, so the UI does not shape the data model. `audit` is now its own config axis
+(`workflow: { mode, audit }`), no longer derived from `mode`; what remains is the durable record and
+the screen.
 
 **Constraint on everything after:** born type-checked for completeness and behavior-tested across
 all targets (§7).

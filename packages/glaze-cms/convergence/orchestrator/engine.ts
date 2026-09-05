@@ -18,9 +18,10 @@
  * `out` up front, so if the apply is declined or fails, that migration is removed — keeping the
  * snapshot in lockstep with the database.
  *
- * See `docs/convergence-design.md`. This covers solo + team-auto. The audit gate returns `pending`
- * but **also rolls the migration back** (no durable pending ledger exists yet), so it never leaves
- * the snapshot ahead of the database; the full pending lifecycle is a later, contained increment.
+ * See `specs/design/convergence.md`. This covers unaudited convergence. With `audit`, it returns
+ * `pending` but **also rolls the migration back** (no durable pending-approvals record exists yet),
+ * so it never leaves the snapshot ahead of the database; the full pending lifecycle is a later,
+ * contained increment (`specs/design/pending-approvals.md`).
  */
 
 import { readdirSync, readFileSync, rmSync } from 'node:fs';
@@ -74,8 +75,11 @@ export interface ConvergeOptions {
 	readonly confirmLoss?: LossResolver;
 	/** Confirms a destructive-but-valid layer-1 change (a populated column drop). Absent ⇒ declined (blocked). */
 	readonly confirmDrop?: DropConfirmer;
-	/** `auto` (default) applies when safe; `audit` returns `pending` without applying. */
-	readonly gate?: 'auto' | 'audit';
+	/**
+	 * Hold the change for a person instead of applying it: returns `pending` with the SQL for review.
+	 * @default false — apply when safe.
+	 */
+	readonly audit?: boolean;
 }
 
 /** The outcome of {@link converge}. */
@@ -103,7 +107,7 @@ interface CapturedRename {
  * @returns What happened — applied, nothing to do, a rejected/declined decision, pending, or an error.
  */
 export async function converge(options: ConvergeOptions): Promise<ConvergeResult> {
-	const { db, dialect, schema, out, resolve, confirmLoss, confirmDrop, gate = 'auto' } = options;
+	const { db, dialect, schema, out, resolve, confirmLoss, confirmDrop, audit = false } = options;
 
 	const renames: CapturedRename[] = [];
 	const recordingResolve: Resolver = async (decision) => {
@@ -146,9 +150,10 @@ export async function converge(options: ConvergeOptions): Promise<ConvergeResult
 	try {
 		const statements = readMigrationStatements(migrationDir);
 
-		if (gate === 'audit') {
-			// No durable pending ledger exists yet, so audit must not leave the snapshot ahead of the DB:
-			// roll the migration back and return the SQL for review only. The next converge regenerates it.
+		if (audit) {
+			// No durable pending-approvals record exists yet, so an audit must not leave the snapshot ahead
+			// of the DB: roll the migration back and return the SQL for review only. The next converge
+			// regenerates it.
 			rmSync(migrationDir, { recursive: true, force: true });
 			return { status: 'pending', statements };
 		}

@@ -52,7 +52,7 @@ async function convergeSchema(
 	out: string,
 	name: string,
 	tables: Record<string, readonly string[]>,
-	extra: { confirmLoss?: () => boolean; confirmDrop?: () => boolean; gate?: 'auto' | 'audit' } = {},
+	extra: { confirmLoss?: () => boolean; confirmDrop?: () => boolean; audit?: boolean } = {},
 ) {
 	const schema = join(dir, `${name}.ts`);
 	writeFileSync(schema, schemaModule(dialect, tables));
@@ -106,7 +106,7 @@ matrixTest(
 				p.out,
 				'a',
 				{ widgets: ['id'] },
-				{ gate: 'audit' },
+				{ audit: true },
 			);
 			expect(pending.status).toBe('pending');
 			// The DB was not touched — the table does not exist.
