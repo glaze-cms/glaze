@@ -178,7 +178,7 @@ silently dropped a populated column, `hints: []`).
 **→ Superseded.** The original conclusion here was to route SQLite convergence through a second
 driver to borrow drizzle's high-level gate. Glaze does not do that: it builds its **own** data-loss
 oracle (`convergence/safety/`), which covers cases drizzle misses either way (see §3 and
-`../design/convergence.md`). The evidence above stands and is the *reason* the oracle exists — the
+`../design/convergence.md`). The evidence above stands and is the _reason_ the oracle exists — the
 recommendation does not. Convergence uses `dialect: 'sqlite'` with `bun:sqlite`, no extra driver.
 
 **⚠️ rc.4 bug (reproducible, verified):** passing the reply hints as an **inline `hints:` array** to

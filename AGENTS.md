@@ -5,7 +5,7 @@ Tool-specific notes live alongside it (e.g. `CLAUDE.md` for Claude Code) and nev
 here.
 
 > **Status:** greenfield rewrite of Glaze CMS. The previous implementation lives at
-> `../glaze-cms-old` (reference for *design intent only* — do not copy its package/publishing
+> `../glaze-cms-old` (reference for _design intent only_ — do not copy its package/publishing
 > setup or its drizzle-kit output-parsing). This document is the **source of truth for
 > foundational decisions**; it is forward-looking until the scaffold lands, then becomes the
 > standard "how to work here" guide.
@@ -20,18 +20,18 @@ source of truth; CMS presentation metadata lives in an internal DB schema.
 **The differentiator — read this first.** Several actors work on the same content and the same
 structure at once. Glaze's job is to make that safe: any change that could destroy data or quietly
 overwrite someone else's work becomes a **structured, reviewable decision** instead of something
-that just applies. The guardrails *are* the product, not a feature of it.
+that just applies. The guardrails _are_ the product, not a feature of it.
 
 **The actors are people and agents, and the loop does not care which.** A non-technical editor, a
-developer and an agent are three **origins** on one pipeline (§4), running the same loop: *propose →
-structured review → approval → verified apply*. Convergence was designed so a non-technical person
+developer and an agent are three **origins** on one pipeline (§4), running the same loop: _propose →
+structured review → approval → verified apply_. Convergence was designed so a non-technical person
 could approve a schema change without touching migrations; an agent needs exactly the same machine.
 Being actor-agnostic is what makes the thesis hold whether or not agent-driven editing becomes the
 norm — agents are the newest origin, not the pitch.
 
 **A consequence for the roadmap:** the quadrant `convergence.md` calls the hard nucleus (team +
 audit — approver ≠ originator, approval asynchronous) is not an edge case under this thesis. It is
-what collaboration *is*, so it moves from deferred to the main line.
+what collaboration _is_, so it moves from deferred to the main line.
 
 **Convergence is the engine that makes this real — it is not a schema-sync utility, it is the
 collaboration engine.** See §4.
@@ -43,7 +43,7 @@ collaboration engine.** See §4.
   management UI; three built-in roles (`admin`, `editor`, `agent`) so day one needs no config.
 - **`propose` and `approve` are first-class actions**, distinct from CRUD's `update`. An actor
   granted `propose` and never `approve` cannot write to production **by policy**, not by a rule
-  buried in code. Approving a pending *structural* change is a permission too.
+  buried in code. Approving a pending _structural_ change is a permission too.
 - **Accept per suggestion, not per document.** Reviewing someone else's long set of edits is not an
   all-or-nothing decision; the right granularity is the change, not the entry.
 - **Fail closed, everywhere.** What the data-loss oracle already does for structure is the rule for
@@ -59,7 +59,7 @@ collaboration engine.** See §4.
 - **AI-heavy development**: agents do most of the work and **must not be able to silently break
   things.** Guardrails — not vigilance — keep the project safe.
 - Every architectural choice therefore optimizes for: (a) agents can't regress it (enforced by
-  **types + tests + contained blast radius**), and (b) **low *ongoing* maintenance.**
+  **types + tests + contained blast radius**), and (b) **low _ongoing_ maintenance.**
 
 **Note the symmetry.** That is §1's thesis applied to this repository. The discipline needed to
 build Glaze safely with agents is the discipline Glaze sells. A guardrail worth having here is
@@ -71,7 +71,7 @@ usually worth shipping.
 and "schemas in code" are what competitors (Payload/Directus/Strapi/Sanity) already say, and where
 Glaze has no edge.
 
-- **Marketing surface = the guarantee.** Lead with what *cannot silently happen*: no unreviewed
+- **Marketing surface = the guarantee.** Lead with what _cannot silently happen_: no unreviewed
   structural change, no data lost without a decision, no agent writing straight to production.
   Prefer **enumerable** claims over adjectives — the five data-loss probes in `convergence/safety/`
   can be verified against the tests; "safe" can only be disputed.
@@ -83,7 +83,7 @@ Glaze has no edge.
   longer a priority for being a Bun touchpoint; it earns its place only as onboarding.
 - **Technical substrate stays portable behind the seams (§5).** Unchanged.
 - **Headless stays — with a declared contract.** LLMs made frontends cheap, therefore numerous and
-  volatile, which *strengthens* the case for keeping content out of them. The edge is that the
+  volatile, which _strengthens_ the case for keeping content out of them. The edge is that the
   frontend **declares what it consumes**, so Glaze can say "this change breaks the article page",
   and so entity→URL mapping and (later) visual editing come from the same declaration. Ship one
   template as the reference implementation of that contract — never a template gallery.
@@ -94,8 +94,8 @@ Glaze has no edge.
 
 Convergence keeps the DB schema in sync with code and Admin-UI changes across **solo/team ×
 auto/audit** workflows. Its whole reason to exist is producing a **clean, structured,
-translatable signal** about (a) *what a schema change will do* and (b) *why something can't
-proceed* — so non-technical users can approve/resolve changes safely.
+translatable signal** about (a) _what a schema change will do_ and (b) _why something can't
+proceed_ — so non-technical users can approve/resolve changes safely.
 
 **Built on Drizzle-kit's programmatic SDK — NOT on shelling out and parsing text.** The old
 implementation scraped drizzle-kit's human output (`lib/drizzle-kit/drizzle-output-parser.ts`),
@@ -108,19 +108,20 @@ which was fragile and is exactly why the collaboration UX felt infeasible. The r
 
 Those envelopes ARE the collaboration data model:
 
-| Drizzle envelope | Powers |
-| --- | --- |
-| `payloads` | "here's what's about to change," rendered for a non-technical user to approve |
-| typed `errors` | mapped onto Glaze i18n `ErrorCode`s (e.g. `FIELD_NOT_NULL_NO_DEFAULT`); UI translates codes — no scraping |
-| non-interactive flow | human-in-the-loop: surface decision → get resolution → continue |
-| structured `status` | reliable team/audit pending-migration tracking |
-| → WebSocket | push envelopes to the Admin app; the payload is the UI's data model |
+| Drizzle envelope     | Powers                                                                                                    |
+| -------------------- | --------------------------------------------------------------------------------------------------------- |
+| `payloads`           | "here's what's about to change," rendered for a non-technical user to approve                             |
+| typed `errors`       | mapped onto Glaze i18n `ErrorCode`s (e.g. `FIELD_NOT_NULL_NO_DEFAULT`); UI translates codes — no scraping |
+| non-interactive flow | human-in-the-loop: surface decision → get resolution → continue                                           |
+| structured `status`  | reliable team/audit pending-migration tracking                                                            |
+| → WebSocket          | push envelopes to the Admin app; the payload is the UI's data model                                       |
 
 Design intent (workflow matrix, granular ops, i18n codes, introspection→regenerate schema,
 pending-migration hash sync) is in `../glaze-cms-old/docs/convergence-v2-summary.md` —
 **re-architect around the SDK; do not port the parser.**
 
 ### Config — code-first, with a loadable `glaze.config.ts`
+
 Config stays **code-first** (typed `.ts`, no JSON/YAML), but convergence's **out-of-process tooling**
 (`bun glaze migrate`, `generate`, the drizzle-kit SDK) must resolve config **without booting the
 server** — inline-only config passed to `glaze({…})` can't provide that (the CLI would have to execute
@@ -130,8 +131,8 @@ CLI import the **same** module — one source of truth. This also **removes** th
 juggling (glaze-old merged it into a temp config at runtime): the user writes one file and Glaze
 derives the drizzle config internally from it.
 
-| `glaze.config.ts` (tooling-loadable, no side effects) | Code — `glaze({…})` (runtime behavior) |
-| --- | --- |
+| `glaze.config.ts` (tooling-loadable, no side effects)                                                               | Code — `glaze({…})` (runtime behavior)                                                                   |
+| ------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
 | `dialect` · `connection`/DB creds (env ref) · `schema` path · `migrations` dir · `workflow` (solo/team, auto/audit) | plugins · security (CORS/rate-limit) · admin/api prefixes · health · auth (Better Auth) · hooks · logger |
 
 `connection` + `schema` are needed by tooling **and** runtime, so they live in the file as the single
@@ -147,11 +148,13 @@ Support a **matrix** — runtimes `{Bun, Node}` × dialects `{Postgres, SQLite}`
 `if (isNode) / if (isSqlite)` in logic. Resolve the environment **once at the composition root**,
 inject inward; logic is written against typed interfaces and is agnostic. Exactly two seams:
 
-### Runtime seam (Bun vs Node) — also a *performance* boundary
+### Runtime seam (Bun vs Node) — also a _performance_ boundary
+
 Writing everything with `node:fs` runs on Bun via the compat layer but is often **slower** than
 native `Bun.file`/`Bun.write` — which would undercut the "Bun is fast" pitch. The adapter lets
 each runtime use its **native-fast** primitive. **Elysia is the template** (Bun-associated, runs
 on Node via an adapter — we mirror it). Narrow port surface (do **not** over-abstract):
+
 - **File I/O** — `Bun.file`/`Bun.write` vs `node:fs`.
 - **Process spawn** (drizzle-kit SDK invocation if out-of-process) — `Bun.spawn`/`Bun.$` vs `node:child_process`.
 - **HTTP server** — Elysia's own adapter (`adapter: node()` vs default Bun; one line, we don't build it).
@@ -160,6 +163,7 @@ on Node via an adapter — we mirror it). Narrow port surface (do **not** over-a
 Standard cross-runtime APIs (`node:path`, most crypto, JSON) are used directly — no adapter.
 
 ### Dialect seam (Postgres vs SQLite) — kept THIN by delegating to drizzle-kit
+
 **Delegate as much as possible to the drizzle-kit SDK.** It already generates dialect-correct DDL
 for both dialects — including SQLite's limited-`ALTER` **table-rebuild dance** — so Glaze does **not**
 hand-write DDL. This deletes the old per-dialect SQL layer and the scary rebuild logic outright; that
@@ -171,13 +175,14 @@ only place a thin dialect implementation lives — and **types still guard it** 
 every dialect or it won't compile).
 
 ### Settled technology choices
-| Concern | Choice |
-| --- | --- |
-| HTTP framework | **Elysia 1.4.x now**; swap to **2.x behind the seam** when its ecosystem is ready (`@elysiajs/node`, cors, Better Auth). Elysia 2 is currently experimental (`exp.46`). |
-| ORM / migrations | **Drizzle ORM + drizzle-kit programmatic SDK** (see §4) |
-| Postgres driver | **`postgres.js`** everywhere (app + convergence, both runtimes) |
-| Bun.SQL | **Dropped** — convergence is gated by drizzle-kit; Bun.SQL buys nothing here |
-| SQLite driver | **`bun:sqlite`** (Bun) / **`better-sqlite3`** (Node); stock-SQLite DDL baseline. `node:sqlite` excluded (no drizzle-kit support). |
+
+| Concern          | Choice                                                                                                                                                                  |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| HTTP framework   | **Elysia 1.4.x now**; swap to **2.x behind the seam** when its ecosystem is ready (`@elysiajs/node`, cors, Better Auth). Elysia 2 is currently experimental (`exp.46`). |
+| ORM / migrations | **Drizzle ORM + drizzle-kit programmatic SDK** (see §4)                                                                                                                 |
+| Postgres driver  | **`postgres.js`** everywhere (app + convergence, both runtimes)                                                                                                         |
+| Bun.SQL          | **Dropped** — convergence is gated by drizzle-kit; Bun.SQL buys nothing here                                                                                            |
+| SQLite driver    | **`bun:sqlite`** (Bun) / **`better-sqlite3`** (Node); stock-SQLite DDL baseline. `node:sqlite` excluded (no drizzle-kit support).                                       |
 
 The SQL driver is **not** where we fight for Bun-nativeness (Drizzle owns it). We fight for it
 where we're not gated: file I/O, `bun:sqlite`, `Bun.serve`, tooling.
@@ -224,7 +229,7 @@ LLM-authored code comes from three things, all adopted here. Glaze is a **backen
 **complex, correctness-critical logic** (convergence above all), so this is **mandatory for
 convergence and any data-safety path**; lighter for low-stakes code (pure utils, admin cosmetics).
 
-1. **Adversarial review in split context windows.** The agent that *wrote* the code is biased to get
+1. **Adversarial review in split context windows.** The agent that _wrote_ the code is biased to get
    it merged; a **separate reviewer in its own context window** is asked to **exhaustively enumerate
    reasons the change is buggy or does not work.** Strict role separation, per the post:
    **1 implementer : 2+ adversarial reviewers**, run in parallel — **the implementer does not review;
@@ -251,15 +256,15 @@ the gnarly logic sits in leaf functions at the bottom. (glaze-old exemplars: `gl
 `core/index.ts`, `runSoloWorkflow`, `resolveConfig` — each is a handful of named steps, with the
 SQL-building / drift / validation detail down in `engine/*`, `sql/*`, `validators/*`.)
 
-- **Facade / shallow top, deep complexity.** A reader should grasp *what* a top-level function does
-  from its body alone; *how* is one level down. Keep functions flat with **guard clauses / early
+- **Facade / shallow top, deep complexity.** A reader should grasp _what_ a top-level function does
+  from its body alone; _how_ is one level down. Keep functions flat with **guard clauses / early
   returns** — the happy path stays un-nested at the bottom.
 - **Name every partial result.** Store intermediate work in **descriptive consts** that say what they
   hold (`const hasDestructive = …`, `const normalizedConfig = …`, `const statement = build…()`), not
   inline expressions. Destructure options at the top of the function.
 - **File/module name = noun (the thing); function name = imperative verb (the action).** A file is
-  named for what it *is* (`resolver.ts`, `provisioner.ts`, `loader.ts`, `builder.ts`); the function it
-  exports is named for what it *does* (`resolveConfig()`, `provisionDatabase()`, `loadConfig()`,
+  named for what it _is_ (`resolver.ts`, `provisioner.ts`, `loader.ts`, `builder.ts`); the function it
+  exports is named for what it _does_ (`resolveConfig()`, `provisionDatabase()`, `loadConfig()`,
   `buildX()`). Matches glaze-old (`detector.ts` → `detect*`, `executor.ts` → `execute*`). Barrels stay
   `index.ts`.
 - **Function names = imperative verbs** (`create*`, `resolve*`, `build*`, `detect*`, `apply*`,
@@ -274,6 +279,7 @@ SQL-building / drift / validation detail down in `engine/*`, `sql/*`, `validator
   `{ success: true … } | { success: false; code … }`), literal unions, and `@example` blocks.
 
 ### File & structure conventions (refined 2026-07-21)
+
 - **`index.ts` is a barrel ONLY** — re-exports, never implementation. Code lives in a findable
   **noun-named file** (`composer.ts`, `resolver.ts`, `engine.ts`), not in `index.ts`. A tree of
   identical `index.ts` files is miserable to navigate in an IDE; named files are searchable.
@@ -289,8 +295,8 @@ SQL-building / drift / validation detail down in `engine/*`, `sql/*`, `validator
 - **Verb functions in noun files — strictly.** Never ship a verb-named file (`create.ts`, `converge.ts`,
   `apply.ts`): use the agent-noun (`composer.ts`, `engine.ts`) or fold it into an existing noun file.
   Prefer clean short verbs (`start`/`stop`, not `runBoot`/`runShutdown`).
-- **`lib/{consts,types,utils}` (package-level) for shared internals:** constant *values* → `#consts`,
-  global *types* → `#types`, shared utility *functions* → `#utils`. Don't inline shared consts / env
+- **`lib/{consts,types,utils}` (package-level) for shared internals:** constant _values_ → `#consts`,
+  global _types_ → `#types`, shared utility _functions_ → `#utils`. Don't inline shared consts / env
   helpers in feature files. (Replaces the old `shared/` folder.)
 - **Shipped code comments must not reference the prior/old implementation** — that is migration context.
   Internal docs (the plan file, memory, `docs/`) may reference it; the codebase a consumer reads may not.
@@ -300,7 +306,7 @@ SQL-building / drift / validation detail down in `engine/*`, `sql/*`, `validator
 One monorepo; **only one package is published.**
 
 - **`glaze`** (published) — the framework. `config / convergence / dialect / runtime / server / logger /
-  lib` are **internal folders**, *not* separately-published packages (internal imports use intra-package
+lib` are **internal folders**, _not_ separately-published packages (internal imports use intra-package
   **`#`-subpath aliases** via the package.json `imports` map — no `workspace:*` version references, so
   publish is **atomic**; this eliminates the old out-of-sync multi-publish failure mode).
 - **`admin`** (not published) — React/Vite app; builds into `glaze`'s bundled assets, **served by the
@@ -310,7 +316,7 @@ One monorepo; **only one package is published.**
   serving uses the runtime seam (`Bun.file` on Bun / `node:fs` on Node). In **dev**: keep Vite's
   HMR — run the Vite dev server (own port) proxying `/api` to Bun (two processes in dev is correct).
   Static assets ⇒ not a lock-in (a CDN can still front them at scale); future flex: `bun build
-  --compile` → single self-contained binary.
+--compile` → single self-contained binary.
 - **`create-glaze-app`** (separate `bin`) — powers `bun create glaze` (onboarding = marketing).
 
 **Distribution:** **git-install** now (`bun add github:...`); no self-hosted registry, no public
@@ -318,7 +324,9 @@ npm trail pre-v1. Rehearse publishing with `npm publish --dry-run` + `publint` +
 `@arethetypeswrong/cli`. Public **npm at launch** (discoverability, Bun ecosystem lists).
 
 ### Types as documentation
+
 Public types must read like docs in editor hover/autocomplete.
+
 - Ship **Bun-native TS source** (`"default": "./index.ts"`) so types resolve from source and can't
   drift; emit `.d.ts` alongside for non-Bun editors. (This also de-risks TS 7's new declaration-emit
   pipeline — source is the primary type surface, `.d.ts` is secondary.)
@@ -338,6 +346,7 @@ Public types must read like docs in editor hover/autocomplete.
 4. Everything after is born type-checked for completeness and behavior-tested across all targets.
 
 ## 12. Open / deferred
+
 - **Admin-stack dependency survey** (Better Auth, React 19 / React Compiler, Base UI 1.0,
   TanStack Router/Start) — deferred until we build admin; doesn't touch seams/convergence/gate.
 - **Elysia 2 swap** — tracked, seam-contained; flip when `@elysiajs/node` + cors + Better Auth are ready.
