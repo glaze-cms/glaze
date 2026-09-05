@@ -340,13 +340,29 @@ Public types must read like docs in editor hover/autocomplete.
 
 ## 11. Build order
 
-1. **Foundation first:** the two seams (§5) + the parameterized matrix test harness (§7).
-2. **Postgres end-to-end** (server, auth, convergence, content API + WS collaboration) — working CMS soonest.
-3. **SQLite as an immediate fast-follow** behind the same seam + harness.
-4. Everything after is born type-checked for completeness and behavior-tested across all targets.
+**Done — the substrate:**
+
+1. The two seams (§5) + the parameterized matrix test harness (§7).
+2. **Postgres end-to-end:** server, auth, convergence, content CRUD.
+3. **SQLite** behind the same seam + harness — both dialects, both runtimes.
+
+**Next — open.** The substrate is built; what is not is the surface where the thesis (§1) becomes
+visible. Convergence is real but invisible today: a developer sees a boot log. It becomes the
+product only when a person is shown _"this change drops `subtitle`; 1,204 rows hold data"_ and can
+decide. Sequencing that against the proposal/review layer is a live decision — see §12.
+
+**Constraint on everything after:** born type-checked for completeness and behavior-tested across
+all targets (§7).
+
+**Not on the critical path: real-time.** Under §1 it is _notification only_ — "this changed,
+refresh" — with polling an acceptable fallback. The WebSocket used to sit inside this list as part
+of "working CMS soonest"; it does not belong there, and `specs/design/convergence.md` already puts it
+outside the convergence core.
 
 ## 12. Open / deferred
 
+- **Next milestone — undecided.** The admin surface that renders convergence decisions, versus the
+  proposal/suggestion layer (§1). Both are "make the thesis visible"; the order is not settled.
 - **Admin-stack dependency survey** (Better Auth, React 19 / React Compiler, Base UI 1.0,
   TanStack Router/Start) — deferred until we build admin; doesn't touch seams/convergence/gate.
 - **Elysia 2 swap** — tracked, seam-contained; flip when `@elysiajs/node` + cors + Better Auth are ready.
