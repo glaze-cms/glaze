@@ -48,8 +48,24 @@ Whether generated migration files are kept and shared. It decides nothing else.
 _Avoid_: persist, workflow
 
 **Audit** (`true` / `false`):
-Whether a structural change waits for a person before it applies. Independent of mode.
+Where a held change is answered: on the admin screen, or at the terminal. It does not decide whether
+a change is held — one that destroys data always is.
 _Avoid_: gate — in this repo "the gate" is oxlint + oxfmt + TS7 + matrix, and nothing else.
+
+**autoApply** (`true` / `false`):
+Whether this machine applies migrations when it starts. On for a developer, off for production, so a
+deploy applies when somebody decides to, not because a process restarted.
+
+**Destructive**:
+A change the database will make without complaint, that destroys data on the way — dropping a column
+holding values. The only question it raises is whether you want it. Distinct from **impossible**: a
+change the database refuses outright, which nobody can agree to. Neither means risky in general — an
+`ALTER` that locks a large table for four minutes is neither.
+_Avoid_: confirmable, blocking — those name the code that handles them, not the change.
+
+**Journal**:
+Drizzle's record of which migrations this database has already run (`drizzle.__drizzle_migrations`).
+It is what makes a committed, unapplied migration an ordinary state rather than drift.
 
 **Origin** (`dev` / `ui`):
 Where a change came from: a developer's schema file, or a click in the admin.

@@ -41,7 +41,9 @@ trigger → drizzle computes diff → decode envelope → resolve decisions → 
      nothing. `db:push`-fast loop, zero repo artifacts.
    - **Yes (team / prod):** the migration + snapshot chain is **committed** — shareable, reviewable
      history.
-3. **Audit (`audit: true` / `false`):** hold for explicit approval, or apply as soon as it's safe.
+3. **Audit (`audit: true` / `false`):** where a held change is answered — on the admin screen, or at
+   the terminal. It does not decide _whether_ a change is held: a change that destroys data always is.
+   See [`pending-approvals.md`](./pending-approvals.md).
 
 Plus: **conflict resolution comes free** — divergent edits are only possible on a shared, persisted
 history, so it exists exactly in `team` mode and is structurally impossible in solo.
