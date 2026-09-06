@@ -39,10 +39,21 @@ export type ApprovalEventType =
 	| 'superseded'
 	| 'withdrawn';
 
-/** What sort of thing acted. `system` is Glaze itself, which acts without being a principal. */
-export type ActorKind = 'user' | 'agent' | 'system';
+/**
+ * What sort of thing acted. `system` is Glaze itself, reconciling a request without being a
+ * principal — the reason `actorId` is nullable.
+ *
+ * There is deliberately no `agent`: an agent acts **as** a user, so an approval it makes is that
+ * person's, recorded under their id. Nothing can write `agent` today, and a union member that cannot
+ * occur tells every reader that agent-actors exist and need handling. The column is plain text, so
+ * the value comes back as a one-line change if an agent ever gets an identity of its own.
+ */
+export type ActorKind = 'user' | 'system';
 
-/** What a principal may do. Replaced wholesale by the real policy model; see AGENTS.md §1. */
+/**
+ * What a principal may do. The real policy model replaces this: two values in a text column cannot
+ * express permissions scoped to a resource, or `propose` held apart from `approve` (AGENTS.md §1).
+ */
 export type PrincipalRole = 'admin' | 'editor';
 
 /**
@@ -137,9 +148,14 @@ function buildSqliteApprovalSchema(): ApprovalSchema {
  * Builds the dialect-correct approvals schema for materialization and for querying the trail.
  *
  * Neither table carries a foreign key to the auth tables, and that is deliberate rather than an
- * omission: `actorId` must survive the deletion of the account that acted, or the trail loses
- * exactly the events a deleted account is most interesting for. `principals.userId` is left free of
- * one for the same reason the table exists at all — an agent is never a Better Auth user.
+ * omission. An event must outlive the account that caused it: with a foreign key, deleting a user
+ * either cascades and destroys the audit trail, or blocks and makes it impossible to offboard
+ * anybody. Without one, the trail still says who dropped the column long after they left.
+ *
+ * The role lives here rather than on the Better Auth user table for a different reason: the sign-up
+ * endpoint must not be able to say "I am admin". A table Better Auth knows nothing about has no
+ * field to express it, so the guarantee is structural rather than a check somebody has to remember.
+ * (The auth schema also has a shape-guard test asserting it carries no RBAC column.)
  *
  * @param dialect - The target database dialect.
  * @returns The approvals tables.

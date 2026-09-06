@@ -235,7 +235,7 @@ One row per event. Nothing is ever updated or deleted; current state is derived.
 | `type`       | `requested` / `approved` / `rejected` / `applied` / `apply_failed` / `superseded` / `withdrawn`. |
 | `changeHash` | Set on `requested`; the dedupe key at boot. Indexed. Null on other types.                        |
 | `actorId`    | The principal who acted. Null when Glaze itself acted (`superseded`, `withdrawn`).               |
-| `actorKind`  | `user` / `agent` / `system`. Present from day one — free now, unreconstructable later.           |
+| `actorKind`  | `user` / `system`. No `agent`: an agent acts **as** a user, so nothing can write one.            |
 | `createdAt`  | Event time.                                                                                      |
 | `payload`    | Type-specific detail (below).                                                                    |
 
@@ -258,10 +258,33 @@ and files a fresh request. Re-approving a failed apply is not a path — fail cl
 `admin`; every account after is `editor`. Approving requires `admin`.
 
 Deliberately **not** a column on the Better Auth user table, though `glaze-cms-old/docs/rbac.md`
-recommended that for request-path performance: `agent` is one of the three principal kinds in
-AGENTS.md §1 and will never be a Better Auth user, and this repo's auth schema states — with a
-shape-guard test behind it — that it carries no RBAC field on purpose. The real policy model replaces
-this table without moving anything else.
+recommended that for request-path performance. The reason is the one that matters most about roles:
+**the sign-up endpoint must not be able to say "I am admin".** A table Better Auth knows nothing
+about has no field to express a role, so the rule is structural rather than a check somebody has to
+remember to write. The auth schema also states — with a shape-guard test behind it — that it carries
+no RBAC field on purpose.
+
+An earlier version of this paragraph justified the separate table with "an agent will never be a
+Better Auth user". That no longer holds: an agent acts **as** a user, and you are responsible for
+what your agent does. The table is still right, for the reason above.
+
+RBAC **builds on this table rather than replacing it** — `approval_events.actorId` points at a
+principal and the trail is append-only, so it cannot be swapped out underneath. What gets replaced is
+the `role` column, which cannot express permissions scoped to a resource or `propose` held apart from
+`approve`.
+
+### Why the trail has no foreign key
+
+Neither table references the auth tables, and that is a decision rather than an omission. **An event
+must outlive the account that caused it.** With a foreign key, deleting a user either cascades and
+destroys the audit trail, or blocks and makes it impossible to offboard anybody — and the events of a
+departed account are exactly the ones an audit is for. Without one, the trail still says who dropped
+the column long after they have gone.
+
+This is also what `actorId` being nullable buys. Glaze reconciles requests itself — `superseded` when
+the schema moves, `withdrawn` when it is reverted — and those events have no person behind them. The
+alternative is inventing a robot account, and then "who approved changes last quarter" counts a
+process as a colleague.
 
 ## Integrity
 

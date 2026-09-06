@@ -103,12 +103,8 @@ an API token. A principal is on the list whether or not it is doing anything rig
 name stays on a staff list overnight.
 
 **Actor**:
-Whoever did one particular thing. Glaze itself does things too (it closes a request when someone
-reverts the schema), and Glaze is not on the list, so an actor is not always a principal.
-Every principal can be an actor; not every actor is a principal.
-_Avoid_: swapping the two words. A principal is a name on the list; an actor is a name in a sentence
-about something that happened. There is no actor table — only the list of principals, and events
-pointing into it.
+Whoever did one particular thing. Usually a principal; `system` when Glaze did it itself, which is
+why an event can have no actor at all.
 
 **Kind** (`user` / `agent` / `system`):
 What sort of thing a principal is: a person, something running on its own, or Glaze itself. It says
