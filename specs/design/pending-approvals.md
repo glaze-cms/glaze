@@ -254,8 +254,28 @@ and files a fresh request. Re-approving a failed apply is not a path — fail cl
 
 ### `principal` — the RBAC placeholder
 
-`userId` (the Better Auth user id), `role` (`admin` | `editor`). The first account to sign up becomes
-`admin`; every account after is `editor`. Approving requires `admin`.
+`userId` (the Better Auth user id) and `role`. Approving requires `admin`.
+
+**Signing up grants no privilege.** A self-registered account gets `user` — the least-privileged
+role, able to authenticate and little else — and stays there until an admin grants more. That is the
+whole of the fix for the hole described below: winning a race to sign up now buys an account that can
+do nothing.
+
+**The first admin is created once, through a sealed path.** Both Payload and Strapi do this: Payload
+redirects every visitor to `/create-first-user` while the users collection is empty and returns
+`Forbidden` from that route once it is not; Strapi's first-launch log sends you to the panel to make
+the first admin. Glaze follows the convention. What Glaze must _not_ copy from its own earlier
+attempt is granting a real role to everybody who signs up afterwards — neither of them does that, and
+it is what turned an ordinary race into privilege escalation.
+
+A setup token printed to the console at first boot would close the race entirely, and neither
+competitor bothers. Keep it as an opt-in for people deploying publicly before configuring
+(`GLAZE_SETUP_TOKEN`), not as the default path.
+
+Roles are not promoted through sign-up, and accounts are not created _for_ people: an administrator
+who creates an account has to set somebody else's password. Instead, **authentication is theirs and
+authorization is the admin's** — a person makes their own account, and an admin decides what it may
+do. That needs no invitation system and no mail server, neither of which Glaze has.
 
 Deliberately **not** a column on the Better Auth user table, though `glaze-cms-old/docs/rbac.md`
 recommended that for request-path performance. The reason is the one that matters most about roles:
@@ -272,6 +292,12 @@ RBAC **builds on this table rather than replacing it** — `approval_events.acto
 principal and the trail is append-only, so it cannot be swapped out underneath. What gets replaced is
 the `role` column, which cannot express permissions scoped to a resource or `propose` held apart from
 `approve`.
+
+**A deliberate divergence, recorded so it does not look accidental.** Payload keeps roles as a field
+on the users collection and protects them with field-level access rules, including an explicit
+`preventSelfRoleChange`. Glaze keeps them in a table the auth library cannot see, so there is no field
+to protect. Theirs is a rule that has to be written correctly every time; ours holds by construction.
+Both work; this is the one we chose.
 
 ### Why the trail has no foreign key
 
@@ -405,7 +431,28 @@ Written down because each is the kind of decision that gets silently re-reverted
    forth, because the setting is a preference rather than a project's identity. Turning it **on**
    against a database that already has tables needs a baseline first — the one asymmetry, and drizzle
    supplies most of it (below).
-6. **A deployed server does not generate.** Re-deriving the change on a machine with nobody at it
+6. **Approve was built before the things it rests on, and reverted.** `f2dd123` added role
+   assignment at sign-up and the three endpoints; three parallel reviews found it unsound and it came
+   out again (`30bcbe8`, `75f066c`). Three independent causes, all of which the order under
+   [Still to build](#still-to-build) now prevents:
+
+   - **The approve handler answered `true` to every question the oracle asked.** That is only safe if
+     the verify pass enumerates every question the apply pass will face, and it cannot — layer-2 runs
+     only around an apply, which the verify pass never performs. A populated table drop produces no
+     layer-1 findings at all, so the recorded findings were `[]`, the comparison was `'' === ''`, and
+     the confirmer said yes to destroying the table. The same failure as the classifier attempt,
+     through a different door.
+   - **`resolve` answered `create` for a rename**, and the fingerprint could not catch it, because an
+     unattended boot answers `create` too — so the filing and both passes produced identical
+     statements and matched perfectly.
+   - **Granting a real role at sign-up turned an ordinary bootstrap race into privilege escalation.**
+     Sign-up is open; before that commit, winning the race bought nothing, because no account had a
+     role at all.
+
+   The tests held almost none of it: `enrolPrincipal` could have given **every** account `admin`, or
+   written an unrelated `user_id`, and the whole suite stayed green.
+
+7. **A deployed server does not generate.** Re-deriving the change on a machine with nobody at it
    makes the change depend on who booted: the same schema file yields a rename on a developer's
    terminal and a drop-plus-create on a server, because the non-interactive answer to
    `rename_or_create` is "create". Found by adversarial review, reproduced on both dialects.
@@ -422,35 +469,56 @@ Written down because each is the kind of decision that gets silently re-reverted
 
 ## Still to build
 
-- **The classifier, with its three buckets.** `deriveUnsafeChanges` returns only the operations it
-  knows are dangerous; it must instead account for every operation in the diff and report the ones it
-  cannot model. Until it does, `audit` holds every structural change — clumsy, and the only reason the
-  gaps described above are not live. Attempted once and reverted (`a63653e`), because narrowing the
-  hold to layer-1's findings removed a blanket that was covering layer-1's blind spots.
-- **Boot reconciliation.** [Reconciling a request that resolved itself](#reconciling-a-request-that-resolved-itself)
-  is design of record with nothing behind it: `no_changes` plus an open request records `withdrawn`
-  unconditionally, with no journal read, no probe and no partial-apply branch. The case it gets wrong
-  is the one that section calls the worst failure an audit trail has.
-- **`pending: drop` on the descriptor**, so the admin can show a column as on its way out.
-- **The apply path for kept files.** `drizzle-orm/postgres-js/migrator` and `drizzle-orm/bun-sqlite/migrator`
-  read the committed chain, compare it to the journal, and apply what is missing. Glaze must apply
-  the statements **itself** rather than delegating: drizzle's migrator owns its own transaction, and
-  the layer-2 oracle has to be able to roll back on a row loss nobody declared. That means Glaze also
-  writes the journal row, which is a compatibility promise — the hash is a sha256 of the whole
-  `migration.sql` text — so that someone running `drizzle-kit migrate` does not re-apply everything.
-- **`autoApply`**, and the `.glaze/` cache that makes `migrations.enabled: false` real. Until it
-  exists the setting is inert and defaults to `true`, which is what the code actually does.
-- **Baselining, for turning the files on against a database that already has tables.** Drizzle does
-  the recording: `migrate(db, { migrationsFolder, init: true })` writes the journal row **without
-  running the SQL**, on both dialects, and refuses if the journal already has rows or if more than one
-  migration is present. `drizzle-kit pull` is CLI-only and not needed — `pull --init` is for someone
-  with a database and no schema file, while this case is the opposite: the schema file already matches
-  the database, which is why there is nothing to apply.
+These are a dependency order, not a menu. Approve was built first, before the two things it rests on,
+and adversarial review found the same class of failure twice in one day — once at boot, once at the
+endpoint. The order below is the lesson.
 
-  The step drizzle cannot do is the one that matters: **verify the database really does match** before
-  recording anything. Our own introspection answers that, and it must fail closed on a mismatch —
-  baselining a database that does not match marks real work as already done, silently, in the
-  direction that loses data later.
+**1. Transactions that are transactions.** `bun:sqlite`'s `Database.transaction` wraps a
+**synchronous** function, so `COMMIT` fires at the first `await` and Drizzle's `transaction` through
+that driver is a no-op: a throwing transaction leaves its rows behind, and two concurrent callers see
+each other's uncommitted state. Proven against the pinned dependencies during review. This is not
+hypothetical or future work — it silently voids the supersede-then-file atomicity already on `main`.
+The dialect seam's own `transaction` (`dialect/sqlite.ts`) does hold `BEGIN` across awaits, so the
+fix is likely to use that rather than the ORM's, with a test that a throwing transaction leaves
+nothing behind.
+
+**2. The role bootstrap.** A sealed first-admin path, and `user` as the default for everyone else.
+Until this exists, no endpoint can be gated on a role.
+
+**3. The classifier, with its three buckets.** `deriveUnsafeChanges` returns only the operations it
+knows are dangerous; it must instead account for every operation in the diff and report the ones it
+cannot model. Until it does, `audit` holds every structural change — clumsy, and the only reason the
+gaps described above are not live. Attempted once and reverted (`a63653e`), because narrowing the
+hold to layer-1's findings removed a blanket that was covering layer-1's blind spots.
+
+**4. Boot reconciliation.** [Reconciling a request that resolved itself](#reconciling-a-request-that-resolved-itself)
+is design of record with nothing behind it: `no_changes` plus an open request records `withdrawn`
+unconditionally, with no journal read, no probe and no partial-apply branch. The case it gets wrong
+is the one that section calls the worst failure an audit trail has.
+
+**5. `pending: drop` on the descriptor**, so the admin can show a column as on its way out.
+
+**6. The apply path for kept files.** `drizzle-orm/postgres-js/migrator` and `drizzle-orm/bun-sqlite/migrator`
+read the committed chain, compare it to the journal, and apply what is missing. Glaze must apply
+the statements **itself** rather than delegating: drizzle's migrator owns its own transaction, and
+the layer-2 oracle has to be able to roll back on a row loss nobody declared. That means Glaze also
+writes the journal row, which is a compatibility promise — the hash is a sha256 of the whole
+`migration.sql` text — so that someone running `drizzle-kit migrate` does not re-apply everything.
+
+**7. `autoApply`**, and the `.glaze/` cache that makes `migrations.enabled: false` real. Until it
+exists the setting is inert and defaults to `true`, which is what the code actually does.
+
+**8. Baselining, for turning the files on against a database that already has tables.** Drizzle does
+the recording: `migrate(db, { migrationsFolder, init: true })` writes the journal row **without
+running the SQL**, on both dialects, and refuses if the journal already has rows or if more than one
+migration is present. `drizzle-kit pull` is CLI-only and not needed — `pull --init` is for someone
+with a database and no schema file, while this case is the opposite: the schema file already matches
+the database, which is why there is nothing to apply.
+
+The step drizzle cannot do is the one that matters: **verify the database really does match** before
+recording anything. Our own introspection answers that, and it must fail closed on a mismatch —
+baselining a database that does not match marks real work as already done, silently, in the
+direction that loses data later.
 
 - **`glaze migrate`.**
 - **A third internal namespace.** Drizzle's journal claims a `drizzle` Postgres schema alongside
