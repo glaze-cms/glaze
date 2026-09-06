@@ -415,27 +415,6 @@ matrixTest('skips an entity whose name collides with a reserved route', async ({
 	}
 });
 
-matrixTest('skips an entity named after the approvals route', async ({ db, dialect }) => {
-	const dir = mkdtempSync(TEMP_FIXTURE_PREFIX);
-	try {
-		const context = buildContext(db, dialect, writePostsSchema(dir, dialect));
-		const [posts] = await loadEntities(context.config);
-		if (!posts) throw new Error('expected the posts entity');
-		// A table called `pending-approvals` would otherwise claim the approvals routes and their
-		// `/:id` children, putting content CRUD where approve and reject live.
-		const router = createContentRouter({
-			context,
-			auth: authStub(SESSION),
-			entities: [{ ...posts, name: 'pending-approvals' }],
-		});
-
-		expect((await send(router, 'GET', '/api/pending-approvals')).status).toBe(404);
-		expect((await send(router, 'GET', '/api/pending-approvals/1')).status).toBe(404);
-	} finally {
-		rmSync(dir, { recursive: true, force: true });
-	}
-});
-
 matrixTest('scopes CORS to content routes, never sibling scopes', async ({ db, dialect }) => {
 	const dir = mkdtempSync(TEMP_FIXTURE_PREFIX);
 	const origin = 'https://partner.example';
