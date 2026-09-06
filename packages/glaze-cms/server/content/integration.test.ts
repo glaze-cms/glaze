@@ -7,7 +7,6 @@ import { createLogger } from '#logger';
 import { resolveRuntime } from '#runtime';
 
 import { createGlazeApp } from '../app/index.ts';
-import { materializeApprovalTables } from '../approvals/index.ts';
 import { materializeAuthTables } from '../auth/index.ts';
 import { resolveOptions } from '../options/index.ts';
 import { loadEntities } from './loader.ts';
@@ -74,9 +73,6 @@ async function bootContentApp(
 		runtime: resolveRuntime(),
 	};
 	await materializeAuthTables(context);
-	// Boot order, as `handleStart` does it: signing up assigns a role, so the approvals tables have to
-	// exist before the first account can be created.
-	await materializeApprovalTables(context);
 	await db.raw('create table posts (id integer primary key, title text)');
 	const entities = await loadEntities(context.config);
 	return createGlazeApp(context, entities);
