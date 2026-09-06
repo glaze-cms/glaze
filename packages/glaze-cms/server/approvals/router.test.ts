@@ -1,11 +1,14 @@
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { Elysia } from 'elysia';
+
 import { resolveConfig } from '#config';
 import { expect, matrixTest } from '#harness';
 import { createLogger } from '#logger';
 import { resolveRuntime } from '#runtime';
 
+import { createContentRouter, loadEntities } from '../content/index.ts';
 import { runConvergence } from '../convergence/index.ts';
 import { resolveOptions } from '../options/index.ts';
 import { materializeApprovalTables } from './materializer.ts';
@@ -294,3 +297,52 @@ matrixTest('a change that moved since it was filed is not applied', async ({ db,
 		rmSync(dir, { recursive: true, force: true });
 	}
 });
+
+// The reservation is what stops a user table called `pending-approvals` from registering
+// `/api/pending-approvals` and `/:id` and putting content CRUD where approve and reject live. Proved
+// against both routers composed together, in the order the app mounts them.
+matrixTest(
+	'a user table named pending-approvals cannot shadow these routes',
+	async ({ db, dialect }) => {
+		const dir = mkdtempSync(TEMP_FIXTURE_PREFIX);
+		try {
+			const context = await seedPendingDrop(db, dialect, dir);
+			await givePrincipal(db, dialect, 'admin-1', 'admin');
+			const auth = authStub('admin-1');
+
+			const [posts] = await loadEntities(context.config);
+			if (!posts) throw new Error('expected the posts entity');
+			const app = new Elysia()
+				.use(
+					createContentRouter({
+						context,
+						auth,
+						entities: [{ ...posts, name: 'pending-approvals' }],
+					}),
+				)
+				.use(createApprovalsRouter({ context, auth }));
+
+			// The approvals list answers, not a content collection: one open request, with its findings.
+			const listed = await send(app, 'GET', '/api/pending-approvals');
+			expect(listed.status).toBe(200);
+			const body = (await listed.json()) as { data: { id: string; findings: unknown[] }[] };
+			expect(body.data).toHaveLength(1);
+			expect(body.data[0]?.findings).toHaveLength(1);
+
+			// Mount order alone would win the list route, so that is not what this proves. The
+			// reservation is what stops content registering its OTHER verbs on the same prefix:
+			// without it, this POST creates a row in a table called `pending-approvals` and answers 201.
+			expect((await send(app, 'POST', '/api/pending-approvals', { title: 'hi' })).status).toBe(404);
+			expect((await send(app, 'DELETE', '/api/pending-approvals/1')).status).toBe(404);
+
+			// And the child route is still the decision, not a content row by id.
+			const id = body.data[0]?.id ?? '';
+			expect(
+				(await send(app, 'POST', `/api/pending-approvals/${id}/reject`, { reason: 'no' })).status,
+			).toBe(200);
+			expect(await trail(db, dialect)).toEqual(['requested', 'rejected']);
+		} finally {
+			rmSync(dir, { recursive: true, force: true });
+		}
+	},
+);
