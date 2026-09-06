@@ -170,6 +170,36 @@ export async function findOpenRequest(db: ApprovalDb, table: Table): Promise<Ope
 }
 
 /**
+ * Assigns a role to a newly created account and records it.
+ *
+ * The first account becomes `admin`; every one after is `editor`. The role is decided here, on the
+ * server, and can never arrive in a request — the sign-up endpoint has no field to express one,
+ * because this table is not part of the auth schema. Promotion happens through the permission model,
+ * never through signing up.
+ *
+ * Two accounts created in the same instant both see an empty table and both become `admin`. On a
+ * brand-new install both racers are the person doing the installing, so the failure mode is two
+ * admins rather than an unauthorised one; the control that matters is gating sign-up itself.
+ *
+ * @param db - The query builder.
+ * @param table - The `principals` table.
+ * @param userId - The account that was just created.
+ * @returns The role it was given.
+ */
+export async function enrolPrincipal(
+	db: ApprovalDb,
+	table: Table,
+	userId: string,
+): Promise<PrincipalRole> {
+	return db.transaction(async (tx) => {
+		const existing = await tx.select().from(table).limit(1);
+		const role: PrincipalRole = existing.length === 0 ? 'admin' : 'editor';
+		await tx.insert(table).values({ userId, role, createdAt: new Date() });
+		return role;
+	});
+}
+
+/**
  * Reads a principal's role.
  *
  * @param db - The query builder.

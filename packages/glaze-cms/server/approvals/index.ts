@@ -1,3 +1,5 @@
+export { createPrincipalEnrolment } from './enrolment.ts';
+export { APPROVALS_ROUTE_NAME, createApprovalsRouter } from './router.ts';
 export { createTrailId } from './id.ts';
 export { materializeApprovalTables } from './materializer.ts';
 export {
@@ -7,7 +9,7 @@ export {
 	GLAZE_PG_SCHEMA,
 	GLAZE_SQLITE_PREFIX,
 } from './schema/index.ts';
-export { findOpenRequest, findRole, recordEvent } from './store.ts';
+export { enrolPrincipal, findOpenRequest, findRole, recordEvent } from './store.ts';
 
 export type {
 	ActorKind,

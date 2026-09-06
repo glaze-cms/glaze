@@ -6,8 +6,10 @@
  * schema via Drizzle. The built-in rate limiter is enabled and keys per-IP off `x-forwarded-for` — the
  * IP-forwarding plugin (see `./ip.ts`) supplies that header from the trusted peer address.
  *
- * Authentication only: no roles/RBAC, no social/2FA/JWT (JWT would add a `jwks` table and isn't needed
- * for the bearer-token hybrid) — all deferred.
+ * Authentication only: the auth tables carry **no role column**, which is what stops a sign-up
+ * request from claiming one. A new account's role is recorded in `glaze.principals` through the
+ * enrolment hook below — decided by Glaze, never sent by the caller. No social/2FA/JWT (JWT would add
+ * a `jwks` table and isn't needed for the bearer-token hybrid) — all deferred.
  */
 
 import { betterAuth } from 'better-auth';
@@ -15,6 +17,7 @@ import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { openAPI } from 'better-auth/plugins';
 import { bearer } from 'better-auth/plugins/bearer';
 
+import { createPrincipalEnrolment } from '../approvals/index.ts';
 import { resolveAuthBaseUrl } from './base-url.ts';
 import { resolveAuthProvider } from './provider.ts';
 import { buildAuthSchema } from './schema/index.ts';
@@ -51,6 +54,9 @@ export function createAuth(context: GlazeContext) {
 		}),
 		emailAndPassword: { enabled: true },
 		session: { cookieCache: { enabled: true } },
+		// A new account gets its role here, decided by Glaze rather than asked for by the caller. The
+		// rule lives in `server/approvals/enrolment.ts`; this is only the wiring.
+		databaseHooks: { user: { create: { after: createPrincipalEnrolment(context) } } },
 		// `openAPI` serves Better Auth's own reference (Scalar) at `{apiPrefix}/auth/reference` — the auth
 		// routes are a schemaless catch-all in Glaze's content spec, so Better Auth documents them itself.
 		// Gated on the docs toggle so `docs.enabled: false` turns off every docs surface together.

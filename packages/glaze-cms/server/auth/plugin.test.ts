@@ -9,6 +9,7 @@ import { createLogger } from '#logger';
 import { resolveRuntime } from '#runtime';
 
 import { createGlazeApp } from '../app/index.ts';
+import { materializeApprovalTables } from '../approvals/index.ts';
 import { resolveOptions } from '../options/index.ts';
 import { materializeAuthTables } from './materializer.ts';
 
@@ -33,6 +34,7 @@ function buildContext(db: DatabaseHandle, dialect: Dialect): GlazeContext {
 async function bootAuthApp(db: DatabaseHandle, dialect: Dialect): Promise<GlazeApp> {
 	const context = buildContext(db, dialect);
 	await materializeAuthTables(context);
+	await materializeApprovalTables(context);
 	return createGlazeApp(context, []);
 }
 
@@ -56,6 +58,11 @@ function sessionCookie(response: Response): string {
 	return tokenCookie.split(';')[0] ?? '';
 }
 
+/** The principals table, dialect-qualified. */
+function principalsTable(dialect: Dialect): string {
+	return dialect === 'postgres' ? 'glaze.principals' : 'zz__glaze_principals';
+}
+
 /** The users table, dialect-qualified. */
 function usersTable(dialect: Dialect): string {
 	return dialect === 'postgres' ? 'glaze_auth.users' : 'zz__glaze_auth_users';
@@ -76,6 +83,12 @@ matrixTest(
 		const rows = await db.raw(`select email from ${usersTable(dialect)}`);
 		expect(rows).toHaveLength(1);
 		expect(String(rows[0]?.['email'])).toBe(CREDENTIALS.email);
+
+		// Signing up also assigns a role, and the first account gets `admin`. The request never said
+		// so — the sign-up body has no field for it, because the role is not on the auth model at all.
+		const principals = await db.raw(`select role from ${principalsTable(dialect)}`);
+		expect(principals).toHaveLength(1);
+		expect(String(principals[0]?.['role'])).toBe('admin');
 
 		// The cookie authenticates the same-origin admin path.
 		const byCookie = await app.handle(
