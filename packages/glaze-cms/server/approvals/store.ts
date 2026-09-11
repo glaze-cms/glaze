@@ -32,8 +32,6 @@ interface SelectBuilder extends PromiseLike<Row[]> {
 export interface ApprovalDb {
 	select(fields?: Record<string, SQLWrapper>): SelectBuilder;
 	insert(table: Table): { values(values: Row): PromiseLike<unknown> };
-	/** Runs `fn` inside one transaction, so a pair of appends cannot half-happen. */
-	transaction<T>(fn: (tx: ApprovalDb) => Promise<T>): Promise<T>;
 }
 
 /** What one appended event says. The id and instant are the store's to assign. */

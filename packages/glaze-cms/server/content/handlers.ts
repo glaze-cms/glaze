@@ -12,6 +12,7 @@
 
 import { and, asc, count, desc, eq, gt, gte, inArray, lt, lte, sql } from 'drizzle-orm';
 
+import type { DatabaseHandle } from '#dialect';
 import type { Entity } from './types.ts';
 import type { Column, SQL, SQLWrapper, Table } from 'drizzle-orm';
 
@@ -43,8 +44,6 @@ export interface ContentDb {
 	insert(table: Table): { values(values: Row): Returning };
 	update(table: Table): { set(values: Row): { where(condition: SQL): Returning } };
 	delete(table: Table): { where(condition: SQL): Returning };
-	/** Runs `fn` against a transaction-bound builder, so its statements share one consistent read. */
-	transaction<T>(fn: (tx: ContentDb) => Promise<T>): Promise<T>;
 }
 
 /** A page of rows and, when it was asked for, the total matching the same filters. */
@@ -73,17 +72,24 @@ export interface RowPage {
  * @returns The page, with `total` set only when requested.
  */
 export async function readRowPage(
-	db: ContentDb,
+	handle: DatabaseHandle,
 	entity: Entity,
 	query: ListQuery,
 	withCount: boolean,
 ): Promise<RowPage> {
+	const db = handle.db as ContentDb;
 	if (!withCount) return { rows: await listRows(db, entity, query), total: null };
 
-	return db.transaction(async (tx) => ({
-		rows: await listRows(tx, entity, query),
-		total: await countRows(tx, entity, query.filters),
-	}));
+	// One consistent read: the rows and the total must describe the same instant, or a page can report
+	// a count that never existed alongside it. Through the seam, whose transaction is real on both
+	// dialects — the ORM's is a no-op on SQLite.
+	return handle.queryTransaction(async (transaction) => {
+		const tx = transaction as ContentDb;
+		return {
+			rows: await listRows(tx, entity, query),
+			total: await countRows(tx, entity, query.filters),
+		};
+	});
 }
 
 /** How a list request is narrowed, ordered and paged. */

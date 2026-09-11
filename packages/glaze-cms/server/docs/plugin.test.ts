@@ -35,6 +35,7 @@ function fakeDatabase(): DatabaseHandle {
 		db: {},
 		raw: () => Promise.resolve([]),
 		transaction: (fn) => fn(() => Promise.resolve([])),
+		queryTransaction: (fn) => fn({}),
 		ensureSchema: () => Promise.resolve([]),
 		close: () => Promise.resolve(),
 	};

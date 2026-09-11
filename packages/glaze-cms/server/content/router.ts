@@ -33,7 +33,12 @@ import {
 } from './handlers.ts';
 import { buildEntitySchemas } from './validation.ts';
 
-import type { ConstraintClassifier, ConstraintKind, ConstraintViolation } from '#dialect';
+import type {
+	ConstraintClassifier,
+	ConstraintKind,
+	ConstraintViolation,
+	DatabaseHandle,
+} from '#dialect';
 import type { Logger } from '#logger';
 import type { GlazeErrorCode } from '#types';
 import type { GlazeContext } from '../app/context.ts';
@@ -376,6 +381,7 @@ function parseListQuery(
  * @param app - The macro-enabled content app.
  * @param entity - The entity to expose.
  * @param db - The content database.
+ * @param handle - The database handle, for the one read that needs a transaction.
  * @param apiPrefix - The API mount prefix (e.g. `/api`).
  * @param responder - The content CORS responder, or `null`.
  */
@@ -383,6 +389,7 @@ function registerEntityRoutes(
 	app: ContentApp,
 	entity: Entity,
 	db: ContentDb,
+	handle: DatabaseHandle,
 	apiPrefix: string,
 	responder: CorsResponder | null,
 ): void {
@@ -394,7 +401,7 @@ function registerEntityRoutes(
 		const parsed = parseListQuery(entity, query);
 		if (!parsed.ok) return buildErrorResponse(422, 'VALIDATION', parsed.message);
 
-		const page = await readRowPage(db, entity, parsed.query, parsed.count);
+		const page = await readRowPage(handle, entity, parsed.query, parsed.count);
 		return buildListResponse(page.rows, {
 			total: page.total,
 			limit: parsed.query.limit,
@@ -462,7 +469,7 @@ export function createContentRouter({ context, auth, entities }: ContentRouterIn
 	const db = context.db.db as ContentDb;
 
 	for (const entity of served) {
-		registerEntityRoutes(app, entity, db, options.prefixes.api, responder);
+		registerEntityRoutes(app, entity, db, context.db, options.prefixes.api, responder);
 	}
 
 	// Registered AFTER the entity loop. Elysia is last-wins, so registering here is what makes the

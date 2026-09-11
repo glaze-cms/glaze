@@ -155,6 +155,9 @@ async function createDatabase(options: CreateDatabaseOptions): Promise<DatabaseH
 		db,
 		raw: runRaw,
 		transaction: runTransaction,
+		// postgres.js reserves a connection for the duration, and Drizzle's transaction is correct on
+		// this driver — unlike SQLite, where the seam has to bracket it by hand.
+		queryTransaction: (fn) => db.transaction(fn),
 		ensureSchema: (schema) => ensurePostgresSchema(schema, runRaw, runTransaction),
 		async close() {
 			await client.end();

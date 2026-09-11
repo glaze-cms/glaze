@@ -132,8 +132,10 @@ async function recordApprovalOutcome(context: GlazeContext, result: ConvergeResu
 	const outcome = result;
 
 	// Read and write in one transaction: closing a request and filing its successor is one decision,
-	// and a crash between them would leave the trail claiming a change was superseded by nothing.
-	await (context.db.db as ApprovalDb).transaction(async (db) => {
+	// and a crash between them would leave the trail claiming a change was superseded by nothing. It
+	// goes through the seam rather than the ORM, whose transaction is a no-op on SQLite.
+	await context.db.queryTransaction(async (tx) => {
+		const db = tx as ApprovalDb;
 		const open = await findOpenRequest(db, events);
 
 		if (outcome.status === 'no_changes') {

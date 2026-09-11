@@ -136,12 +136,35 @@ async function createBunSqlite(path: string): Promise<DatabaseHandle> {
 		db,
 		raw: runRaw,
 		transaction: runTransaction,
+		queryTransaction: (fn) => runQueryTransaction(db, runTransaction, fn),
 		ensureSchema: (schema) => ensureSqliteSchema(schema, runRaw, runTransaction),
 		close() {
 			client.close();
 			return Promise.resolve();
 		},
 	};
+}
+
+/**
+ * Runs a query-builder callback inside the seam's own transaction.
+ *
+ * Drizzle's `db.transaction` cannot be used here: both SQLite drivers wrap a **synchronous** function,
+ * so `COMMIT` runs as soon as an async callback awaits — before its statements, which then commit one
+ * by one and survive a throw. SQLite holds a single connection, so bracketing the builder with the
+ * seam's `BEGIN`/`COMMIT` covers exactly the statements the builder issues.
+ *
+ * @typeParam T - The value `fn` produces.
+ * @param db - The Drizzle instance, which shares the connection the bracket runs on.
+ * @param runTransaction - The seam's raw transaction, which does hold `BEGIN` across awaits.
+ * @param fn - Receives the builder; its statements are covered by the transaction.
+ * @returns Whatever `fn` returns, after commit.
+ */
+function runQueryTransaction<T>(
+	db: unknown,
+	runTransaction: Transactor,
+	fn: (tx: never) => Promise<T>,
+): Promise<T> {
+	return runTransaction(() => fn(db as never));
 }
 
 /**
@@ -180,6 +203,7 @@ async function createNodeSqlite(path: string): Promise<DatabaseHandle> {
 		db,
 		raw: runRaw,
 		transaction: runTransaction,
+		queryTransaction: (fn) => runQueryTransaction(db, runTransaction, fn),
 		ensureSchema: (schema) => ensureSqliteSchema(schema, runRaw, runTransaction),
 		close() {
 			client.close();
