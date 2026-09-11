@@ -16,7 +16,7 @@ import { Type } from 'typebox';
 import { Compile } from 'typebox/compile';
 import { Value } from 'typebox/value';
 
-import { DEFAULT_PORT, MIN_AUTH_SECRET_LENGTH } from '#consts';
+import { DEFAULT_PORT, MIN_AUTH_SECRET_LENGTH, MIN_SETUP_TOKEN_LENGTH } from '#consts';
 import { isProduction } from '#utils';
 
 import type { Logger } from '#logger';
@@ -52,6 +52,7 @@ const GlazeEnvSchema = Type.Object({
 	),
 	GLAZE_AUTH_SECRET: Type.Optional(Type.String({ minLength: MIN_AUTH_SECRET_LENGTH })),
 	GLAZE_AUTH_URL: Type.Optional(Type.String({ minLength: 1, pattern: '^https?://' })),
+	GLAZE_SETUP_TOKEN: Type.Optional(Type.String({ minLength: MIN_SETUP_TOKEN_LENGTH })),
 	GLAZE_PORT: Type.Integer({ default: DEFAULT_PORT, minimum: 1, maximum: 65535 }),
 });
 
@@ -60,6 +61,7 @@ const FRIENDLY_MESSAGE: Readonly<Record<string, string>> = {
 	NODE_ENV: `must be one of: ${NODE_ENVS.join(', ')}`,
 	GLAZE_AUTH_SECRET: `must be at least ${MIN_AUTH_SECRET_LENGTH} characters`,
 	GLAZE_AUTH_URL: 'must be a URL starting with http:// or https://',
+	GLAZE_SETUP_TOKEN: `must be at least ${MIN_SETUP_TOKEN_LENGTH} characters`,
 	GLAZE_PORT: 'must be a whole number between 1 and 65535',
 };
 
@@ -130,11 +132,13 @@ function readRawEnv(): Record<string, unknown> {
 	const port = getEnv('GLAZE_PORT') ?? getEnv('PORT');
 	const secret = getEnv('GLAZE_AUTH_SECRET');
 	const authUrl = getEnv('GLAZE_AUTH_URL');
+	const setupToken = getEnv('GLAZE_SETUP_TOKEN');
 
 	if (nodeEnv !== undefined) raw['NODE_ENV'] = nodeEnv;
 	if (port !== undefined) raw['GLAZE_PORT'] = port;
 	if (secret !== undefined) raw['GLAZE_AUTH_SECRET'] = secret;
 	if (authUrl !== undefined) raw['GLAZE_AUTH_URL'] = authUrl;
+	if (setupToken !== undefined) raw['GLAZE_SETUP_TOKEN'] = setupToken;
 
 	return raw;
 }

@@ -17,6 +17,7 @@ import { resolveDialect } from '#dialect';
 import { createAuthMacro } from '../auth/index.ts';
 import { buildErrorResponse, buildListResponse, buildSuccessResponse } from '../responses/index.ts';
 import { createCorsResponder } from '../security/index.ts';
+import { SETUP_ROUTE_NAME } from '../setup/index.ts';
 import { describeContentModel } from './descriptor/index.ts';
 import {
 	buildFilter,
@@ -59,9 +60,10 @@ const ENTITIES_ROUTE_NAME = 'entities';
 /**
  * Entity names that would collide with a Glaze-owned route and are never served as content. `auth`
  * maps to `{apiPrefix}/auth`, where Better Auth is mounted — a content `/:id` route there would shadow
- * its single-segment endpoints (e.g. `get-session`). `schema` maps to the content-model descriptor.
+ * its single-segment endpoints (e.g. `get-session`). `setup` is where the first admin is claimed, and
+ * `entities` is the content-model descriptor.
  */
-const RESERVED_ENTITY_NAMES = new Set(['auth', ENTITIES_ROUTE_NAME]);
+const RESERVED_ENTITY_NAMES = new Set(['auth', SETUP_ROUTE_NAME, ENTITIES_ROUTE_NAME]);
 /** An entity name is not a safe single URL path segment if it contains any of these. */
 const UNSAFE_SEGMENT = /[/\s:*?#[\]]/;
 

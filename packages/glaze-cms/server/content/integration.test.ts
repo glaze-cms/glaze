@@ -7,6 +7,7 @@ import { createLogger } from '#logger';
 import { resolveRuntime } from '#runtime';
 
 import { createGlazeApp } from '../app/index.ts';
+import { materializeApprovalTables } from '../approvals/index.ts';
 import { materializeAuthTables } from '../auth/index.ts';
 import { resolveOptions } from '../options/index.ts';
 import { loadEntities } from './loader.ts';
@@ -73,6 +74,7 @@ async function bootContentApp(
 		runtime: resolveRuntime(),
 	};
 	await materializeAuthTables(context);
+	await materializeApprovalTables(context);
 	await db.raw('create table posts (id integer primary key, title text)');
 	const entities = await loadEntities(context.config);
 	return createGlazeApp(context, entities);
@@ -147,6 +149,48 @@ matrixTest('a real sign-up authenticates content CRUD end to end', async ({ db, 
 		// The row really landed in the database.
 		const rows = await db.raw('select title from posts where id = 1');
 		expect(String(rows[0]?.['title'])).toBe('hello');
+
+		// Signing up granted nothing: the first-admin claim is still open, and this real session is the
+		// one that closes it. Asserted on the same sign-up so the rate-limit budget stays untouched.
+		const before = (await (await send(app, 'GET', '/api/setup')).json()) as {
+			data: { firstAdminNeeded: boolean };
+		};
+		expect(before.data.firstAdminNeeded).toBe(true);
+		expect(
+			(await send(app, 'POST', '/api/setup/first-admin', { headers: { cookie } })).status,
+		).toBe(201);
+		expect(
+			(await send(app, 'POST', '/api/setup/first-admin', { headers: { cookie } })).status,
+		).toBe(403);
+		const users = await db.raw(
+			`select id from ${dialect === 'postgres' ? 'glaze_auth.users' : 'zz__glaze_auth_users'}`,
+		);
+		const principals = await db.raw(
+			`select user_id, role from ${dialect === 'postgres' ? 'glaze.principals' : 'zz__glaze_principals'}`,
+		);
+		// The grant went to the account Better Auth actually created, and to nobody else.
+		expect(principals.map((row) => [row['user_id'], row['role']])).toEqual([
+			[users[0]?.['id'], 'admin'],
+		]);
+
+		// A revoked session cannot claim. Both cookies are kept, as a client that ignored sign-out would
+		// keep them: the signed session-data cookie still says "valid" for minutes, so a claim that
+		// trusted it would answer 403 (sealed) here rather than 401 (nobody).
+		const everyCookie = signUp.headers
+			.getSetCookie()
+			.map((pair) => pair.split(';')[0] ?? '')
+			.join('; ');
+		expect(everyCookie).toContain('better-auth.session_data=');
+		// A browser sends `origin` on a cookie-authenticated POST, and Better Auth's CSRF check wants it
+		// (skipped under `NODE_ENV=test`, which `bun test` sets and `node --test` does not).
+		const signOut = await send(app, 'POST', '/api/auth/sign-out', {
+			headers: { cookie: everyCookie, origin: 'http://localhost:4000' },
+		});
+		expect(signOut.status).toBe(200);
+		expect(
+			(await send(app, 'POST', '/api/setup/first-admin', { headers: { cookie: everyCookie } }))
+				.status,
+		).toBe(401);
 	} finally {
 		rmSync(dir, { recursive: true, force: true });
 	}

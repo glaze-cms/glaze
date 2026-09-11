@@ -98,22 +98,29 @@ when it changed into something else, withdrawn when it was reverted.
 ## Identity
 
 **Principal**:
-Someone or something that can sign in and be given permissions: a person with an account, an agent,
-an API token. A principal is on the list whether or not it is doing anything right now, the way a
-name stays on a staff list overnight.
+Someone who can sign in and be given permissions: a person with an account. An agent is not one of
+its own — it acts as the person who runs it. A principal is on the list whether or not it is doing
+anything right now, the way a name stays on a staff list overnight.
 
 **Actor**:
 Whoever did one particular thing. Usually a principal; `system` when Glaze did it itself, which is
 why an event can have no actor at all.
 
-**Kind** (`user` / `agent` / `system`):
-What sort of thing a principal is: a person, something running on its own, or Glaze itself. It says
-nothing about what they may do.
+**Kind** (`user` / `system`):
+What sort of thing acted: a person, or Glaze itself. There is no `agent` kind — an agent acts as the
+person who runs it, and what it does is recorded under that person's id. It says nothing about what
+they may do.
 
-**Role** (`admin` / `editor`):
+**Role** (`admin` / `editor` / `user`):
 What a principal is allowed to do — approve a schema change, edit content. It is written down on the
-principal, never guessed from how they signed in, and never from their kind: an agent that may edit
-is not an agent that may approve.
+principal, never guessed from how they signed in. `user` is the floor: every account stands on it the
+moment it exists, and it is never stored — a principal row is a grant of something more.
+
+**Claim** (the first admin):
+How a fresh Glaze gets its first admin. A signed-in account asks for it, and gets it only while no
+admin exists; afterwards the path is **sealed** and refuses everybody, the admin included. It is the
+one grant that has no admin to make it.
+_Avoid_: bootstrap, setup user, create-first-user
 
 ## Content
 

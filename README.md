@@ -124,6 +124,10 @@ curl -X POST localhost:4000/api/auth/sign-up/email -c cookies.txt \
   -H 'content-type: application/json' \
   -d '{"email":"ada@example.com","password":"correct-horse-battery","name":"Ada"}'
 
+# the first account to claim it becomes admin; the route refuses everyone once an admin exists
+# (set GLAZE_SETUP_TOKEN before strangers can reach the server, and send it as x-glaze-setup-token)
+curl -X POST localhost:4000/api/setup/first-admin -b cookies.txt
+
 # create + list (cookie or `Authorization: Bearer <token>`)
 curl -X POST localhost:4000/api/posts -b cookies.txt \
   -H 'content-type: application/json' -d '{"title":"Hello"}'

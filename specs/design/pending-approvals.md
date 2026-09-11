@@ -27,12 +27,12 @@ what will be destroyed.**
 Four things decide what happens to a schema change. Only the first two are workflow config; the
 third is per machine and the fourth is a permission.
 
-| Setting              | Values             | Decides                                                         |
-| -------------------- | ------------------ | --------------------------------------------------------------- |
-| `migrations.enabled` | `true` / `false`   | is a file kept for every schema change                          |
-| `audit`              | `false` / `true`   | a held change is answered at a terminal, or on the admin screen |
-| `autoApply`          | `false` / `true`   | does this machine apply anything at boot                        |
-| role                 | `admin` / `editor` | who may approve                                                 |
+| Setting              | Values                      | Decides                                                         |
+| -------------------- | --------------------------- | --------------------------------------------------------------- |
+| `migrations.enabled` | `true` / `false`            | is a file kept for every schema change                          |
+| `audit`              | `false` / `true`            | a held change is answered at a terminal, or on the admin screen |
+| `autoApply`          | `false` / `true`            | does this machine apply anything at boot                        |
+| role                 | `admin` / `editor` / `user` | who may approve                                                 |
 
 **Keeping the files is behavioural.** It is not a filing preference: a committed chain is a thing a
 machine _applies_. With `enabled: false`, every machine diffs the schema against the database and
@@ -257,9 +257,16 @@ and files a fresh request. Re-approving a failed apply is not a path — fail cl
 `userId` (the Better Auth user id) and `role`. Approving requires `admin`.
 
 **Signing up grants no privilege.** A self-registered account gets `user` — the least-privileged
-role, able to authenticate and little else — and stays there until an admin grants more. That is the
-whole of the fix for the hole described below: winning a race to sign up now buys an account that can
-do nothing.
+role — and stays there until an admin grants more. Today a `user` can do what any signed-in account
+can: the content API is gated on a session, not on a role, until RBAC says otherwise. What a `user`
+cannot do is approve a schema change or become admin, and that is the whole of the fix for the hole
+described below: winning a race to sign up no longer buys either.
+
+`user` is not a row. A row in `principals` is a grant of something above the floor, and an account
+with no row is a `user` by definition. So nothing runs at sign-up: no hook that can throw after Better
+Auth has already committed the account, no orphaned account with a half-assigned role, and no way for
+sign-up volume to touch a Glaze table. A row whose value the code does not recognise also reads as
+`user` — an unknown value in the role column is answered with the least privilege, never a guess.
 
 **The first admin is created once, through a sealed path.** Both Payload and Strapi do this: Payload
 redirects every visitor to `/create-first-user` while the users collection is empty and returns
@@ -268,9 +275,41 @@ the first admin. Glaze follows the convention. What Glaze must _not_ copy from i
 attempt is granting a real role to everybody who signs up afterwards — neither of them does that, and
 it is what turned an ordinary race into privilege escalation.
 
-A setup token printed to the console at first boot would close the race entirely, and neither
-competitor bothers. Keep it as an opt-in for people deploying publicly before configuring
-(`GLAZE_SETUP_TOKEN`), not as the default path.
+Glaze's sealed path is a **claim**, not a form that creates the account. A person signs up like
+anybody else and, while signed in, asks `POST {api}/setup/first-admin`; the answer is `admin` if no
+admin exists yet, and `403` for everybody — the admin included — from the moment one does. The seal is
+"an admin exists", not "you are not the admin". It is the one grant that has no admin to make it, so
+the empty table stands in for one, and it has the same shape every later grant will have:
+authentication is the person's, authorization is the admin's. Creating the account inside the same
+call was considered and not chosen: it would mean forwarding Better Auth's cookies past Elysia, mapping
+its thrown errors into the envelope, and a failure between creating the account and granting the role
+would leave a taken email with nothing to show for it. `GET {api}/setup` reports whether a first
+admin is still needed, which is what the setup screen will read — Payload's redirect reveals the same.
+
+**"First" is held, not hoped for.** The read and the write share one `queryTransaction`, and claims
+take turns: on Postgres the transaction takes `pg_advisory_xact_lock` first, so a second claimant
+waits for the first to commit and then reads the admin it wrote; on SQLite the seam runs transactions
+one at a time on its single connection, which is the same guarantee. Eight claims arriving together
+grant one admin, on both dialects, and the test that says so fails without the lock.
+
+The claim reads the session **table**, not the signed session-data cookie the rest of the API accepts
+for a few minutes after sign-out. Reading content on a just-revoked session is tolerable; making an
+admin on one is not.
+
+An account that already holds a lesser grant (an editor, once something can make one) is raised to
+`admin` by the claim rather than refused — the seal is about admins existing, not about the claimant
+being new. Two consequences of keying the seal on "an admin row exists", written down so they do not
+look accidental: demoting or deleting the only admin's row reopens the claim to whoever is signed in
+(nothing does either today); and deleting the only admin's **account** while the row stays leaves
+the seal shut with nobody able to act, since `principals` has no foreign key to the auth tables. The
+recovery for the second is to remove that row by hand; RBAC, which will have an admin-facing way to
+grant and revoke, is where a better answer belongs.
+
+Neither competitor bothers with a setup token, and neither does Glaze by default. It is an opt-in for
+people deploying publicly before configuring (`GLAZE_SETUP_TOKEN`; when set, the claim must carry it
+in `x-glaze-setup-token`, compared in constant time; a random value, not a phrase, because the route
+is not rate-limited). The seal is checked before the token, so once an admin exists the token cannot
+be probed through this route.
 
 Roles are not promoted through sign-up, and accounts are not created _for_ people: an administrator
 who creates an account has to set somebody else's password. Instead, **authentication is theirs and
@@ -473,17 +512,23 @@ These are a dependency order, not a menu. Approve was built first, before the tw
 and adversarial review found the same class of failure twice in one day — once at boot, once at the
 endpoint. The order below is the lesson.
 
-**1. Transactions that are transactions.** `bun:sqlite`'s `Database.transaction` wraps a
-**synchronous** function, so `COMMIT` fires at the first `await` and Drizzle's `transaction` through
-that driver is a no-op: a throwing transaction leaves its rows behind, and two concurrent callers see
-each other's uncommitted state. Proven against the pinned dependencies during review. This is not
-hypothetical or future work — it silently voids the supersede-then-file atomicity already on `main`.
-The dialect seam's own `transaction` (`dialect/sqlite.ts`) does hold `BEGIN` across awaits, so the
-fix is likely to use that rather than the ORM's, with a test that a throwing transaction leaves
-nothing behind.
+**1. Transactions that are transactions. — Done (`aef4266`).** `bun:sqlite`'s `Database.transaction`
+wraps a **synchronous** function, so `COMMIT` fires at the first `await` and Drizzle's `transaction`
+through that driver is a no-op: a throwing transaction leaves its rows behind, and two concurrent
+callers see each other's uncommitted state. The dialect seam now offers `queryTransaction`, which runs
+a query-builder callback inside the seam's own `BEGIN`/`COMMIT`; the rule for callers is that every
+statement goes through the `tx` it hands out, never the outer handle (on Postgres the outer handle
+takes a different pooled connection and escapes the transaction). `dialect/transaction.test.ts` proves
+a throw leaves nothing behind, on both dialects and both runtimes.
 
-**2. The role bootstrap.** A sealed first-admin path, and `user` as the default for everyone else.
-Until this exists, no endpoint can be gated on a role.
+**2. The role bootstrap. — Done.** `user` is the absence of a `principals` row, so sign-up writes
+nothing and there is no hook to fail. The first admin is made by a signed-in account **claiming** it
+at `POST {api}/setup/first-admin`, allowed only while no admin exists; `GET {api}/setup` says whether
+that is still the case. `GLAZE_SETUP_TOKEN`, when set, is required on the claim. See
+[`principal`](#principal--the-rbac-placeholder). What is left for the screen: the setup step in
+`glaze-admin`, `FORBIDDEN` in its hand-kept copy of `GlazeErrorCode`
+(`packages/glaze-admin/src/lib/api/error.ts`), and CORS on `{api}/setup` if the admin is ever served
+from another origin — today it is served in-process, same-origin, and the setup routes get none.
 
 **3. The classifier, with its three buckets.** `deriveUnsafeChanges` returns only the operations it
 knows are dangerous; it must instead account for every operation in the diff and report the ones it

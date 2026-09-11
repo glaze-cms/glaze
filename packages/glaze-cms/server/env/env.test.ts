@@ -4,7 +4,14 @@ import { createLogger } from '#logger';
 import { parseEnv, validateEnv } from './env.ts';
 
 /** The Glaze-owned env vars a test may set; cleared before each run so the process env can't leak in. */
-const MANAGED = ['NODE_ENV', 'GLAZE_AUTH_SECRET', 'GLAZE_AUTH_URL', 'GLAZE_PORT', 'PORT'] as const;
+const MANAGED = [
+	'NODE_ENV',
+	'GLAZE_AUTH_SECRET',
+	'GLAZE_AUTH_URL',
+	'GLAZE_SETUP_TOKEN',
+	'GLAZE_PORT',
+	'PORT',
+] as const;
 
 /**
  * Runs `fn` with a hermetic environment: the managed vars are cleared, `overrides` applied, then the
@@ -91,6 +98,15 @@ test('parseEnv rejects a non-numeric port', () => {
 
 test('parseEnv rejects a malformed auth URL', () => {
 	expect(failedVariables({ GLAZE_AUTH_URL: 'ftp://nope' })).toContain('GLAZE_AUTH_URL');
+});
+
+test('parseEnv rejects a too-short setup token', () => {
+	expect(failedVariables({ GLAZE_SETUP_TOKEN: 'short' })).toContain('GLAZE_SETUP_TOKEN');
+});
+
+test('parseEnv accepts a setup token of the minimum length and treats a blank one as unset', () => {
+	expect(failedVariables({ GLAZE_SETUP_TOKEN: 't'.repeat(16) })).toEqual([]);
+	expect(failedVariables({ GLAZE_SETUP_TOKEN: '   ' })).toEqual([]);
 });
 
 test('parseEnv rejects an unknown NODE_ENV', () => {

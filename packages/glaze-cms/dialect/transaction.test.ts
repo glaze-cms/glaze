@@ -87,3 +87,31 @@ matrixTest('a failing statement rolls back the ones before it', async ({ db, dia
 	// Only the pre-existing row survives; `first` went back with the failure.
 	expect(await countRows(db)).toBe(1);
 });
+
+// Two callers whose transactions overlap across an `await` must each get a whole transaction. On
+// SQLite there is one connection, so without ordering the second `BEGIN` fails inside the first; on
+// Postgres each takes its own pooled connection. Either way, both land and neither sees a half.
+matrixTest('overlapping query transactions each complete whole', async ({ db, dialect }) => {
+	await createProbeTable(db);
+	const table = probeTable(dialect);
+
+	const results = await Promise.allSettled(
+		['a', 'b', 'c', 'd'].map((id) =>
+			db.queryTransaction(async (tx) => {
+				await (tx as Builder).insert(table).values({ id });
+				// Yield so the brackets interleave rather than running back to back.
+				await new Promise((resolve) => setTimeout(resolve, 1));
+				await (tx as Builder).insert(table).values({ id: `${id}2` });
+				return id;
+			}),
+		),
+	);
+
+	expect(results.map((result) => result.status)).toEqual([
+		'fulfilled',
+		'fulfilled',
+		'fulfilled',
+		'fulfilled',
+	]);
+	expect(await countRows(db)).toBe(8);
+});

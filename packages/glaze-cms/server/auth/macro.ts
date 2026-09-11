@@ -18,6 +18,11 @@ export interface SessionProvider {
 	readonly api: {
 		getSession(input: {
 			headers: Headers;
+			/**
+			 * `disableCookieCache: true` makes Better Auth read the session table instead of trusting the
+			 * signed session-data cookie, so a session revoked by sign-out is seen as gone at once.
+			 */
+			query?: { disableCookieCache?: boolean };
 		}): Promise<{ readonly user: unknown; readonly session: unknown } | null>;
 	};
 }

@@ -42,9 +42,9 @@ collaboration engine.** See §4.
 - **One principal model** — a person, an agent and a machine client sit on the same list and carry
   the same kind of permissions; there is no side door for API access. "What can this principal do"
   is a permissions question, so RBAC is designed in from the start, not retrofitted. Full policy
-  model, minimal management UI; two built-in roles (`admin`, `editor`) so day one needs no config.
-  What a principal **is** (`user` / `agent` / `system`) is its kind, and is never its role: an agent
-  that may edit is not an agent that may approve.
+  model, minimal management UI; three built-in roles (`admin`, `editor`, and `user` as the floor
+  every account starts on) so day one needs no config. An agent is not a principal of its own — it
+  acts as the person who runs it, and what it does is recorded under that person's id.
 - **`propose` and `approve` are first-class actions**, distinct from CRUD's `update`. A principal
   granted `propose` and never `approve` cannot write to production **by policy**, not by a rule
   buried in code. Approving a pending _structural_ change is a permission too.

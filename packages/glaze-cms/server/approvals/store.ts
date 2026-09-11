@@ -14,6 +14,7 @@ import { desc, eq, sql } from 'drizzle-orm';
 
 import { createTrailId } from './id.ts';
 
+import type { Dialect } from '#dialect';
 import type { ActorKind, ApprovalEventType, PrincipalRole } from './schema/index.ts';
 import type { Column, SQL, SQLWrapper, Table } from 'drizzle-orm';
 
@@ -32,7 +33,19 @@ interface SelectBuilder extends PromiseLike<Row[]> {
 export interface ApprovalDb {
 	select(fields?: Record<string, SQLWrapper>): SelectBuilder;
 	insert(table: Table): { values(values: Row): PromiseLike<unknown> };
+	update(table: Table): { set(values: Row): { where(condition: SQL): PromiseLike<unknown> } };
 }
+
+/** The Postgres builder's raw-statement entry, used only to take the claim lock. */
+interface StatementRunner {
+	execute(query: SQL): PromiseLike<unknown>;
+}
+
+/**
+ * The advisory-lock key the first-admin claim takes on Postgres. Any constant works; it only has to
+ * be the same for every claimant and unlikely to collide with somebody else's lock.
+ */
+const FIRST_ADMIN_LOCK_KEY = 7_212_001;
 
 /** What one appended event says. The id and instant are the store's to assign. */
 export interface ApprovalEventInput {
@@ -167,19 +180,25 @@ export async function findOpenRequest(db: ApprovalDb, table: Table): Promise<Ope
 	};
 }
 
+/** The role values this store recognises when reading a row back. Anything else is treated as `user`. */
+const GRANTED_ROLES: ReadonlySet<string> = new Set(['admin', 'editor']);
+
 /**
  * Reads a principal's role.
+ *
+ * An account with no row is a `user`, and so is a row whose value this code does not recognise: an
+ * unknown value in the role column is answered with the least privilege, never with a guess.
  *
  * @param db - The query builder.
  * @param table - The `principals` table.
  * @param userId - The account to look up.
- * @returns The role, or `null` when the account has none.
+ * @returns The role — `user` when the account has been granted nothing.
  */
 export async function findRole(
 	db: ApprovalDb,
 	table: Table,
 	userId: string,
-): Promise<PrincipalRole | null> {
+): Promise<PrincipalRole> {
 	const columns = table as unknown as Record<string, Column>;
 	const rows = (await db
 		.select()
@@ -188,5 +207,78 @@ export async function findRole(
 		.limit(1)) as unknown as Array<{ role: string }>;
 
 	const role = rows[0]?.role;
-	return role === 'admin' || role === 'editor' ? role : null;
+	return role !== undefined && GRANTED_ROLES.has(role) ? (role as PrincipalRole) : 'user';
+}
+
+/**
+ * Reports whether any account holds `admin`.
+ *
+ * @param db - The query builder.
+ * @param table - The `principals` table.
+ * @returns `true` once at least one admin exists.
+ */
+export async function hasAdmin(db: ApprovalDb, table: Table): Promise<boolean> {
+	const columns = table as unknown as Record<string, Column>;
+	const rows = await db
+		.select()
+		.from(table)
+		.where(eq(columns['role'] as Column, 'admin'))
+		.limit(1);
+	return rows.length > 0;
+}
+
+/**
+ * Makes concurrent claims take turns, so two of them cannot both read "no admin" and both write one.
+ *
+ * On Postgres each transaction has its own connection, so the read-then-write needs a lock held to
+ * the end of the transaction: `pg_advisory_xact_lock` blocks the second claimant until the first has
+ * committed, and the second then reads the admin the first wrote. On SQLite the seam runs
+ * transactions one at a time on its single connection, which is the same guarantee for free.
+ *
+ * @param db - The query builder from the surrounding transaction.
+ * @param dialect - The dialect the builder speaks.
+ */
+async function lockFirstAdminClaim(db: ApprovalDb, dialect: Dialect): Promise<void> {
+	if (dialect !== 'postgres') return;
+	await (db as unknown as StatementRunner).execute(
+		sql`select pg_advisory_xact_lock(${sql.raw(String(FIRST_ADMIN_LOCK_KEY))})`,
+	);
+}
+
+/**
+ * Grants `admin` to an account, but only while no admin exists at all.
+ *
+ * This is the one grant that has no admin to make it, so the empty table stands in for one: the
+ * first account to ask is granted, and from then on the answer is `false` for everybody, the admin
+ * included. Nothing is written when the answer is `false`. An account that already holds a lesser
+ * grant is raised to `admin` rather than refused — the seal is about admins existing, not about the
+ * claimant being new.
+ *
+ * Run it inside `DatabaseHandle.queryTransaction` and pass the builder that transaction hands out:
+ * the lock, the read and the write have to share one transaction for "first" to mean anything.
+ *
+ * @param db - The query builder from the surrounding transaction.
+ * @param table - The `principals` table.
+ * @param userId - The account asking to be the first admin.
+ * @param dialect - The dialect the builder speaks, which decides how claims take turns.
+ * @returns `true` when the grant was made; `false` when an admin already existed.
+ */
+export async function claimFirstAdmin(
+	db: ApprovalDb,
+	table: Table,
+	userId: string,
+	dialect: Dialect,
+): Promise<boolean> {
+	await lockFirstAdminClaim(db, dialect);
+	if (await hasAdmin(db, table)) return false;
+
+	const columns = table as unknown as Record<string, Column>;
+	const userIdColumn = columns['userId'] as Column;
+	const existing = await db.select().from(table).where(eq(userIdColumn, userId)).limit(1);
+	if (existing.length > 0) {
+		await db.update(table).set({ role: 'admin' }).where(eq(userIdColumn, userId));
+	} else {
+		await db.insert(table).values({ userId, role: 'admin', createdAt: new Date() });
+	}
+	return true;
 }

@@ -10,6 +10,7 @@ export type GlazeErrorCode =
 	| 'NOT_FOUND'
 	| 'INVALID_ID'
 	| 'UNAUTHORIZED'
+	| 'FORBIDDEN'
 	| 'CONFLICT'
 	| 'FOREIGN_KEY'
 	| 'NOT_NULL'

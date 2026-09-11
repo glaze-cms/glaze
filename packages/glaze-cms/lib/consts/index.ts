@@ -6,4 +6,5 @@ export {
 	DEFAULT_HEALTH_PATH,
 	DEFAULT_PORT,
 	MIN_AUTH_SECRET_LENGTH,
+	MIN_SETUP_TOKEN_LENGTH,
 } from './defaults.ts';

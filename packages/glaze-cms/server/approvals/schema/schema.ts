@@ -51,10 +51,15 @@ export type ApprovalEventType =
 export type ActorKind = 'user' | 'system';
 
 /**
- * What a principal may do. The real policy model replaces this: two values in a text column cannot
+ * What a principal may do. `user` is the floor every account stands on the moment it exists: it can
+ * sign in and nothing more. It is never written to `principals` — a row there is a grant of something
+ * above the floor, so an account with no row is a `user` by definition, and nothing has to run at
+ * sign-up for that to be true.
+ *
+ * The real policy model replaces the column, not the table: three values in a text column cannot
  * express permissions scoped to a resource, or `propose` held apart from `approve` (AGENTS.md §1).
  */
-export type PrincipalRole = 'admin' | 'editor';
+export type PrincipalRole = 'admin' | 'editor' | 'user';
 
 /**
  * The approvals tables, keyed by name. A type alias rather than an interface so it carries an
@@ -100,6 +105,7 @@ function buildPostgresApprovalSchema(): ApprovalSchema {
 		(table) => [index(REQUEST_INDEX).on(table.requestId), index(TYPE_INDEX).on(table.type)],
 	);
 
+	// One row per grant above `user`; an account with no row is a `user`.
 	const principals = glaze.table('principals', {
 		userId: text('user_id').primaryKey(),
 		role: text('role').notNull(),
@@ -135,6 +141,7 @@ function buildSqliteApprovalSchema(): ApprovalSchema {
 		],
 	);
 
+	// One row per grant above `user`; an account with no row is a `user`.
 	const principals = sqliteTable(`${GLAZE_SQLITE_PREFIX}principals`, {
 		userId: sqliteText('user_id').primaryKey(),
 		role: sqliteText('role').notNull(),

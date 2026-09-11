@@ -3,9 +3,8 @@
  * request through the IP shim so the rate limiter keys per trusted peer. A catch-all `all()` route is
  * used instead of `.mount()` because the handler needs Elysia's `server` to resolve the peer address.
  *
- * Route protection helpers (a session macro/derive) are intentionally deferred: running `getSession`
- * globally would tax every request with an auth lookup, so it lands as an opt-in macro with the first
- * protected routes. Until then the session is reachable via Better Auth's own `/api/auth/get-session`.
+ * Route protection is not here: it is the opt-in `{ auth: true }` macro in `./macro.ts`, so a route
+ * that needs no session pays for no lookup.
  */
 
 import { Elysia } from 'elysia';

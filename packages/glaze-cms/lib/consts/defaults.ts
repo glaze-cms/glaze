@@ -21,6 +21,9 @@ export const DEFAULT_PORT = 4000;
 /** Minimum length Glaze requires of `GLAZE_AUTH_SECRET`; a shorter secret is too weak to sign sessions. */
 export const MIN_AUTH_SECRET_LENGTH = 32;
 
+/** Minimum length Glaze requires of `GLAZE_SETUP_TOKEN` when one is set; shorter is guessable. */
+export const MIN_SETUP_TOKEN_LENGTH = 16;
+
 /** The locked-secure Content-Security-Policy baseline; user directives merge on top (extend, not replace). */
 export const DEFAULT_CSP: Readonly<Record<string, string>> = {
 	'default-src': "'self'",

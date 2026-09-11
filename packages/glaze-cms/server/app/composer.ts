@@ -17,6 +17,7 @@ import { createDocsPlugin } from '../docs/index.ts';
 import { createHealthCheck } from '../health/index.ts';
 import { handleStop } from '../lifecycle/index.ts';
 import { createSecurityHeaders } from '../security/index.ts';
+import { createSetupRouter } from '../setup/index.ts';
 import { selectAdapter } from './adapter.ts';
 
 import type { Entity } from '../content/index.ts';
@@ -57,6 +58,7 @@ export function createGlazeApp(context: GlazeContext, entities: readonly Entity[
 		.use(createHealthCheck(options.health))
 		.use(createAuthPlugin(context, auth))
 		.use(createContentRouter({ context, auth, entities }))
+		.use(createSetupRouter({ context, auth }))
 		.use(createDocsPlugin(options.docs, options.prefixes.api))
 		.use(createAdminPlugin(context))
 		.get('/', () => buildManifest(options))

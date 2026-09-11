@@ -116,7 +116,7 @@ async function createBunSqlite(path: string): Promise<DatabaseHandle> {
 
 	// SQLite is single-connection here, so BEGIN/COMMIT/ROLLBACK on the same handle is the
 	// transaction. A failed statement does not auto-rollback in SQLite, so rollback is explicit.
-	const runTransaction: Transactor = async (fn) => {
+	const runTransaction = serializeTransactions(async (fn) => {
 		client.run('BEGIN');
 		try {
 			const result = await fn(runRaw);
@@ -130,7 +130,7 @@ async function createBunSqlite(path: string): Promise<DatabaseHandle> {
 			}
 			throw error;
 		}
-	};
+	});
 
 	return {
 		db,
@@ -142,6 +142,28 @@ async function createBunSqlite(path: string): Promise<DatabaseHandle> {
 			client.close();
 			return Promise.resolve();
 		},
+	};
+}
+
+/**
+ * Runs transactions one at a time on the single SQLite connection.
+ *
+ * `BEGIN` on a connection that is already inside a transaction is an error, and two callers that
+ * overlap across an `await` would issue exactly that: the second would fail, and its failure would
+ * roll back nothing of its own while the first carried on. Queueing them keeps every bracket whole
+ * and, since a transaction reads what the one before it committed, makes a read-then-write in one
+ * transaction safe against another doing the same.
+ *
+ * @param run - The transaction bracket to serialize.
+ * @returns A transactor that runs each call after the previous one has settled.
+ */
+function serializeTransactions(run: Transactor): Transactor {
+	let tail: Promise<unknown> = Promise.resolve();
+	return <T>(fn: (tx: RawExecutor) => Promise<T>): Promise<T> => {
+		const turn = tail.then(() => run(fn));
+		// The queue only orders; each caller still sees its own failure.
+		tail = turn.catch(() => undefined);
+		return turn;
 	};
 }
 
@@ -183,7 +205,7 @@ async function createNodeSqlite(path: string): Promise<DatabaseHandle> {
 	const runRaw: RawExecutor = (sql) =>
 		Promise.resolve(client.prepare(sql).all() as Array<Record<string, unknown>>);
 
-	const runTransaction: Transactor = async (fn) => {
+	const runTransaction = serializeTransactions(async (fn) => {
 		client.exec('BEGIN');
 		try {
 			const result = await fn(runRaw);
@@ -197,7 +219,7 @@ async function createNodeSqlite(path: string): Promise<DatabaseHandle> {
 			}
 			throw error;
 		}
-	};
+	});
 
 	return {
 		db,
