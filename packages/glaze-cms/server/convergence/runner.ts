@@ -8,7 +8,12 @@
  * terminal) blocks startup with an actionable error rather than losing data or hanging.
  */
 
-import { converge, createInteractiveResolver } from '#convergence';
+import {
+	converge,
+	createInteractiveResolver,
+	describeChange,
+	describeOperation,
+} from '#convergence';
 
 import {
 	buildApprovalSchema,
@@ -17,7 +22,7 @@ import {
 	recordEvent,
 } from '../approvals/index.ts';
 
-import type { ConvergeResult, InteractiveResolver } from '#convergence';
+import type { ConvergeResult, InteractiveResolver, UnsafeChange } from '#convergence';
 import type { Logger } from '#logger';
 import type { GlazeContext } from '../app/context.ts';
 import type { ApprovalDb } from '../approvals/index.ts';
@@ -47,7 +52,20 @@ function blockedReason(
 		return `the migration would drop data from ${listTables(result.losses)} and was rolled back`;
 	}
 	if (result.status === 'unsafe_change') {
-		return `a change is unsafe against existing data (${listChanges(result.findings)})`;
+		const unmeasured = result.findings.every((finding) => finding.code === 'could_not_verify');
+		return unmeasured
+			? `a change could not be measured against the database (${listChanges(result.findings)})`
+			: `a change is unsafe against existing data (${listChanges(result.findings)})`;
+	}
+	if (result.status === 'drop_declined') {
+		return `a destructive change was declined (${listChanges(result.findings)})`;
+	}
+	if (result.status === 'unclassified_change') {
+		return (
+			'Glaze cannot tell whether a change destroys data ' +
+			`(${result.operations.map(describeOperation).join('; ')}); ` +
+			'confirm it at a terminal, or turn on `audit` to decide it on the admin screen'
+		);
 	}
 	return result.detail ? `${result.code}: ${result.detail}` : result.code;
 }
@@ -63,15 +81,26 @@ function listTables(losses: readonly { readonly table: string }[]): string {
 }
 
 /**
- * Joins the `table.column` of each unsafe finding for a message.
+ * Describes each unsafe finding for a message, with the database's own words when a measurement
+ * could not be taken.
  *
  * @param findings - The data-loss findings.
- * @returns A comma-separated list of `table.column`.
+ * @returns A semicolon-separated list.
  */
 function listChanges(
-	findings: readonly { readonly change: { readonly table: string; readonly column: string } }[],
+	findings: readonly {
+		readonly change: UnsafeChange;
+		readonly code: string;
+		readonly detail?: string;
+	}[],
 ): string {
-	return findings.map((finding) => `${finding.change.table}.${finding.change.column}`).join(', ');
+	return findings
+		.map((finding) =>
+			finding.code === 'could_not_verify' && finding.detail
+				? `${describeChange(finding.change)}: ${finding.detail}`
+				: describeChange(finding.change),
+		)
+		.join('; ');
 }
 
 /**
@@ -89,15 +118,20 @@ function reportConvergence(logger: Logger, result: ConvergeResult): void {
 		case 'applied':
 			logger.info(`Glaze converged the schema (${result.statements.length} statement(s)).`);
 			return;
-		case 'pending':
-			// An audited change is held for approval, so the database does NOT yet match the schema. The
-			// change is on file as a pending approval, but nothing applies until a person decides — warn
-			// (not info) so the gap between schema and database stays visible rather than silently normal.
+		case 'pending': {
+			// A pending change means the database does NOT yet match the schema. The change is on file as
+			// a pending approval, but nothing applies until a person decides — warn (not info) so the gap
+			// between schema and database stays visible rather than silently normal.
+			const why = [
+				...result.findings.map((finding) => describeChange(finding.change)),
+				...result.unclassified.map((operation) => `${describeOperation(operation)} (unclassified)`),
+			];
 			logger.warn(
-				`Glaze detected ${result.statements.length} pending schema change(s) held for approval; the ` +
-					'database does not yet match the schema. Approve them in the admin to apply them.',
+				`Glaze filed a pending schema change (${why.join('; ')}); the database does not yet ` +
+					'match the schema. Approve it in the admin to apply it.',
 			);
 			return;
+		}
 		default: {
 			const reason = blockedReason(result);
 			logger.error(`Glaze could not converge the schema: ${reason}`);
@@ -113,8 +147,9 @@ function reportConvergence(logger: Logger, result: ConvergeResult): void {
  * Four cases, and the hash decides between them:
  *
  * - **Nothing to do, nothing on file** — silence is correct.
- * - **Nothing to do, a request on file** — the schema went back to what the database already has, so
- *   the request describes a change nobody is proposing any more: `withdrawn`.
+ * - **Nothing pending, a request on file** — the schema went back to what the database already has
+ *   (or moved to something that applied on its own), so the request describes a change nobody is
+ *   proposing any more: `withdrawn`.
  * - **A change matching the open request** — the same change, still waiting. Recording it again would
  *   turn one decision into a queue of identical ones.
  * - **A change that does not match** — the schema moved while the request was open. The old request is
@@ -125,7 +160,13 @@ function reportConvergence(logger: Logger, result: ConvergeResult): void {
  * @returns Resolves once the trail reflects this boot.
  */
 async function recordApprovalOutcome(context: GlazeContext, result: ConvergeResult): Promise<void> {
-	if (result.status !== 'pending' && result.status !== 'no_changes') return;
+	if (
+		result.status !== 'pending' &&
+		result.status !== 'no_changes' &&
+		result.status !== 'applied'
+	) {
+		return;
+	}
 
 	const schema = buildApprovalSchema(context.config.dialect);
 	const events = schema.approvalEvents as Table;
@@ -138,7 +179,7 @@ async function recordApprovalOutcome(context: GlazeContext, result: ConvergeResu
 		const db = tx as ApprovalDb;
 		const open = await findOpenRequest(db, events);
 
-		if (outcome.status === 'no_changes') {
+		if (outcome.status !== 'pending') {
 			if (open) {
 				await recordEvent(db, events, {
 					requestId: open.requestId,
@@ -165,15 +206,24 @@ async function recordApprovalOutcome(context: GlazeContext, result: ConvergeResu
 			type: 'requested',
 			changeHash: outcome.changeHash,
 			actorKind: 'system',
-			payload: { origin: 'dev', statements: outcome.statements, findings: outcome.findings },
+			payload: {
+				origin: 'dev',
+				statements: outcome.statements,
+				findings: outcome.findings,
+				unclassified: outcome.unclassified,
+				description: [
+					...outcome.findings.map((finding) => describeChange(finding.change)),
+					...outcome.unclassified.map(describeOperation),
+				],
+			},
 		});
 	});
 }
 
 /**
  * Converges the live database to the developer's Drizzle schema at boot. A no-op when the config
- * declares no `schema`. Without `audit` it applies a detected change, prompting (in a TTY) for any
- * rename/data-loss decision; with `audit` it holds the change for approval and applies nothing. Any
+ * declares no `schema`. An additive change applies either way. One that needs a person is asked at
+ * the terminal (in a TTY) without `audit`, and filed as a pending approval with it. Any
  * declined/unsafe/errored result throws, failing boot closed.
  *
  * @param context - The Glaze context (database handle, resolved config, logger).
@@ -189,7 +239,7 @@ export async function runConvergence(
 
 	if (!config.schema) return;
 
-	const { resolve, confirmLoss, confirmDrop } = resolver;
+	const { resolve, confirmLoss, confirmDrop, confirmUnclassified } = resolver;
 	const result = await converge({
 		db,
 		dialect: config.dialect,
@@ -198,6 +248,7 @@ export async function runConvergence(
 		resolve,
 		confirmLoss,
 		confirmDrop,
+		confirmUnclassified,
 		audit: config.workflow.audit,
 	});
 

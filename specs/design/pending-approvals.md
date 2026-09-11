@@ -1,14 +1,14 @@
 # Pending approvals — design of record
 
 > Settled 2026-09-05, amended 2026-09-05 after the first implementation pass and two adversarial
-> reviews. The amendment is not cosmetic: a change is now held for **what it does** rather than for
+> reviews. The amendment is not cosmetic: a change is now pending for **what it does** rather than for
 > a boolean, a deployed server **applies** the committed chain instead of re-deriving it, and a
 > developer answers at a terminal rather than waiting for a screen built for someone else. What each
 > correction supersedes is recorded under [Recorded reversals](#recorded-reversals).
 
 ## The principle
 
-**A change that cannot be applied without a decision is held, recorded, and shown to a person before
+**A change that cannot be applied without a decision is made pending, recorded, and shown to a person before
 it applies.** The record is durable, append-only, and lives in the database so it is shared across
 the team.
 
@@ -27,12 +27,12 @@ what will be destroyed.**
 Four things decide what happens to a schema change. Only the first two are workflow config; the
 third is per machine and the fourth is a permission.
 
-| Setting              | Values                      | Decides                                                         |
-| -------------------- | --------------------------- | --------------------------------------------------------------- |
-| `migrations.enabled` | `true` / `false`            | is a file kept for every schema change                          |
-| `audit`              | `false` / `true`            | a held change is answered at a terminal, or on the admin screen |
-| `autoApply`          | `false` / `true`            | does this machine apply anything at boot                        |
-| role                 | `admin` / `editor` / `user` | who may approve                                                 |
+| Setting              | Values                      | Decides                                                            |
+| -------------------- | --------------------------- | ------------------------------------------------------------------ |
+| `migrations.enabled` | `true` / `false`            | is a file kept for every schema change                             |
+| `audit`              | `false` / `true`            | a pending change is answered at a terminal, or on the admin screen |
+| `autoApply`          | `false` / `true`            | does this machine apply anything at boot                           |
+| role                 | `admin` / `editor` / `user` | who may approve                                                    |
 
 **Keeping the files is behavioural.** It is not a filing preference: a committed chain is a thing a
 machine _applies_. With `enabled: false`, every machine diffs the schema against the database and
@@ -44,7 +44,7 @@ The setting says nothing about how many people you are. A developer working alon
 of every change writes `migrations: { enabled: true }` and is done; the old `solo`/`team` pair made
 that person declare a team to get a file format.
 
-**`audit` does not decide whether a dangerous change is held.** It is always held. A safety promise
+**`audit` does not decide whether a dangerous change is pending.** It always is. A safety promise
 with an off switch is not a promise. `audit` decides where the answer comes from: `false` asks at the
 terminal and fails closed when there is no terminal; `true` files a pending approval and lets a
 person answer on a screen.
@@ -53,19 +53,19 @@ Defaults: `audit` is `false` — you are at a terminal, so answer there. A proje
 `true` so the question reaches a screen instead. `autoApply` follows the old `autoRun`: on for a
 developer, off for production.
 
-## What is held, and what is not
+## What is pending, and what is not
 
-**A change that destroys data is held. Everything else applies.**
+**A change that destroys data is pending. Everything else applies.**
 
-This is the mechanism finally matching the principle. Earlier drafts of this document held _every_
-structural change behind a boolean, which is both more ceremony than the promise needs and less
+This is the mechanism finally matching the principle. Earlier drafts of this document made _every_
+structural change pending behind a boolean, which is both more ceremony than the promise needs and less
 protection than it implies. Adding a column is not dangerous and buys nothing by waiting. Dropping a
 populated one is the entire reason this feature exists.
 
 ### The classifier must account for every operation
 
 **A classifier reads the snapshot diff and must have something to say about every operation in it. An
-operation it does not model is held.**
+operation it does not model is pending.**
 
 This is the load-bearing sentence, and getting it wrong is what makes the feature unsafe. A first
 attempt keyed "destructive" off the layer-1 findings alone, so a diff producing no findings read as
@@ -80,8 +80,8 @@ So the classifier returns three buckets, not a list of findings:
   index. Applies.
 - **Destructive in shape** — removes or rewrites stored values: drop a column, drop a table, narrow
   or coerce a type. Then probe the live database, because dropping an _empty_ column destroys nothing
-  and should stop nobody. Held only when the target actually holds values.
-- **Unclassified** — the differ has no model for this operation. **Held**, and reported as
+  and should stop nobody. Pending only when the target actually holds values.
+- **Unclassified** — the differ has no model for this operation. **Pending**, and reported as
   unclassified rather than as a data-loss finding, because it is not one. It is an admission.
 
 The third bucket is the point. It inverts what a gap in the differ costs: today a gap costs data,
@@ -89,9 +89,50 @@ silently; under this rule it costs an unnecessary approval. Glaze becomes annoyi
 ignorant and never unsafe — and the annoyance is self-correcting, because somebody goes and teaches
 the differ.
 
-The cost is real and worth stating plainly: on a first version that bucket catches a great deal —
-indexes, defaults, foreign keys, enums, everything not yet modelled. Bucket one has to be seeded with
-the additive operations we already understand, or an audited project is unusable on contact.
+The cost is real and worth stating plainly: on a first version that kind catches a great deal.
+Additive has to be seeded with the operations we already understand, or an audited project is
+unusable on contact.
+
+**What the classifier reads.** drizzle-kit exposes no typed list of operations — `generate` writes a
+migration and a snapshot, nothing else — and the SQL is the wrong input: on SQLite a `NOT NULL` add is
+emitted as a whole table rebuild with a `DROP TABLE` in the middle of it. So the classifier diffs the
+two snapshots' `ddl` arrays by entity identity (type, schema, table, name), after first rewriting the
+parent with the renames the resolver answered so a rename reads as a rename. Measurements name what the
+database has **now**: a column under a table being renamed is counted under the table's old name,
+because the rename has not happened yet. Every measurement is schema-qualified on Postgres, so a
+populated `shop.orders` is never mistaken for an empty `public.orders`. (The row-count oracle that
+verifies the apply still counts `public` only — a table outside it is decided here and not
+re-verified there.)
+
+**The rules, first version** (`convergence/classifier/classifier.ts`). Anything not in this table is
+unclassified.
+
+| entity                          | added                                                                                                                                                                                                                                                              | dropped                                                        | changed                                                                                                                                                                                                                              |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| anything under a new table      | additive                                                                                                                                                                                                                                                           | —                                                              | —                                                                                                                                                                                                                                    |
+| anything under a dropped table  | —                                                                                                                                                                                                                                                                  | covered by the table drop                                      | —                                                                                                                                                                                                                                    |
+| table                           | additive                                                                                                                                                                                                                                                           | destructive (`table_has_rows`)                                 | unclassified                                                                                                                                                                                                                         |
+| column                          | additive; required without a default → destructive (`not_null_column_non_empty`), unless the database fills it (identity, serial); required and generated → unclassified                                                                                           | destructive (`column_has_data`); a generated column → additive | `NOT NULL` gained → destructive; lost → additive; default → additive; string type widened → additive, narrowed → destructive (`column_length_overflow`); on an array column → unclassified; **any other type change → unclassified** |
+| index                           | additive; unique over one existing column → destructive (`unique_duplicates`); over an expression, several columns, or with a `where` → unclassified; over columns created in the same change → additive when they arrive without a default, unclassified with one | additive                                                       | as added                                                                                                                                                                                                                             |
+| unique constraint               | over one existing column → destructive (`unique_duplicates`); over several → unclassified; over columns created in the same change → additive when they arrive without a default, unclassified with one                                                            | additive                                                       | unclassified                                                                                                                                                                                                                         |
+| foreign key, check, primary key | unclassified (the database may refuse it; nothing measures that yet)                                                                                                                                                                                               | additive                                                       | unclassified                                                                                                                                                                                                                         |
+| enum, schema, view              | additive                                                                                                                                                                                                                                                           | unclassified                                                   | unclassified                                                                                                                                                                                                                         |
+
+The shapes the database may refuse (`NOT NULL` over nulls, a unique over duplicates) sit in destructive
+because the same measurement answers them; afterwards the finding code tells a real decision (a
+populated drop, which a person may agree to) from an impossible change (which fails closed).
+
+Where the differ will next need teaching, in the order people will hit it: a foreign key or check added
+to an existing table (measure for violating rows); an integer or numeric widening (additive, provably);
+an enum gaining a value (additive); a column rename under a check, a partial index or a generated
+column, which drizzle re-renders in the expression text so the rename reads as a change to the
+expression (pending today, a rename in truth). Each is a row in the table and a test, not a design.
+
+Two things drizzle-kit rc.4 does that the classifier cannot undo, recorded so nobody hunts for them
+in Glaze: dropping a column together with a generated column that depends on it is emitted
+source-first, so the approve can never apply (both databases refuse; the apply rolls back, data
+intact); and a required generated column on Postgres is emitted without its `NOT NULL`, so the
+database and the snapshot disagree from then on. Both are in `specs/research/drizzle-kit-rc-1.0-sdk.md`.
 
 ### Impossible is separate, and fails closed
 
@@ -100,13 +141,17 @@ The database refuses these outright, so there is nothing to say yes to and nobod
 closed at boot, audited or not. Filing one as a pending approval would put an approve button on a
 change that can never succeed.
 
+Narrowing a string column over longer values is **not** in this class, though it looks like it should
+be: drizzle emits the change with an explicit cast (`USING "c"::varchar(10)`), and Postgres truncates
+under a cast rather than refusing. It destroys data and succeeds, so it is a decision like a drop.
+
 ### Layer-2 does not decide
 
-The two oracles divide the work and say so. Layer-1 owns column-level, count-preserving loss and
-delegates whole-table drops to layer-2 — "a whole-table drop is the oracle's job"
-(`orchestrator/preflight.ts`). Layer-2 states in its own documentation that it does **not** see
-count-preserving corruption: a column drop, a precision truncation, a SQLite rebuild landing values in
-the wrong columns.
+The two oracles used to divide the work and say so. Layer-1 owned column-level, count-preserving
+loss and delegated whole-table drops to layer-2 — "a whole-table drop is the oracle's job", the old
+pre-flight said. Layer-2 states in its own documentation that it does **not** see count-preserving
+corruption: a column drop, a precision truncation, a SQLite rebuild landing values in the wrong
+columns.
 
 That division is right for verification and fatal for deciding. Layer-2 runs _around the apply_, so a
 decision resting on it cannot hold anything — which is exactly how a populated table drop escaped: it
@@ -139,7 +184,7 @@ nothing; "this drops `subtitle`, and 1,204 rows have data in it" is the whole pr
 
 **The promise is precise, and narrower than it sounds.** The oracle detects data loss. It does not
 detect an `ALTER` that locks a large table for four minutes, or an index build over ten million rows.
-Those are safe by this definition and can still take a site down. Holding protects data, not uptime,
+Those are safe by this definition and can still take a site down. Pending protects data, not uptime,
 and should not be described as catching dangerous changes in general.
 
 ### The second trigger: a change nobody reviewed
@@ -148,7 +193,7 @@ A `dev`-origin change has already been read by a person — it went through a pu
 could reach a schema file. A `ui`-origin change has not: someone clicked a button and the schema
 moved. That is not dangerous because it destroys data; it is unreviewed.
 
-So a `ui` change is also held — **but only when the person who made it cannot approve it.** This is
+So a `ui` change is also pending — **but only when the person who made it cannot approve it.** This is
 the difference between a team with developers and a team without, and it is a permission, not a
 workflow setting: give editors `propose` and withhold `approve`, and their changes queue for someone
 who has it. AGENTS.md §1 already commits to this ("an actor granted `propose` and never `approve`
@@ -156,19 +201,19 @@ cannot write to production **by policy**").
 
 **A team of only editors and non-technical admins must be able to work.** They are who the thesis is
 for. Their admin holds `approve` — the first account to sign up becomes `admin` — so their safe
-changes apply immediately and their destructive ones are held, shown, and approved by them. That
+changes apply immediately and their destructive ones are pending, shown, and approved by them. That
 self-approval is not ceremony: the value was never a second signature, it is being shown the row
 counts before agreeing, and one person can be shown a number.
 
 ### Permission answers "may you approve", never "may you skip"
 
-Holding applies uniformly across origins and actors. There is no bypass — not for an admin, not for
+Pending applies uniformly across origins and actors. There is no bypass — not for an admin, not for
 the person who made the change. What is not permitted is a destructive change that applies without
 ever having been recorded.
 
 **Distinct from this:** drizzle's own decisions (`rename_or_create`, `confirm_data_loss`) still
 resolve **synchronously**, as `convergence.md` requires — they must be answered before a migration
-can be generated at all. The hold then applies to the generated result. Two different moments.
+can be generated at all. Pending then applies to the generated result. Two different moments.
 
 ## Lifecycle
 
@@ -184,7 +229,7 @@ destructive change detected
   → [ applied elsewhere ] → record `applied`, noting it happened outside Glaze
 ```
 
-**Pending is a state, not a route.** A record is written for every held change; "pending" is only
+**Pending is a state, not a route.** A record is written for every pending change; "pending" is only
 what it is called while nobody has answered. A developer at a terminal answers immediately and the
 request is never pending for a human-perceptible moment — but it is still recorded, with who agreed
 and what the counts were.
@@ -372,7 +417,7 @@ those as one decision is the silent error the oracle exists to prevent.
 2. **Nothing to do** — reconcile any open request (below).
 3. **Safe** — apply it, if this machine applies at all (`autoApply`).
 4. **Blocking** — fail closed with an actionable error. Audited or not.
-5. **Destructive** — probe the live row counts, record `requested`, and hold. Answer it now if
+5. **Destructive** — measure the live row counts, record `requested`, and wait. Answer it now if
    somebody is here; otherwise leave it pending. Boot continues either way.
 
 Boot **does not fail** on a pending approval. The server starts, the admin is reachable — it is where
@@ -399,8 +444,8 @@ below) so the trail stays accurate because the tool they reached for knows about
 
 ## The content API while a change is pending
 
-Only destructive changes are held, which removes almost all of this problem. An earlier draft held
-additive changes too, so the schema file advertised a column the database did not have and every read
+Only destructive changes are pending, which removes almost all of this problem. An earlier draft made
+additive changes pending too, so the schema file advertised a column the database did not have and every read
 of that entity failed. That cannot happen now: an added column is applied before anything serves it.
 
 What remains is a column pending a **drop**. The database still has it and it is still served, which
@@ -461,8 +506,8 @@ Written down because each is the kind of decision that gets silently re-reverted
    journal tracks what has been applied, it is.
 3. **`audit` is config, not derived from `mode`.** `glaze-cms-old` had `{ mode, audit }` as
    independent settings; this repo fused them into a derived `gate`. Restored, under the old name.
-4. **A change is held for what it does, not for a flag.** An earlier draft of this document held every
-   structural change when `audit` was on. That is more ceremony than the promise needs, less
+4. **A change is pending for what it does, not for a flag.** An earlier draft of this document made every
+   structural change pending when `audit` was on. That is more ceremony than the promise needs, less
    protection than it implies, and it created the content-API problem that section used to solve.
 5. **`solo` / `team` is gone.** It named a team size and meant a file format, so a developer working
    alone had to declare a team to get a history. Replaced by `migrations: { enabled, path }`, which
@@ -530,16 +575,22 @@ that is still the case. `GLAZE_SETUP_TOKEN`, when set, is required on the claim.
 (`packages/glaze-admin/src/lib/api/error.ts`), and CORS on `{api}/setup` if the admin is ever served
 from another origin — today it is served in-process, same-origin, and the setup routes get none.
 
-**3. The classifier, with its three buckets.** `deriveUnsafeChanges` returns only the operations it
-knows are dangerous; it must instead account for every operation in the diff and report the ones it
-cannot model. Until it does, `audit` holds every structural change — clumsy, and the only reason the
-gaps described above are not live. Attempted once and reverted (`a63653e`), because narrowing the
-hold to layer-1's findings removed a blanket that was covering layer-1's blind spots.
+**3. The classifier, with its three kinds. — Done.** `classifyChange` accounts for every operation
+in the snapshot diff (see the rule table under [What is pending](#what-is-pending-and-what-is-not)).
+An additive change now applies under `audit`; a destructive one is measured and pending only when the
+measurement finds something; an unclassified one is pending, or asked about at a terminal
+(`confirmUnclassified`), and named as unknown rather than dangerous. A populated table drop is decided
+before anything runs (`table_has_rows`), and the apply oracle verifies it instead of asking again. The
+three cases that escaped the first attempt — a populated table drop, a column drop beside a table
+rename, `numeric(10,4) → numeric(10,2)` — are each a test that asserts on the database. Attempted once
+before and reverted (`a63653e`), because narrowing to layer-1's findings removed a blanket that was
+covering layer-1's blind spots; the unclassified kind is what replaced the blanket.
 
 **4. Boot reconciliation.** [Reconciling a request that resolved itself](#reconciling-a-request-that-resolved-itself)
 is design of record with nothing behind it: `no_changes` plus an open request records `withdrawn`
-unconditionally, with no journal read, no probe and no partial-apply branch. The case it gets wrong
-is the one that section calls the worst failure an audit trail has.
+unconditionally — and so, since the classifier landed, does an additive change that applied on its
+own while a request was open — with no journal read, no probe and no partial-apply branch. The case
+it gets wrong is the one that section calls the worst failure an audit trail has.
 
 **5. `pending: drop` on the descriptor**, so the admin can show a column as on its way out.
 

@@ -248,6 +248,19 @@ push-time `confirm_data_loss: table_recreate`, per §4.)
 
 ## 7. Surfaces & housekeeping
 
+- **Statement order and generated columns (rc.4, verified 2026-09-11).** Dropping a column and a
+  generated column that depends on it in one migration is emitted source-first
+  (`DROP COLUMN "src"; DROP COLUMN "dbl";`); Postgres and SQLite both refuse the first statement, so
+  the migration can never apply. Also: a required generated column on Postgres is emitted **without**
+  `NOT NULL` (`ADD COLUMN "g" integer GENERATED ALWAYS AS (…) STORED`) although the snapshot records
+  `notNull: true`, so the database and the snapshot disagree from then on. And the parent snapshot is
+  picked by lexical folder sort, so two migrations generated within one second can sort by their
+  random suffix — realistic only in tests that commit several migrations quickly.
+- **Some diffs produce no migration (rc.4, verified 2026-09-11).** `generate` writes nothing for a
+  Postgres column gaining array `dimensions` (`text → text[]`) or a SQLite index becoming unique under
+  the same name; `converge` reports `no_changes` while the database stays divergent. `generateDrizzleJson`
+  does show the difference, so this is drizzle-kit's differ, not the snapshot. Re-check on each RC bump.
+
 - **Three surfaces, identical envelope:** in-process **SDK** (`drizzle-kit/cli`), **CLI**
   (`drizzle-kit <verb> --output json`), and **MCP** (`drizzle-kit mcp` over stdio exposing
   `generate`/`push`/`check`). **For Glaze (a framework embedding this), the in-process SDK is the

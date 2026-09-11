@@ -1,12 +1,13 @@
 /**
  * Data-safety types for convergence.
  *
- * These describe schema changes that a database will **reject at apply time** when existing data
- * conflicts — and which drizzle-kit does **not** surface as `confirm_data_loss` decisions (verified
- * against drizzle-kit 1.0.0-rc.4: e.g. `SET NOT NULL` over existing NULLs is emitted and fails as a
- * runtime `query_error`). Glaze detects them **before** applying so the change becomes a clean,
- * translatable decision instead of a mid-migration failure. See
- * `specs/research/drizzle-kit-rc-1.0-sdk.md` §3.
+ * These describe schema changes that go wrong against existing data — some the database **rejects at
+ * apply time** (`SET NOT NULL` over existing NULLs, a unique over duplicates), some it performs and
+ * **destroys values doing so** (a populated drop; a narrowing, which drizzle emits with an explicit
+ * cast that Postgres truncates under) — and which drizzle-kit does **not** surface as
+ * `confirm_data_loss` decisions (verified against drizzle-kit 1.0.0-rc.4). Glaze measures them
+ * **before** applying so the change becomes a clean, translatable decision instead of a mid-migration
+ * failure or a silent loss. See `specs/research/drizzle-kit-rc-1.0-sdk.md` §3.
  *
  * This is a data-safety gate, so it **fails closed**: when a probe cannot determine safety (a
  * missing object, an unreadable result, a bad descriptor), it reports `could_not_verify` — never a
@@ -32,9 +33,12 @@ export type QueryExecutor = (sql: string) => Promise<Array<Record<string, unknow
  * - `not_null_existing_nulls` — a column gaining `NOT NULL` has existing NULL rows.
  * - `not_null_column_non_empty` — a new `NOT NULL` column without a default on a non-empty table.
  * - `unique_duplicates` — a new `UNIQUE` constraint but duplicate values already exist.
- * - `column_length_overflow` — a column's length is narrowed below values that already exist.
+ * - `column_length_overflow` — a column's length is narrowed below values that already exist; Postgres
+ *   truncates them under drizzle's explicit cast, so this is a decision like a drop.
  * - `column_has_data` — a column being dropped still holds data (a silent, count-preserving loss the
  *   row-count oracle cannot see — the reason layer-1 must gate it before apply).
+ * - `table_has_rows` — a table being dropped still holds rows. Measured here so the decision is made
+ *   before anything runs; the row-count oracle then verifies the apply rather than deciding it.
  * - `could_not_verify` — the gate could not determine safety; treat as unsafe (fail closed).
  */
 export const DATA_LOSS_CODES = [
@@ -43,6 +47,7 @@ export const DATA_LOSS_CODES = [
 	'unique_duplicates',
 	'column_length_overflow',
 	'column_has_data',
+	'table_has_rows',
 	'could_not_verify',
 ] as const;
 
@@ -51,19 +56,24 @@ export type DataLossCode = (typeof DATA_LOSS_CODES)[number];
 
 /**
  * A proposed schema change the detector knows how to probe. A discriminated union on `kind` — each
- * variant carries exactly the identifiers its probe needs. Produced later from the drizzle-kit
- * snapshot diff. `table`/`column` are single (unqualified) identifiers, quoted safely at probe time.
+ * variant carries exactly the identifiers its probe needs. Produced by the classifier from the
+ * snapshot diff, naming what the live database has **now** (a table being renamed is still under its
+ * old name). `schema`, `table` and `column` are single identifiers, quoted safely at probe time.
  */
 export type UnsafeChange =
 	| {
 			/** `ALTER COLUMN … SET NOT NULL` on an existing column. */
 			readonly kind: 'set_not_null';
+			/** The table's schema on Postgres; absent on SQLite, which has none. */
+			readonly schema?: string;
 			readonly table: string;
 			readonly column: string;
 	  }
 	| {
 			/** `ADD COLUMN … NOT NULL` on an existing table. */
 			readonly kind: 'add_not_null_column';
+			/** The table's schema on Postgres; absent on SQLite, which has none. */
+			readonly schema?: string;
 			readonly table: string;
 			readonly column: string;
 			/** Whether the new column supplies a `DEFAULT`; a non-NULL default makes the add safe. */
@@ -76,6 +86,8 @@ export type UnsafeChange =
 			 * case-insensitive collisions; a binary column does not). See {@link checkUniqueOnDuplicates}.
 			 */
 			readonly kind: 'add_unique';
+			/** The table's schema on Postgres; absent on SQLite, which has none. */
+			readonly schema?: string;
 			readonly table: string;
 			readonly column: string;
 			/**
@@ -90,6 +102,8 @@ export type UnsafeChange =
 			 * Postgres; SQLite ignores column length, so this is a no-op there.
 			 */
 			readonly kind: 'narrow_column';
+			/** The table's schema on Postgres; absent on SQLite, which has none. */
+			readonly schema?: string;
 			readonly table: string;
 			readonly column: string;
 			/** The new maximum length. Must be a non-negative integer. */
@@ -103,8 +117,17 @@ export type UnsafeChange =
 			 * whether the column holds any data ({@link checkColumnHasData}).
 			 */
 			readonly kind: 'drop_column';
+			/** The table's schema on Postgres; absent on SQLite, which has none. */
+			readonly schema?: string;
 			readonly table: string;
 			readonly column: string;
+	  }
+	| {
+			/** `DROP TABLE` — every row is destroyed. The probe counts them ({@link checkTableHasRows}). */
+			readonly kind: 'drop_table';
+			/** The table's schema on Postgres; absent on SQLite, which has none. */
+			readonly schema?: string;
+			readonly table: string;
 	  };
 
 /**

@@ -1,4 +1,5 @@
 export { applyMigration, captureRowCounts, findUnexpectedLosses } from './apply/index.ts';
+export { classifyChange, describeChange, describeOperation } from './classifier/index.ts';
 export { computeChangeHash, readParentSnapshotId } from './orchestrator/index.ts';
 export {
 	CONVERGENCE_ERROR_CODES,
@@ -23,6 +24,7 @@ export type {
 	TableRename,
 	UnexpectedRowLoss,
 } from './apply/index.ts';
+export type { Classification, Operation, Renames } from './classifier/index.ts';
 export type {
 	ConvergenceErrorCode,
 	DataLossReason,
@@ -40,5 +42,6 @@ export type {
 	LossResolver,
 	ResolvedOutcome,
 	Resolver,
+	UnclassifiedConfirmer,
 } from './orchestrator/index.ts';
 export type { DataLossCode, DataLossFinding, QueryExecutor, UnsafeChange } from './safety/index.ts';

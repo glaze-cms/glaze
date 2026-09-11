@@ -1,5 +1,6 @@
 export {
 	checkColumnHasData,
+	checkTableHasRows,
 	checkColumnLengthOverflow,
 	checkNotNullColumnOnNonEmpty,
 	checkNotNullOnExistingNulls,

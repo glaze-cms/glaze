@@ -1,117 +1,103 @@
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
 import { expect, test } from '../../harness/index.ts';
-import { deriveUnsafeChanges } from './preflight.ts';
+import { runPreflight } from './preflight.ts';
 
-import type { SnapshotColumn } from './preflight.ts';
+// Pre-flight over hand-written snapshot files, so the parent lookup can be driven into the corners
+// drizzle-kit itself never produces: a parent it names but that is not there, and a merge.
 
-// Pure tests for the snapshot-diff → UnsafeChange classifier (no DB). The live-DB probing that turns
-// these descriptors into findings is covered by the safety suite and the converge matrix tests.
-
-/** Builds a snapshot column with sensible defaults (public schema, nullable text). */
-function col(table: string, name: string, overrides: Partial<SnapshotColumn> = {}): SnapshotColumn {
-	return {
-		schema: 'public',
-		table,
-		name,
-		type: 'text',
-		notNull: false,
-		hasDefault: false,
-		...overrides,
-	};
+/** Writes a migration dir holding a snapshot with the given identity and entities. */
+function writeMigration(
+	out: string,
+	name: string,
+	snapshot: { id: string; prevIds: string[]; ddl: unknown[] },
+): string {
+	const dir = join(out, name);
+	mkdirSync(dir, { recursive: true });
+	writeFileSync(
+		join(dir, 'snapshot.json'),
+		JSON.stringify({ version: '7', dialect: 'sqlite', ...snapshot }),
+	);
+	return dir;
 }
 
-test('deriveUnsafeChanges flags a dropped column when its table survives', () => {
-	const parent = [col('users', 'id'), col('users', 'email')];
-	const next = [col('users', 'id')];
+/** A query executor that must not be reached: nothing here should be measured. */
+const neverQueried = (): Promise<never> => Promise.reject(new Error('no measurement expected'));
 
-	expect(deriveUnsafeChanges(parent, next)).toEqual([
-		{ kind: 'drop_column', table: 'users', column: 'email' },
-	]);
+const USERS = [
+	{ entityType: 'tables', name: 'users' },
+	{
+		entityType: 'columns',
+		table: 'users',
+		name: 'id',
+		type: 'integer',
+		notNull: true,
+		default: null,
+	},
+];
+
+test('a parent the snapshot names but that is missing is one unclassified operation', async () => {
+	const out = mkdtempSync(join(tmpdir(), 'glaze-preflight-'));
+	try {
+		const next = writeMigration(out, '0002_next', { id: 'b', prevIds: ['a'], ddl: [] });
+
+		const result = await runPreflight(neverQueried, 'sqlite', next, out);
+
+		expect(result.status).toBe('ok');
+		if (result.status !== 'ok') return;
+		expect(result.findings).toEqual([]);
+		expect(result.classification.destructive).toEqual([]);
+		expect(
+			result.classification.unclassified.map((op) => [op.entityType, op.name, op.detail]),
+		).toEqual([['snapshot', 'parent', 'parent snapshot a not found']]);
+	} finally {
+		rmSync(out, { recursive: true, force: true });
+	}
 });
 
-test('deriveUnsafeChanges does NOT flag columns of a wholly-dropped table (that is the oracle)', () => {
-	const parent = [col('users', 'id'), col('users', 'email')];
-	const next: SnapshotColumn[] = [];
+test('a merge snapshot is one unclassified operation, even when its parents are present', async () => {
+	const out = mkdtempSync(join(tmpdir(), 'glaze-preflight-'));
+	try {
+		writeMigration(out, '0001_a', { id: 'a', prevIds: [], ddl: USERS });
+		writeMigration(out, '0001_b', { id: 'b', prevIds: [], ddl: USERS });
+		const next = writeMigration(out, '0002_merge', { id: 'c', prevIds: ['a', 'b'], ddl: [] });
 
-	expect(deriveUnsafeChanges(parent, next)).toEqual([]);
+		const result = await runPreflight(neverQueried, 'sqlite', next, out);
+
+		expect(result.status).toBe('ok');
+		if (result.status !== 'ok') return;
+		// Not an empty diff: the table drop in `ddl: []` is not measured, because what it is relative
+		// to is not known.
+		expect(result.classification.destructive).toEqual([]);
+		expect(result.classification.unclassified.map((op) => op.detail)).toEqual([
+			'a merge snapshot has several parents',
+		]);
+	} finally {
+		rmSync(out, { recursive: true, force: true });
+	}
 });
 
-test('deriveUnsafeChanges flags a column newly gaining NOT NULL', () => {
-	const parent = [col('t', 'c')];
-	const next = [col('t', 'c', { notNull: true })];
+test('a first migration diffs against nothing, and a found parent against itself', async () => {
+	const out = mkdtempSync(join(tmpdir(), 'glaze-preflight-'));
+	try {
+		const first = writeMigration(out, '0001_first', {
+			id: 'a',
+			prevIds: ['00000000-0000-0000-0000-000000000000'],
+			ddl: USERS,
+		});
+		const created = await runPreflight(neverQueried, 'sqlite', first, out);
+		expect(created.status).toBe('ok');
+		if (created.status !== 'ok') return;
+		expect(created.classification.additive.map((op) => op.name)).toEqual(['users']);
 
-	expect(deriveUnsafeChanges(parent, next)).toEqual([
-		{ kind: 'set_not_null', table: 't', column: 'c' },
-	]);
-});
-
-test('deriveUnsafeChanges flags a narrowed varchar but not a widened one', () => {
-	const narrowed = deriveUnsafeChanges(
-		[col('t', 'c', { type: 'varchar(255)' })],
-		[col('t', 'c', { type: 'varchar(10)' })],
-	);
-	expect(narrowed).toEqual([{ kind: 'narrow_column', table: 't', column: 'c', maxLength: 10 }]);
-
-	const widened = deriveUnsafeChanges(
-		[col('t', 'c', { type: 'varchar(10)' })],
-		[col('t', 'c', { type: 'varchar(255)' })],
-	);
-	expect(widened).toEqual([]);
-});
-
-test('deriveUnsafeChanges flags a new NOT NULL column but not a nullable one', () => {
-	const parent = [col('t', 'id')];
-
-	const notNull = deriveUnsafeChanges(parent, [
-		col('t', 'id'),
-		col('t', 'flag', { notNull: true }),
-	]);
-	expect(notNull).toEqual([
-		{ kind: 'add_not_null_column', table: 't', column: 'flag', hasDefault: false },
-	]);
-
-	const nullable = deriveUnsafeChanges(parent, [col('t', 'id'), col('t', 'note')]);
-	expect(nullable).toEqual([]);
-});
-
-test('deriveUnsafeChanges keys columns unambiguously when identifiers contain spaces', () => {
-	// Regression for the space-key collision: `('a b','c')` and `('a','b c')` collide under a
-	// space-joined key, which would hide the drop of `c` (silent data loss). NUL-separated keys don't.
-	const parent = [col('a b', 'id'), col('a b', 'c'), col('a', 'b c')];
-	const next = [col('a b', 'id'), col('a', 'b c')]; // table `a b` survives; column `c` is dropped
-
-	expect(deriveUnsafeChanges(parent, next)).toEqual([
-		{ kind: 'drop_column', table: 'a b', column: 'c' },
-	]);
-});
-
-test('deriveUnsafeChanges treats a resolved column rename as a rename, not a drop + add', () => {
-	const parent = [col('users', 'id'), col('users', 'handle', { notNull: true })];
-	const next = [col('users', 'id'), col('users', 'nick', { notNull: true })];
-
-	// With the rename known, neither a drop of `handle` nor an add of `nick` is derived.
-	expect(
-		deriveUnsafeChanges(parent, next, [{ table: 'users', from: 'handle', to: 'nick' }]),
-	).toEqual([]);
-
-	// Without it, the same diff is (wrongly) read as a drop + a new NOT NULL column — the bug this guards.
-	expect(deriveUnsafeChanges(parent, next)).toEqual([
-		{ kind: 'drop_column', table: 'users', column: 'handle' },
-		{ kind: 'add_not_null_column', table: 'users', column: 'nick', hasDefault: false },
-	]);
-});
-
-test('deriveUnsafeChanges flags text → varchar(n) as a narrowing, but not the reverse', () => {
-	expect(
-		deriveUnsafeChanges(
-			[col('t', 'c', { type: 'text' })],
-			[col('t', 'c', { type: 'varchar(20)' })],
-		),
-	).toEqual([{ kind: 'narrow_column', table: 't', column: 'c', maxLength: 20 }]);
-
-	expect(
-		deriveUnsafeChanges(
-			[col('t', 'c', { type: 'varchar(20)' })],
-			[col('t', 'c', { type: 'text' })],
-		),
-	).toEqual([]);
+		const second = writeMigration(out, '0002_second', { id: 'b', prevIds: ['a'], ddl: USERS });
+		const unchanged = await runPreflight(neverQueried, 'sqlite', second, out);
+		expect(unchanged.status).toBe('ok');
+		if (unchanged.status !== 'ok') return;
+		expect(unchanged.classification).toEqual({ additive: [], destructive: [], unclassified: [] });
+	} finally {
+		rmSync(out, { recursive: true, force: true });
+	}
 });

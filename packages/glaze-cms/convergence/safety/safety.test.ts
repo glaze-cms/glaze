@@ -237,6 +237,25 @@ matrixTest(
 	},
 );
 
+matrixTest(
+	'drop_table flags a populated table and permits an empty one',
+	async ({ db, dialect }) => {
+		const query = queryOf(db);
+		await db.raw('create table t_full (id integer primary key)');
+		await db.raw('create table t_empty (id integer primary key)');
+		await db.raw('insert into t_full (id) values (1), (2), (3)');
+
+		const findings = await detectDataLoss(query, dialect, [
+			{ kind: 'drop_table', table: 't_full' },
+			{ kind: 'drop_table', table: 't_empty' },
+		]);
+
+		expect(
+			findings.map((finding) => [finding.change.table, finding.code, finding.affectedRows]),
+		).toEqual([['t_full', 'table_has_rows', 3]]);
+	},
+);
+
 matrixTest('probes identifiers with hyphens and spaces safely', async ({ db, dialect }) => {
 	const query = queryOf(db);
 	await db.raw('create table "t-dash" (id integer primary key, "the note" text)');

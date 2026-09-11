@@ -23,8 +23,9 @@ There is **one** convergence pipeline. What people called "solo" vs "team" and "
 not separate flows — they are toggles and input adapters over the same pipeline:
 
 ```
-trigger → drizzle computes diff → decode envelope → resolve decisions → layer-1 pre-flight
-        → audit hold → apply via layer-2 oracle → keep or discard (mode) → (conflicts) → converged
+trigger → drizzle computes diff → decode envelope → resolve decisions → classify + measure
+        → applies, or pending (screen) / asked (terminal) → apply via layer-2 oracle
+        → keep or discard (mode) → (conflicts) → converged
 ```
 
 ## Three orthogonal axes
@@ -41,9 +42,9 @@ trigger → drizzle computes diff → decode envelope → resolve decisions → 
      nothing. `db:push`-fast loop, zero repo artifacts.
    - **Yes (shared / prod):** the migration + snapshot chain is **committed** — shareable, reviewable
      history.
-3. **Audit (`audit: true` / `false`):** where a held change is answered — on the admin screen, or at
-   the terminal. It does not decide _whether_ a change is held: a change that destroys data always is.
-   See [`pending-approvals.md`](./pending-approvals.md).
+3. **Audit (`audit: true` / `false`):** where a pending change is answered — on the admin screen, or
+   at the terminal. It does not decide _whether_ a change is pending: a change that destroys data
+   always is, and an additive one never is. See [`pending-approvals.md`](./pending-approvals.md).
 
 Plus: **conflict resolution comes free** — divergent edits are only possible on a shared, persisted
 history, so it exists exactly when the files are kept and is structurally impossible without them.
@@ -136,15 +137,18 @@ desync (audit rolled the migration back, there being no durable pending record y
 fidelity (preserve the failing statement + distinguish `verification_error` as internal); a
 concurrent-`out` fail-closed guard; non-`ok` migration sweep; and the `hintsFile` temp-file leak.
 
-**Layer-1 pre-flight is now wired in (2026-07-20).** `converge()` diffs the new snapshot's `ddl`
-columns against its parent's, derives `UnsafeChange` descriptors (`drop_column`, `set_not_null`,
-`narrow_column`, `add_not_null_column`), and probes the live DB via `detectDataLoss` **before** apply.
-A **populated column drop** (`column_has_data`) — the headline count-preserving loss the row-count
-oracle can't see — is surfaced to the injected `confirmDrop` seam: confirmed ⇒ applies; declined/absent
-⇒ `unsafe_change` (snapshot rolled back, data intact). A change the DB would itself reject
-(`not_null_existing_nulls`, `unique_duplicates`, `column_length_overflow`, `could_not_verify`) is a
-hard block. In non-interactive contexts confirmation is absent, so destructive changes block rather
-than guess (see `glaze-convergence-interactive-resolution`; the TTY/UI confirmer is #20).
+**Deciding happens once, before anything runs (2026-09-11).** `converge()` diffs the new snapshot's
+whole `ddl` against its parent's and the **classifier** (`convergence/classifier/`) sorts every
+operation: additive applies; destructive becomes an `UnsafeChange` (`drop_table`, `drop_column`,
+`set_not_null`, `narrow_column`, `add_not_null_column`, `add_unique`) measured against the live DB by
+`detectDataLoss`; unclassified — no rule — waits. A finding a person may agree to (`column_has_data`,
+`table_has_rows`) goes to the injected `confirmDrop` seam, or is returned as `pending` under `audit`;
+declined ⇒ `drop_declined`. A change the DB would itself reject (`not_null_existing_nulls`,
+`unique_duplicates`, `column_length_overflow`, `could_not_verify`) is a hard block in either mode. An
+unclassified operation goes to `confirmUnclassified`, or is `pending`; declined ⇒
+`unclassified_change`. Non-interactive contexts decline every seam, so nothing is guessed. The
+row-count oracle then verifies the apply; a table drop already decided is handed to it as such. The
+rule table and the reasoning are in [`pending-approvals.md`](./pending-approvals.md).
 
 Still out of scope for now (each has a follow-up task):
 

@@ -12,6 +12,7 @@
 
 import {
 	checkColumnHasData,
+	checkTableHasRows,
 	checkColumnLengthOverflow,
 	checkNotNullColumnOnNonEmpty,
 	checkNotNullOnExistingNulls,
@@ -58,6 +59,8 @@ async function detectChange(
 			case 'drop_column':
 				// Dialect-agnostic: a drop destroys the column's data on both Postgres and SQLite.
 				return await checkColumnHasData(query, change);
+			case 'drop_table':
+				return await checkTableHasRows(query, change);
 			default: {
 				const unexpected: never = change;
 				throw new Error(`Unknown change kind: ${JSON.stringify(unexpected)}`);

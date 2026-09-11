@@ -2,15 +2,18 @@ import { createInterface } from 'node:readline/promises';
 
 import { isEnvFlagEnabled } from '#utils';
 
+import { describeChange, describeOperation } from '../classifier/index.ts';
 import { describeReason, formatTarget, formatPanel, isAffirmative, renameFrom } from './utils.ts';
 
 import type { UnexpectedRowLoss } from '../apply/index.ts';
+import type { Operation } from '../classifier/index.ts';
 import type { SchemaDecision } from '../envelope/index.ts';
 import type {
 	DecisionResolution,
 	DropConfirmer,
 	LossResolver,
 	Resolver,
+	UnclassifiedConfirmer,
 } from '../orchestrator/index.ts';
 import type { DataLossFinding } from '../safety/index.ts';
 import type { Readable, Writable } from 'node:stream';
@@ -37,14 +40,16 @@ export interface ResolverIo {
 	isTty(): boolean;
 }
 
-/** The three human seams {@link converge} injects, bundled as one interactive implementation. */
+/** The human seams {@link converge} injects, bundled as one interactive implementation. */
 export interface InteractiveResolver {
 	/** Resolves a rename-vs-create or confirm-data-loss decision. */
 	resolve: Resolver;
 	/** Confirms an intended table-level data loss the apply oracle detected. */
 	confirmLoss: LossResolver;
-	/** Confirms a populated column drop layer-1 pre-flight flagged. */
+	/** Confirms a populated column or table drop the measurement flagged. */
 	confirmDrop: DropConfirmer;
+	/** Confirms an operation the classifier has no rule for. */
+	confirmUnclassified: UnclassifiedConfirmer;
 }
 
 /**
@@ -151,24 +156,51 @@ async function confirmTableLoss(io: ResolverIo, loss: UnexpectedRowLoss): Promis
 }
 
 /**
- * Confirms a populated column drop layer-1 pre-flight flagged (its values are destroyed silently,
- * below the row-count oracle). Non-TTY or a non-affirmative answer ⇒ `false` (declined; boot blocks).
+ * Confirms a populated column or table drop the measurement flagged. Non-TTY or a non-affirmative
+ * answer ⇒ `false` (declined; boot blocks).
  *
  * @param io - The terminal I/O port.
  * @param finding - The data-loss finding (the change plus its affected row count).
- * @returns `true` to drop the column, `false` to decline.
+ * @returns `true` to drop it and its data, `false` to decline.
  */
-async function confirmColumnDrop(io: ResolverIo, finding: DataLossFinding): Promise<boolean> {
+async function confirmDataDrop(io: ResolverIo, finding: DataLossFinding): Promise<boolean> {
 	if (!io.isTty()) return false;
 
-	const { table, column } = finding.change;
 	const affected = finding.affectedRows ?? 'an unknown number of';
-	const panel = formatPanel('Confirm column drop', [
-		`Dropping "${table}"."${column}" will destroy its data.`,
+	const panel = formatPanel('Confirm data loss', [
+		`This change will ${describeChange(finding.change)} and destroy its data.`,
 		'',
 		`    rows affected: ${affected}`,
 	]);
-	return askYesNo(io, panel, 'Drop the column and its data?');
+	return askYesNo(io, panel, 'Proceed and lose this data?');
+}
+
+/**
+ * Confirms an operation the classifier has no rule for. Glaze cannot say whether it destroys data;
+ * the person at the terminal can. Non-TTY or a non-affirmative answer ⇒ `false`.
+ *
+ * @param io - The terminal I/O port.
+ * @param operation - The operation nothing has a rule for.
+ * @param statements - The migration's SQL, so the person sees what a yes runs.
+ * @returns `true` to apply it anyway, `false` to decline.
+ */
+async function confirmUnclassifiedOperation(
+	io: ResolverIo,
+	operation: Operation,
+	statements: readonly string[],
+): Promise<boolean> {
+	if (!io.isTty()) return false;
+
+	const panel = formatPanel('Unclassified change', [
+		'Glaze cannot tell whether this change destroys data:',
+		'',
+		`    ${describeOperation(operation)}`,
+		'',
+		'It is part of this migration:',
+		'',
+		...statements.map((statement) => `    ${statement}`),
+	]);
+	return askYesNo(io, panel, 'Apply it anyway?');
 }
 
 /**
@@ -237,12 +269,14 @@ function stdioIo(): ResolverIo {
  * confirmations), so non-interactive boots fail closed instead of hanging or losing data.
  *
  * @param io - The terminal I/O port. Defaults to real stdio ({@link stdioIo}).
- * @returns The `{ resolve, confirmLoss, confirmDrop }` seams to pass to {@link converge}.
+ * @returns The `{ resolve, confirmLoss, confirmDrop, confirmUnclassified }` seams to pass to {@link converge}.
  */
 export function createInteractiveResolver(io: ResolverIo = stdioIo()): InteractiveResolver {
 	return {
 		resolve: (decision) => resolveDecision(io, decision),
 		confirmLoss: (loss) => confirmTableLoss(io, loss),
-		confirmDrop: (finding) => confirmColumnDrop(io, finding),
+		confirmDrop: (finding) => confirmDataDrop(io, finding),
+		confirmUnclassified: (operation, statements) =>
+			confirmUnclassifiedOperation(io, operation, statements),
 	};
 }

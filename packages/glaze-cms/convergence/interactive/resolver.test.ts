@@ -5,6 +5,7 @@ import { expect, test } from '#harness';
 import { askLine, createInteractiveResolver, isInteractive, type ResolverIo } from './resolver.ts';
 
 import type { UnexpectedRowLoss } from '../apply/index.ts';
+import type { Operation } from '../classifier/index.ts';
 import type { SchemaDecision } from '../envelope/index.ts';
 import type { DataLossFinding } from '../safety/index.ts';
 
@@ -46,6 +47,24 @@ const COLUMN_DROP: DataLossFinding = {
 	change: { kind: 'drop_column', table: 'users', column: 'bio' },
 	code: 'column_has_data',
 	affectedRows: 5,
+};
+
+const TABLE_DROP: DataLossFinding = {
+	change: { kind: 'drop_table', table: 'drafts' },
+	code: 'table_has_rows',
+	affectedRows: 12,
+};
+
+const STATEMENTS = ['ALTER TABLE "items" ALTER COLUMN "price" SET DATA TYPE numeric(10, 2);'];
+
+const RETYPED_COLUMN: Operation = {
+	entityType: 'columns',
+	op: 'alter',
+	schema: 'public',
+	table: 'items',
+	name: 'price',
+	changed: ['type'],
+	detail: 'numeric(10,4) → numeric(10,2)',
 };
 
 test('resolve treats a typed name as a rename, swapping it into the target namespace', async () => {
@@ -112,6 +131,39 @@ test('confirmDrop declines when non-interactive, without prompting', async () =>
 	const { io, prompts } = scriptedIo('y', false);
 	const confirmed = await createInteractiveResolver(io).confirmDrop(COLUMN_DROP);
 	expect(confirmed).toBe(false);
+	expect(prompts).toHaveLength(0);
+});
+
+test('confirmDrop names a table drop and its row count', async () => {
+	const { io, prompts } = scriptedIo('y');
+	expect(await createInteractiveResolver(io).confirmDrop(TABLE_DROP)).toBe(true);
+	expect(prompts[0]).toContain('drop table drafts');
+	expect(prompts[0]).toContain('12');
+});
+
+test('confirmUnclassified returns true only on an affirmative answer, and says what it is', async () => {
+	const { io, prompts } = scriptedIo('y');
+	expect(await createInteractiveResolver(io).confirmUnclassified(RETYPED_COLUMN, STATEMENTS)).toBe(
+		true,
+	);
+	expect(
+		await createInteractiveResolver(scriptedIo('').io).confirmUnclassified(
+			RETYPED_COLUMN,
+			STATEMENTS,
+		),
+	).toBe(false);
+	expect(prompts[0]).toContain('cannot tell whether this change destroys data');
+	expect(prompts[0]).toContain('change column items.price');
+	expect(prompts[0]).toContain('numeric(10,4) → numeric(10,2)');
+	// And the SQL a yes would run, since nothing was measured.
+	expect(prompts[0]).toContain('SET DATA TYPE numeric(10, 2)');
+});
+
+test('confirmUnclassified declines when non-interactive, without prompting', async () => {
+	const { io, prompts } = scriptedIo('y', false);
+	expect(await createInteractiveResolver(io).confirmUnclassified(RETYPED_COLUMN, STATEMENTS)).toBe(
+		false,
+	);
 	expect(prompts).toHaveLength(0);
 });
 

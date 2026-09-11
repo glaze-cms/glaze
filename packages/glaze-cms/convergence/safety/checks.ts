@@ -8,7 +8,12 @@
  * `could_not_verify`), never a silent "safe."
  */
 
-import { assertNonNegativeInteger, quoteIdentifier, readCount } from '../sql.ts';
+import {
+	assertNonNegativeInteger,
+	quoteIdentifier,
+	quoteQualifiedName,
+	readCount,
+} from '../sql.ts';
 
 import type { DataLossFinding, QueryExecutor, UnsafeChange } from './types.ts';
 
@@ -22,6 +27,8 @@ type AddUniqueChange = Extract<UnsafeChange, { kind: 'add_unique' }>;
 type NarrowColumnChange = Extract<UnsafeChange, { kind: 'narrow_column' }>;
 /** A `drop_column` change, narrowed. */
 type DropColumnChange = Extract<UnsafeChange, { kind: 'drop_column' }>;
+/** The `drop_table` variant. */
+type DropTableChange = Extract<UnsafeChange, { kind: 'drop_table' }>;
 
 /**
  * Detects rows that already hold NULL in a column about to gain `NOT NULL`. Such a change is emitted
@@ -35,7 +42,7 @@ export async function checkNotNullOnExistingNulls(
 	query: QueryExecutor,
 	change: SetNotNullChange,
 ): Promise<DataLossFinding | null> {
-	const table = quoteIdentifier(change.table);
+	const table = quoteQualifiedName(change.schema, change.table);
 	const column = quoteIdentifier(change.column);
 
 	const rows = await query(`SELECT COUNT(*) AS c FROM ${table} WHERE ${column} IS NULL`);
@@ -61,7 +68,7 @@ export async function checkNotNullColumnOnNonEmpty(
 ): Promise<DataLossFinding | null> {
 	if (change.hasDefault) return null;
 
-	const table = quoteIdentifier(change.table);
+	const table = quoteQualifiedName(change.schema, change.table);
 
 	const rows = await query(`SELECT COUNT(*) AS c FROM ${table}`);
 	const rowCount = readCount(rows);
@@ -92,7 +99,7 @@ export async function checkUniqueOnDuplicates(
 	query: QueryExecutor,
 	change: AddUniqueChange,
 ): Promise<DataLossFinding | null> {
-	const table = quoteIdentifier(change.table);
+	const table = quoteQualifiedName(change.schema, change.table);
 	const column = quoteIdentifier(change.column);
 
 	const duplicatedValues = `SELECT ${column} FROM ${table} WHERE ${column} IS NOT NULL GROUP BY ${column} HAVING COUNT(*) > 1`;
@@ -123,7 +130,7 @@ export async function checkColumnLengthOverflow(
 	query: QueryExecutor,
 	change: NarrowColumnChange,
 ): Promise<DataLossFinding | null> {
-	const table = quoteIdentifier(change.table);
+	const table = quoteQualifiedName(change.schema, change.table);
 	const column = quoteIdentifier(change.column);
 	const maxLength = assertNonNegativeInteger(change.maxLength);
 
@@ -151,7 +158,7 @@ export async function checkColumnHasData(
 	query: QueryExecutor,
 	change: DropColumnChange,
 ): Promise<DataLossFinding | null> {
-	const table = quoteIdentifier(change.table);
+	const table = quoteQualifiedName(change.schema, change.table);
 	const column = quoteIdentifier(change.column);
 
 	const rows = await query(`SELECT COUNT(${column}) AS c FROM ${table}`);
@@ -160,4 +167,27 @@ export async function checkColumnHasData(
 	if (populatedRows === 0) return null;
 
 	return { change, code: 'column_has_data', affectedRows: populatedRows };
+}
+
+/**
+ * Detects whether a table about to be dropped still holds rows. Dropping an empty table destroys
+ * nothing and should stop nobody; dropping a populated one is the decision this whole feature exists
+ * to put in front of a person, and it has to be made before anything runs.
+ *
+ * @param query - The dialect-agnostic query executor.
+ * @param change - The `drop_table` change to probe.
+ * @returns A finding when the table holds rows, otherwise `null`.
+ */
+export async function checkTableHasRows(
+	query: QueryExecutor,
+	change: DropTableChange,
+): Promise<DataLossFinding | null> {
+	const table = quoteQualifiedName(change.schema, change.table);
+
+	const rows = await query(`SELECT COUNT(*) AS c FROM ${table}`);
+	const rowCount = readCount(rows);
+
+	if (rowCount === 0) return null;
+
+	return { change, code: 'table_has_rows', affectedRows: rowCount };
 }

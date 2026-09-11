@@ -49,20 +49,37 @@ machine apply a chain instead of working the change out again for itself.
 _Avoid_: solo, team, mode, persist — those named a team size and meant a file format.
 
 **Audit** (`true` / `false`):
-Where a held change is answered: on the admin screen, or at the terminal. It does not decide whether
-a change is held — one that destroys data always is.
-_Avoid_: gate — in this repo "the gate" is oxlint + oxfmt + TS7 + matrix, and nothing else.
+Where a pending change is answered: on the admin screen, or at the terminal. It does not decide
+whether a change is pending — one that destroys data always is.
+_Avoid_: gate — in this repo "the gate" is oxlint + oxfmt + TS7 + matrix, and nothing else. held,
+hold — a change is pending, or it applies.
 
 **autoApply** (`true` / `false`):
 Whether this machine applies migrations when it starts. On for a developer, off for production, so a
 deploy applies when somebody decides to, not because a process restarted.
 
+**Classifier**:
+The step that reads the difference between two snapshots and has something to say about every
+operation in it: additive, destructive, or unclassified. Runs once, before anything is applied.
+_Avoid_: differ, detector — the first is drizzle's job, the second measures rather than sorts.
+
+**Additive**:
+A change that destroys nothing by construction — a new table, a nullable column, a wider type, an
+index. It applies without asking anybody, audited or not.
+
 **Destructive**:
-A change the database will make without complaint, that destroys data on the way — dropping a column
-holding values. The only question it raises is whether you want it. Distinct from **impossible**: a
-change the database refuses outright, which nobody can agree to. Neither means risky in general — an
-`ALTER` that locks a large table for four minutes is neither.
+A change that removes or rewrites stored values in shape — dropping a column or a table, narrowing a
+type. Measured against the live database first: dropping an empty column destroys nothing and stops
+nobody; dropping one holding 1,204 values is pending until a person agrees. Distinct from
+**impossible**: a change the database refuses outright (`NOT NULL` over nulls), which nobody can agree
+to. Neither means risky in general — an `ALTER` that locks a large table for four minutes is neither.
 _Avoid_: confirmable, blocking — those name the code that handles them, not the change.
+
+**Unclassified**:
+A change the classifier has no rule for. It is pending — or asked about at the terminal — and
+reported as unknown, not as dangerous. It is an admission: a gap in the classifier costs an approval,
+never data. Somebody teaches the classifier and the annoyance goes away.
+_Avoid_: unknown change, unsupported — the change is supported; it is not yet understood.
 
 **Journal**:
 Drizzle's record of which migrations this database has already run (`drizzle.__drizzle_migrations`).

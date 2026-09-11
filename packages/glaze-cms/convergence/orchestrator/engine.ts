@@ -3,25 +3,26 @@
  * pieces built so far — `drizzle generate` (compute) → the decode + resolution loop → the layer-2
  * apply oracle — behind injected human seams, so it is fully testable before any API/UI exists.
  *
- * Three decision channels, because `generate` is file-only and cannot see data:
- * - **Structural** (rename vs create) come from drizzle's `missing_hints` → the injected `resolve`.
- * - **Silent, count-preserving loss** — a dropped column that still holds data is invisible to the
- *   row-count oracle, so a **layer-1 pre-flight** diffs the snapshots and probes the live DB. A
- *   populated column drop is surfaced to the injected `confirmDrop` (proceed only if confirmed); a
- *   change the DB would itself reject (e.g. `NOT NULL` over existing nulls) is a hard block.
- * - **Table-level loss** (dropping a populated table) is only visible once applied, so the layer-2
- *   apply oracle detects it. A table that **vanished** is surfaced to `confirmLoss` and, once
- *   confirmed, exempted on re-apply. A table that **survived but lost rows** is never confirmable —
- *   it is returned as `unexpected_data_loss` (a truncation / bad-rebuild signal) and never exempted.
+ * Deciding happens **once, before anything runs**, over the whole diff:
+ * - **Structural** decisions (rename vs create) come from drizzle's `missing_hints` → the injected
+ *   `resolve`, because a migration cannot be generated until they are answered.
+ * - The **classifier** then reads the snapshot diff and sorts every operation: additive applies;
+ *   destructive is measured against the live database, and only a measurement that finds something
+ *   (a populated column or table drop) becomes a decision; unclassified — no rule — always does. A
+ *   change the database would itself reject (`NOT NULL` over existing nulls) is a hard block, in
+ *   either mode: there is nothing to say yes to.
+ * - A decision goes to a person: with `audit`, the change is returned as `pending` and recorded for
+ *   the admin screen; without it, the injected `confirmDrop` / `confirmUnclassified` seams ask at the
+ *   terminal.
+ * - The **layer-2 apply oracle** then verifies, never decides: a table that vanished without having
+ *   been decided on goes to `confirmLoss`; a table that **survived but lost rows** is never
+ *   confirmable — it is `unexpected_data_loss` (a truncation / bad-rebuild signal).
  *
  * The snapshot only advances when the migration actually commits: `generate` writes the migration to
- * `out` up front, so if the apply is declined or fails, that migration is removed — keeping the
- * snapshot in lockstep with the database.
+ * `out` up front, so if the apply is declined, pending or failed, that migration is removed —
+ * keeping the snapshot in lockstep with the database.
  *
- * See `specs/design/convergence.md`. With `audit`, it probes the live database, fingerprints the
- * change, and returns `pending` **after rolling the migration back**, so it never leaves the
- * snapshot ahead of the database. The caller records that as a pending approval; approving it is
- * what applies the change (`specs/design/pending-approvals.md`).
+ * See `specs/design/convergence.md` and `specs/design/pending-approvals.md`.
  */
 
 import { readdirSync, readFileSync, rmSync } from 'node:fs';
@@ -35,9 +36,14 @@ import { resolveWithDecisions } from './resolution.ts';
 
 import type { DatabaseHandle, Dialect } from '../../dialect/index.ts';
 import type { ApplyResult, TableRename, UnexpectedRowLoss } from '../apply/index.ts';
+import type {
+	ColumnRename,
+	Operation,
+	Renames,
+	TableRename as ClassifierTableRename,
+} from '../classifier/index.ts';
 import type { ConvergenceErrorCode, SchemaDecision } from '../envelope/index.ts';
 import type { DataLossFinding } from '../safety/index.ts';
-import type { ColumnRename } from './preflight.ts';
 import type { ResolvedOutcome, Resolver } from './types.ts';
 
 /** An apply failure that is not the confirmable data-loss case. */
@@ -50,10 +56,19 @@ type ApplyFailure = Exclude<
 export type LossResolver = (loss: UnexpectedRowLoss) => boolean | Promise<boolean>;
 
 /**
- * Confirms (`true`) or declines (`false`) a destructive-but-valid change layer-1 pre-flight flagged
- * — currently a populated column drop. The finding carries the table, column, and affected row count.
+ * Confirms (`true`) or declines (`false`) a destructive-but-valid change the measurement flagged — a
+ * populated column or table drop. The finding carries the target and the affected row count.
  */
 export type DropConfirmer = (finding: DataLossFinding) => boolean | Promise<boolean>;
+
+/**
+ * Confirms (`true`) or declines (`false`) an operation the classifier has no rule for. Glaze cannot
+ * say whether it destroys data; the person can, so they are also shown the SQL it is part of.
+ */
+export type UnclassifiedConfirmer = (
+	operation: Operation,
+	statements: readonly string[],
+) => boolean | Promise<boolean>;
 
 /** Options for {@link converge}. */
 export interface ConvergeOptions {
@@ -72,13 +87,19 @@ export interface ConvergeOptions {
 	readonly out: string;
 	/** Resolves structural decisions (rename vs create). */
 	readonly resolve: Resolver;
-	/** Confirms intended data loss (a populated table drop). Absent ⇒ any data loss is declined. */
-	readonly confirmLoss?: LossResolver;
-	/** Confirms a destructive-but-valid layer-1 change (a populated column drop). Absent ⇒ declined (blocked). */
-	readonly confirmDrop?: DropConfirmer;
 	/**
-	 * Hold the change for a person instead of applying it: returns `pending` with the SQL for review.
-	 * @default false — apply when safe.
+	 * Confirms a table loss the apply oracle found that nobody decided on beforehand. Absent ⇒ declined.
+	 * A populated table drop the classifier saw coming goes to `confirmDrop` instead.
+	 */
+	readonly confirmLoss?: LossResolver;
+	/** Confirms a measured, destructive-but-valid change (a populated column or table drop). Absent ⇒ declined. */
+	readonly confirmDrop?: DropConfirmer;
+	/** Confirms an operation the classifier cannot sort. Absent ⇒ declined. */
+	readonly confirmUnclassified?: UnclassifiedConfirmer;
+	/**
+	 * Where a change that needs a person is answered: `true` returns it as `pending` for the admin
+	 * screen, `false` asks the terminal seams. An additive change applies either way.
+	 * @default false
 	 */
 	readonly audit?: boolean;
 }
@@ -91,13 +112,17 @@ export type ConvergeResult =
 	| { readonly status: 'data_loss_declined'; readonly losses: readonly UnexpectedRowLoss[] }
 	| { readonly status: 'unexpected_data_loss'; readonly losses: readonly UnexpectedRowLoss[] }
 	| { readonly status: 'unsafe_change'; readonly findings: readonly DataLossFinding[] }
+	| { readonly status: 'drop_declined'; readonly findings: readonly DataLossFinding[] }
+	| { readonly status: 'unclassified_change'; readonly operations: readonly Operation[] }
 	| {
 			readonly status: 'pending';
 			readonly statements: readonly string[];
 			/** Fingerprint of this change; the dedupe key at boot and the guard at approval. */
 			readonly changeHash: string;
-			/** What layer-1 found in the live database — the row counts a person is shown. */
+			/** What the measurement found in the live database — the row counts a person is shown. */
 			readonly findings: readonly DataLossFinding[];
+			/** The operations Glaze has no rule for — pending because they are unknown, not destructive. */
+			readonly unclassified: readonly Operation[];
 	  }
 	| { readonly status: 'error'; readonly code: ConvergenceErrorCode; readonly detail?: string };
 
@@ -115,7 +140,17 @@ interface CapturedRename {
  * @returns What happened — applied, nothing to do, a rejected/declined decision, pending, or an error.
  */
 export async function converge(options: ConvergeOptions): Promise<ConvergeResult> {
-	const { db, dialect, schema, out, resolve, confirmLoss, confirmDrop, audit = false } = options;
+	const {
+		db,
+		dialect,
+		schema,
+		out,
+		resolve,
+		confirmLoss,
+		confirmDrop,
+		confirmUnclassified,
+		audit = false,
+	} = options;
 
 	const renames: CapturedRename[] = [];
 	const recordingResolve: Resolver = async (decision) => {
@@ -157,52 +192,22 @@ export async function converge(options: ConvergeOptions): Promise<ConvergeResult
 	// applied), so sweep it and return a typed error rather than an uncaught rejection.
 	try {
 		const statements = readMigrationStatements(migrationDir);
-
-		if (audit) {
-			// Layer-1 runs BEFORE the rollback: its findings are live row counts read from the database,
-			// and once the migration dir is gone there is no snapshot to diff against. They are what the
-			// approver is shown ("1,204 rows hold data"), so a request without them is a request nobody
-			// can make an informed decision about.
-			const preflight = await runPreflight(
-				(sql) => db.raw(sql),
-				dialect,
-				migrationDir,
-				out,
-				deriveRenamedColumns(renames),
-			);
-			if (preflight.status === 'error') {
-				rmSync(migrationDir, { recursive: true, force: true });
-				return { status: 'error', code: 'internal', detail: preflight.detail };
-			}
-			// `audit` decides WHO says yes, never WHETHER the safety rule applies. A blocking finding is
-			// one the database itself would reject, so it must fail boot here exactly as it does on the
-			// unaudited path — filing it as a pending approval would put an approve button on a change
-			// that can never succeed, and turn a clean refusal into a mid-migration failure later.
-			const findings = preflight.status === 'unsafe' ? preflight.findings : [];
-			if (findings.some((finding) => !isConfirmable(finding))) {
-				rmSync(migrationDir, { recursive: true, force: true });
-				return { status: 'unsafe_change', findings };
-			}
-
-			const changeHash = computeChangeHash(statements, readParentSnapshotId(migrationDir));
-
-			// An audit must not leave the snapshot ahead of the database: roll the migration back and
-			// return the change for review only. Approval regenerates it and verifies this hash.
-			rmSync(migrationDir, { recursive: true, force: true });
-			return { status: 'pending', statements, changeHash, findings };
-		}
-
-		const result = await guardAndApply({
+		const result = await decideAndApply({
 			db,
 			dialect,
 			statements,
-			renamedTables: deriveRenamedTables(renames),
-			renamedColumns: deriveRenamedColumns(renames),
+			renames: {
+				tables: deriveRenamedTables(renames),
+				columns: deriveRenamedColumns(renames),
+			},
 			migrationDir,
 			out,
+			audit,
 			confirmLoss,
 			confirmDrop,
+			confirmUnclassified,
 		});
+		// Only a commit advances the snapshot. Pending included: the approval regenerates the change.
 		if (result.status !== 'applied') rmSync(migrationDir, { recursive: true, force: true });
 		return result;
 	} catch (error) {
@@ -215,91 +220,148 @@ export async function converge(options: ConvergeOptions): Promise<ConvergeResult
 	}
 }
 
-/** Everything {@link guardAndApply} needs to pre-flight and apply one freshly-generated migration. */
-interface GuardAndApplyArgs {
+/** Everything {@link decideAndApply} needs to classify, measure and apply one freshly-generated migration. */
+interface DecideAndApplyArgs {
 	readonly db: DatabaseHandle;
 	readonly dialect: Dialect;
 	readonly statements: readonly string[];
-	readonly renamedTables: readonly TableRename[];
-	readonly renamedColumns: readonly ColumnRename[];
+	readonly renames: Renames;
 	readonly migrationDir: string;
 	readonly out: string;
+	readonly audit: boolean;
 	readonly confirmLoss: LossResolver | undefined;
 	readonly confirmDrop: DropConfirmer | undefined;
+	readonly confirmUnclassified: UnclassifiedConfirmer | undefined;
 }
 
 /**
- * Runs layer-1 pre-flight, then the layer-2 apply oracle. Pre-flight catches the count-preserving loss
- * the oracle cannot see (a populated column drop): a blocking finding (the DB would reject the change)
- * stops here as `unsafe_change`; a confirmable finding (a valid but destructive drop) proceeds only
- * once every one is confirmed. This does not roll the snapshot back — the caller does on non-`applied`.
+ * The one decision path, audited or not. Classify and measure; block what the database would refuse;
+ * apply what needs nobody; hand what needs a person to the screen (`pending`) or the terminal seams.
+ * The caller rolls the snapshot back on anything but `applied`.
  *
- * @param args - The database, dialect, migration, output dir, and injected confirm seams.
+ * @param args - The database, dialect, migration, renames, mode and the injected seams.
  * @returns The converge result.
  */
-async function guardAndApply(args: GuardAndApplyArgs): Promise<ConvergeResult> {
-	const {
-		db,
-		dialect,
-		statements,
-		renamedTables,
-		renamedColumns,
-		migrationDir,
-		out,
-		confirmLoss,
-		confirmDrop,
-	} = args;
+async function decideAndApply(args: DecideAndApplyArgs): Promise<ConvergeResult> {
+	const { db, dialect, statements, renames, migrationDir, out, audit } = args;
 
-	const preflight = await runPreflight(
-		(sql) => db.raw(sql),
-		dialect,
-		migrationDir,
-		out,
-		renamedColumns,
-	);
+	const preflight = await runPreflight((sql) => db.raw(sql), dialect, migrationDir, out, renames);
 	if (preflight.status === 'error') {
 		return { status: 'error', code: 'internal', detail: preflight.detail };
 	}
-	if (
-		preflight.status === 'unsafe' &&
-		!(await allDropsConfirmed(preflight.findings, confirmDrop))
-	) {
-		return { status: 'unsafe_change', findings: preflight.findings };
+	const { findings, classification } = preflight;
+	const { unclassified } = classification;
+
+	// A blocking finding is one the database itself would reject. `audit` decides WHO says yes, never
+	// WHETHER the rule applies: filing it as a pending approval would put an approve button on a change
+	// that can never succeed, and turn a clean refusal into a mid-migration failure later.
+	if (findings.some((finding) => !isConfirmable(finding))) {
+		return { status: 'unsafe_change', findings };
 	}
 
-	return applyWithLossConfirmation(db, dialect, statements, renamedTables, confirmLoss);
+	const needsPerson = findings.length > 0 || unclassified.length > 0;
+	if (needsPerson && audit) {
+		// The measurements are live row counts, read before the rollback: they are what the approver
+		// is shown, and once the migration dir is gone there is no snapshot to diff against.
+		const changeHash = computeChangeHash(statements, readParentSnapshotId(migrationDir));
+		return { status: 'pending', statements, changeHash, findings, unclassified };
+	}
+	if (needsPerson) {
+		if (!(await allDropsConfirmed(findings, args.confirmDrop))) {
+			return { status: 'drop_declined', findings };
+		}
+		if (!(await allUnclassifiedConfirmed(unclassified, statements, args.confirmUnclassified))) {
+			return { status: 'unclassified_change', operations: unclassified };
+		}
+	}
+
+	// The apply oracle counts `public` only and knows tables by bare name, so it is told only about
+	// what it can see: a rename or a decided drop in another schema would otherwise read as a
+	// same-named public table vanishing.
+	const decidedDrops = findings
+		.map((finding) => finding.change)
+		.filter((change) => change.kind === 'drop_table' && isVisibleToOracle(change.schema))
+		.map((change) => change.table);
+	const visibleRenames = renames.tables
+		.filter((rename) => isVisibleToOracle(rename.schema))
+		.map(({ from, to }) => ({ from, to }));
+	return applyWithLossConfirmation(
+		db,
+		dialect,
+		statements,
+		visibleRenames,
+		args.confirmLoss,
+		decidedDrops,
+	);
 }
 
 /**
- * Whether a pre-flight finding is one a person may agree to. Only a populated column drop is: it is
- * valid SQL that destroys data, so it is a decision. Every other code describes a change the
- * database would refuse outright, which is not a decision anybody can take.
+ * Whether the apply oracle can see a table: it counts `public` only (SQLite has no schemas).
  *
- * @param finding - A layer-1 pre-flight finding.
+ * @param schema - The table's schema, or `undefined` on SQLite.
+ * @returns `true` when the oracle counts that table.
+ */
+function isVisibleToOracle(schema: string | undefined): boolean {
+	return schema === undefined || schema === 'public';
+}
+
+/** The findings a person may agree to: valid SQL that destroys data, so a decision. */
+const CONFIRMABLE_CODES: ReadonlySet<DataLossFinding['code']> = new Set([
+	'column_has_data',
+	'table_has_rows',
+	// drizzle narrows with `USING "c"::varchar(n)`, and Postgres truncates under an explicit cast
+	// rather than refusing — so this destroys data silently, like a drop.
+	'column_length_overflow',
+]);
+
+/**
+ * Whether a finding is one a person may agree to. A populated column or table drop, or a narrowing
+ * over longer values, is: valid SQL that destroys data, so it is a decision. Every other code
+ * describes a change the database would refuse outright, which is not a decision anybody can take.
+ *
+ * @param finding - A measurement finding.
  * @returns `true` when the finding can be confirmed rather than blocked.
  */
 function isConfirmable(finding: DataLossFinding): boolean {
-	return finding.code === 'column_has_data';
+	return CONFIRMABLE_CODES.has(finding.code);
 }
 
 /**
- * Decides whether pre-flight findings clear the way to apply. Only a `column_has_data` finding (a
- * valid-but-destructive column drop) is confirmable; every other code is a hard block the DB would
- * reject, so a single one fails the whole batch. Each confirmable finding must be individually
- * confirmed; an absent confirmer declines.
+ * Asks the terminal seam about each confirmable finding. Each must be individually confirmed; an
+ * absent confirmer declines.
  *
- * @param findings - The layer-1 pre-flight findings.
+ * @param findings - The measurement findings, all confirmable.
  * @param confirmDrop - The injected drop confirmer; absent ⇒ decline.
- * @returns `true` only when every finding is a confirmed column drop.
+ * @returns `true` only when every finding is confirmed.
  */
 async function allDropsConfirmed(
 	findings: readonly DataLossFinding[],
 	confirmDrop: DropConfirmer | undefined,
 ): Promise<boolean> {
 	for (const finding of findings) {
-		if (!isConfirmable(finding)) return false;
 		// oxlint-disable-next-line no-await-in-loop
 		const confirmed = confirmDrop ? await confirmDrop(finding) : false;
+		if (!confirmed) return false;
+	}
+	return true;
+}
+
+/**
+ * Asks the terminal seam about each unclassified operation. An absent confirmer declines.
+ *
+ * @param operations - The operations the classifier has no rule for.
+ * @param statements - The migration's SQL, shown alongside.
+ * @param confirm - The injected confirmer; absent ⇒ decline.
+ * @returns `true` only when every operation is confirmed.
+ */
+async function allUnclassifiedConfirmed(
+	operations: readonly Operation[],
+	statements: readonly string[],
+	confirm: UnclassifiedConfirmer | undefined,
+): Promise<boolean> {
+	for (const operation of operations) {
+		// oxlint-disable-next-line no-await-in-loop
+		const confirmed = confirm ? await confirm(operation, statements) : false;
 		if (!confirmed) return false;
 	}
 	return true;
@@ -340,6 +402,7 @@ function fromNonOk(outcome: Exclude<ResolvedOutcome, { status: 'ok' }>): Converg
  * @param statements - The migration statements.
  * @param renamedTables - Tables renamed by this migration (from resolved rename decisions).
  * @param confirmLoss - Confirms intended data loss; absent ⇒ decline.
+ * @param decidedDrops - Tables whose drop a person already decided on; the oracle verifies, not asks.
  * @returns The converge result.
  */
 async function applyWithLossConfirmation(
@@ -348,8 +411,9 @@ async function applyWithLossConfirmation(
 	statements: readonly string[],
 	renamedTables: readonly TableRename[],
 	confirmLoss: LossResolver | undefined,
+	decidedDrops: readonly string[],
 ): Promise<ConvergeResult> {
-	const droppedTables: string[] = [];
+	const droppedTables: string[] = [...decidedDrops];
 
 	// Bounded by the number of tables that could be dropped (at least one confirmed per round).
 	for (let round = 0; round <= statements.length; round++) {
@@ -412,18 +476,35 @@ function fromApplyFailure(failure: ApplyFailure): ConvergeResult {
 }
 
 /**
- * Derives the table renames the oracle needs from the resolved rename decisions. Only table renames
- * matter — a column rename does not change any table's row count.
+ * Derives the table renames from the resolved rename decisions, with the schema each lives in, so a
+ * rename in one Postgres schema cannot be mistaken for a same-named table in another. The apply
+ * oracle takes the same pairs without the schema.
  *
  * @param renames - The captured rename resolutions.
- * @returns The table renames (`from` → `to`).
+ * @returns The table renames (`from` → `to`), with their schema when the tuple carries one.
  */
-function deriveRenamedTables(renames: readonly CapturedRename[]): TableRename[] {
+function deriveRenamedTables(renames: readonly CapturedRename[]): ClassifierTableRename[] {
 	return renames
 		.filter(
 			({ decision }) => decision.type === 'rename_or_create' && decision.targetKind === 'table',
 		)
-		.map(({ decision, from }) => ({ from: tableName(from), to: tableName(decision.target) }));
+		.map(({ decision, from }) => ({
+			...schemaSlot(decision.target, 2),
+			from: tableName(from),
+			to: tableName(decision.target),
+		}));
+}
+
+/**
+ * The schema slot of a target tuple, when the tuple is long enough to carry one.
+ *
+ * @param tuple - The target tuple (`[schema, table]` or `[schema, table, column]`).
+ * @param length - The tuple length that carries a schema for this kind.
+ * @returns `{ schema }`, or nothing.
+ */
+function schemaSlot(tuple: readonly string[], length: number): { schema?: string } {
+	const schema = tuple.length >= length ? tuple[0] : undefined;
+	return schema ? { schema } : {};
 }
 
 /**
@@ -450,6 +531,7 @@ function deriveRenamedColumns(renames: readonly CapturedRename[]): ColumnRename[
 			({ decision }) => decision.type === 'rename_or_create' && decision.targetKind === 'column',
 		)
 		.map(({ decision, from }) => ({
+			...schemaSlot(decision.target, 3),
 			table: tableSlot(decision.target),
 			from: tableName(from),
 			to: tableName(decision.target),
