@@ -29,9 +29,10 @@ interface SnapshotIdentity {
  * Reads the id of the snapshot a freshly-generated migration builds on — what the database is
  * expected to look like before this change applies.
  *
- * Returns `''` for the first migration in a chain (nothing precedes it), which is a real state
- * rather than a failure. It also returns `''` when the snapshot cannot be read or does not carry a
- * parent, so the hash then rests on the statements alone: weaker, never wrong.
+ * A first migration names drizzle's zero-UUID baseline as its parent, and that is returned as
+ * written: the chain reader keeps the same value, so the two agree on what a first migration hashes
+ * to. `''` is returned only when the snapshot cannot be read or does not carry a parent, so the hash
+ * then rests on the statements alone: weaker, never wrong.
  *
  * @param migrationDir - The freshly-generated migration directory.
  * @returns The parent snapshot id, or `''` when there is none.
@@ -61,6 +62,23 @@ export function readParentSnapshotId(migrationDir: string): string {
  * @returns The hash, as lowercase hex.
  */
 export function computeChangeHash(statements: readonly string[], parentSnapshotId: string): string {
-	const parts = [...statements, parentSnapshotId];
+	const parts = [...statements.map(normalizeStatement), parentSnapshotId];
 	return createHash('sha256').update(parts.join(PART_SEPARATOR)).digest('hex');
+}
+
+/**
+ * The form of a statement that is hashed: line endings normalised, comment-only lines dropped, so a
+ * migration file checked out with CRLF or annotated by a reviewer still fingerprints as the change it
+ * carries. Only the fingerprint sees this; what runs is the file as written.
+ *
+ * @param statement - One statement, as read from `migration.sql`.
+ * @returns The statement as hashed.
+ */
+function normalizeStatement(statement: string): string {
+	return statement
+		.replaceAll('\r\n', '\n')
+		.split('\n')
+		.filter((line) => !line.trimStart().startsWith('--'))
+		.join('\n')
+		.trim();
 }

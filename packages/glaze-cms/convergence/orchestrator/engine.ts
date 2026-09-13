@@ -25,10 +25,11 @@
  * See `specs/design/convergence.md` and `specs/design/pending-approvals.md`.
  */
 
-import { readdirSync, readFileSync, rmSync } from 'node:fs';
+import { readdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { applyMigration } from '../apply/index.ts';
+import { readMigrationStatements } from './chain.ts';
 import { createGenerateCompute } from './generate.ts';
 import { computeChangeHash, readParentSnapshotId } from './hash.ts';
 import { runPreflight } from './preflight.ts';
@@ -106,7 +107,12 @@ export interface ConvergeOptions {
 
 /** The outcome of {@link converge}. */
 export type ConvergeResult =
-	| { readonly status: 'applied'; readonly statements: readonly string[] }
+	| {
+			readonly status: 'applied';
+			readonly statements: readonly string[];
+			/** Fingerprint of what applied, so boot can match it against a request on file. */
+			readonly changeHash: string;
+	  }
 	| { readonly status: 'no_changes' }
 	| { readonly status: 'rejected'; readonly decision: SchemaDecision }
 	| { readonly status: 'data_loss_declined'; readonly losses: readonly UnexpectedRowLoss[] }
@@ -119,6 +125,8 @@ export type ConvergeResult =
 			readonly statements: readonly string[];
 			/** Fingerprint of this change; the dedupe key at boot and the guard at approval. */
 			readonly changeHash: string;
+			/** The snapshot the change was measured against; where reconciliation starts reading from. */
+			readonly parentSnapshotId: string;
 			/** What the measurement found in the live database — the row counts a person is shown. */
 			readonly findings: readonly DataLossFinding[];
 			/** The operations Glaze has no rule for — pending because they are unknown, not destructive. */
@@ -189,7 +197,10 @@ export async function converge(options: ConvergeOptions): Promise<ConvergeResult
 
 	// Everything past here can throw — a filesystem error, or an injected confirmer that rejects. A
 	// throw must not leave the migration dir behind (that would advance the snapshot with nothing
-	// applied), so sweep it and return a typed error rather than an uncaught rejection.
+	// applied), so sweep it and return a typed error rather than an uncaught rejection. Ctrl+C at the
+	// confirmation prompt arrives as the prompt closing, which declines and lands here too. A process
+	// killed outright can still leave the directory; boot reconciliation checks the live database
+	// before believing one.
 	try {
 		const statements = readMigrationStatements(migrationDir);
 		const result = await decideAndApply({
@@ -259,12 +270,16 @@ async function decideAndApply(args: DecideAndApplyArgs): Promise<ConvergeResult>
 		return { status: 'unsafe_change', findings };
 	}
 
+	// The fingerprint names the change and the snapshot it was measured against; boot reconciles a
+	// request it filed by looking for exactly this pair in the chain later.
+	const parentSnapshotId = readParentSnapshotId(migrationDir);
+	const changeHash = computeChangeHash(statements, parentSnapshotId);
+
 	const needsPerson = findings.length > 0 || unclassified.length > 0;
 	if (needsPerson && audit) {
 		// The measurements are live row counts, read before the rollback: they are what the approver
 		// is shown, and once the migration dir is gone there is no snapshot to diff against.
-		const changeHash = computeChangeHash(statements, readParentSnapshotId(migrationDir));
-		return { status: 'pending', statements, changeHash, findings, unclassified };
+		return { status: 'pending', statements, changeHash, parentSnapshotId, findings, unclassified };
 	}
 	if (needsPerson) {
 		if (!(await allDropsConfirmed(findings, args.confirmDrop))) {
@@ -285,7 +300,7 @@ async function decideAndApply(args: DecideAndApplyArgs): Promise<ConvergeResult>
 	const visibleRenames = renames.tables
 		.filter((rename) => isVisibleToOracle(rename.schema))
 		.map(({ from, to }) => ({ from, to }));
-	return applyWithLossConfirmation(
+	const applied = await applyWithLossConfirmation(
 		db,
 		dialect,
 		statements,
@@ -293,6 +308,7 @@ async function decideAndApply(args: DecideAndApplyArgs): Promise<ConvergeResult>
 		args.confirmLoss,
 		decidedDrops,
 	);
+	return applied.status === 'applied' ? { ...applied, changeHash } : applied;
 }
 
 /**
@@ -420,7 +436,7 @@ async function applyWithLossConfirmation(
 		// oxlint-disable-next-line no-await-in-loop
 		const result = await applyMigration(db, { statements, dialect, droppedTables, renamedTables });
 
-		if (result.success) return { status: 'applied', statements };
+		if (result.success) return { status: 'applied', statements, changeHash: '' };
 		if (result.reason !== 'unexpected_data_loss') return fromApplyFailure(result);
 
 		// A surviving table that lost rows is never a confirmable drop — it signals a truncation or a
@@ -591,17 +607,4 @@ function sweepNewMigrations(out: string, prior: readonly string[]): void {
 	for (const dir of newMigrationDirs(out, prior)) {
 		rmSync(dir, { recursive: true, force: true });
 	}
-}
-
-/**
- * Reads a migration's statements, split on drizzle's `--> statement-breakpoint` markers.
- *
- * @param migrationDir - The migration directory.
- * @returns The statements, in order.
- */
-function readMigrationStatements(migrationDir: string): string[] {
-	return readFileSync(join(migrationDir, 'migration.sql'), 'utf8')
-		.split('--> statement-breakpoint')
-		.map((statement) => statement.trim())
-		.filter((statement) => statement.length > 0);
 }

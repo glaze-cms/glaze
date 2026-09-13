@@ -143,19 +143,19 @@ export async function recordEvent(
 }
 
 /**
- * Finds the request still waiting on a person, if there is one.
+ * Finds every request still waiting on a person, newest first.
  *
  * A request is open when its **latest** event is `requested`, so the query asks for exactly that: a
  * `requested` event with nothing after it on the same request. Checking only the newest `requested`
  * event in the table would be shorter and wrong — it assumes one request at a time. That holds for
- * the `dev` origin today, and stops holding the moment the `ui` origin can file its own, at which
- * point an older request would silently become invisible rather than merely unsupported.
+ * the `dev` origin most of the time, and stops holding the moment a request cannot be reconciled and
+ * a new one is filed beside it, or the `ui` origin files its own.
  *
  * @param db - The query builder.
  * @param table - The `approval_events` table.
- * @returns The open request, or `null` when nothing is pending.
+ * @returns The open requests, newest first; empty when nothing is pending.
  */
-export async function findOpenRequest(db: ApprovalDb, table: Table): Promise<OpenRequest | null> {
+export async function findOpenRequests(db: ApprovalDb, table: Table): Promise<OpenRequest[]> {
 	const columns = table as unknown as Record<string, Column>;
 	const id = columns['id'] as Column;
 	const requestId = columns['requestId'] as Column;
@@ -166,18 +166,25 @@ export async function findOpenRequest(db: ApprovalDb, table: Table): Promise<Ope
 		.where(
 			sql`${eq(columns['type'] as Column, 'requested')} and not exists (select 1 from ${table} as later where later."request_id" = ${requestId} and later."id" > ${id})`,
 		)
-		.orderBy(desc(id))
-		.limit(1)) as unknown as EventRow[];
+		.orderBy(desc(id))) as unknown as EventRow[];
 
-	const open = rows[0];
-	if (!open) return null;
-
-	return {
+	return rows.map((open) => ({
 		requestId: open.requestId,
 		changeHash: open.changeHash ?? '',
 		createdAt: toDate(open.createdAt),
 		payload: open.payload,
-	};
+	}));
+}
+
+/**
+ * Finds the newest request still waiting on a person, if there is one.
+ *
+ * @param db - The query builder.
+ * @param table - The `approval_events` table.
+ * @returns The open request, or `null` when nothing is pending.
+ */
+export async function findOpenRequest(db: ApprovalDb, table: Table): Promise<OpenRequest | null> {
+	return (await findOpenRequests(db, table))[0] ?? null;
 }
 
 /** The role values this store recognises when reading a row back. Anything else is treated as `user`. */

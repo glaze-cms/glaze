@@ -83,7 +83,10 @@ _Avoid_: unknown change, unsupported — the change is supported; it is not yet 
 
 **Journal**:
 Drizzle's record of which migrations this database has already run (`drizzle.__drizzle_migrations`).
-It is what makes a committed, unapplied migration an ordinary state rather than drift.
+It is what makes a committed, unapplied migration an ordinary state rather than drift. Until Glaze
+writes it, the snapshot chain in the migration directory is the nearest thing — evidence that a
+change was generated and committed somewhere, which boot confirms against the live database before
+believing, and refuses to believe when a rename on the way could have moved the data instead.
 
 **Origin** (`dev` / `ui`):
 Where a change came from: a developer's schema file, or a click in the admin.

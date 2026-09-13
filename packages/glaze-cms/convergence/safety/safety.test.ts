@@ -237,6 +237,22 @@ matrixTest(
 	},
 );
 
+// SQLite reads an unknown double-quoted name as a string literal, so a probe of a missing column
+// would count the word and report data. Both dialects must answer "could not verify" instead.
+matrixTest('a probe of a column that does not exist cannot verify', async ({ db, dialect }) => {
+	const query = queryOf(db);
+	await db.raw('create table t_gone (id integer primary key)');
+	await db.raw('insert into t_gone (id) values (1), (2)');
+
+	const findings = await detectDataLoss(query, dialect, [
+		{ kind: 'drop_column', table: 't_gone', column: 'body' },
+		{ kind: 'set_not_null', table: 't_gone', column: 'body' },
+	]);
+
+	expect(findings.map((finding) => finding.code)).toEqual(['could_not_verify', 'could_not_verify']);
+	expect(findings.every((finding) => finding.detail?.includes('body'))).toBe(true);
+});
+
 matrixTest(
 	'drop_table flags a populated table and permits an empty one',
 	async ({ db, dialect }) => {

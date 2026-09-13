@@ -1,6 +1,14 @@
 export { applyMigration, captureRowCounts, findUnexpectedLosses } from './apply/index.ts';
 export { classifyChange, describeChange, describeOperation } from './classifier/index.ts';
-export { computeChangeHash, readParentSnapshotId } from './orchestrator/index.ts';
+export {
+	computeChangeHash,
+	findMigrationByHash,
+	linkHash,
+	readMigrationStatements,
+	readParentSnapshotId,
+	readSnapshotChain,
+	statementsSince,
+} from './orchestrator/index.ts';
 export {
 	CONVERGENCE_ERROR_CODES,
 	decodeEnvelope,
@@ -33,6 +41,8 @@ export type {
 } from './envelope/index.ts';
 export type { InteractiveResolver, ResolverIo } from './interactive/index.ts';
 export type {
+	ChainLink,
+	ChainSearch,
 	ConvergeOptions,
 	ConvergeResult,
 	DecisionResolution,
@@ -42,6 +52,7 @@ export type {
 	LossResolver,
 	ResolvedOutcome,
 	Resolver,
+	SnapshotChain,
 	UnclassifiedConfirmer,
 } from './orchestrator/index.ts';
 export type { DataLossCode, DataLossFinding, QueryExecutor, UnsafeChange } from './safety/index.ts';

@@ -3,7 +3,7 @@ import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { expect, matrixTest } from '../../harness/index.ts';
+import { expect, matrixTest, nextSecond } from '../../harness/index.ts';
 import { converge } from './index.ts';
 
 import type { DatabaseHandle, Dialect } from '../../dialect/index.ts';
@@ -121,16 +121,6 @@ function unclassifiedTypeChange(dialect: Dialect): { before: string; after: stri
 				after: `price: numeric('price', { precision: 10, scale: 2 })`,
 			}
 		: { before: `price: text('price')`, after: `price: integer('price')` };
-}
-
-/**
- * Waits for the wall clock to enter a new second. drizzle-kit names migration folders by the second
- * and, given two in the same second, picks the parent by lexical sort of a random suffix — so a test
- * that chains several converges has to keep them in distinct seconds.
- */
-async function nextSecond(): Promise<void> {
-	const now = Date.now();
-	await new Promise((resolve) => setTimeout(resolve, 1000 - (now % 1000) + 5));
 }
 
 /** A seam that must not be reached: reaching it fails the test loudly. */

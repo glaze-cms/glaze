@@ -1,3 +1,4 @@
+export { nextSecond } from './clock.ts';
 export { matrixTest } from './matrix.ts';
 export { isDockerAvailable, provisionDatabase } from './provisioner.ts';
 export { DIALECTS } from './targets.ts';

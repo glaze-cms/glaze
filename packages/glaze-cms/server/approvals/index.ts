@@ -7,7 +7,14 @@ export {
 	GLAZE_PG_SCHEMA,
 	GLAZE_SQLITE_PREFIX,
 } from './schema/index.ts';
-export { claimFirstAdmin, findOpenRequest, findRole, hasAdmin, recordEvent } from './store.ts';
+export {
+	claimFirstAdmin,
+	findOpenRequest,
+	findOpenRequests,
+	findRole,
+	hasAdmin,
+	recordEvent,
+} from './store.ts';
 
 export type {
 	ActorKind,

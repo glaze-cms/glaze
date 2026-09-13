@@ -438,6 +438,68 @@ Glaze must therefore work out which happened rather than assume:
   target still present means the schema was reverted, which is the only case `withdrawn` is true for.
 - **Partially applied** — real drift, and dangerous. Fail closed rather than pick a story.
 
+**The chain is evidence; the database is the witness.** Both `migrations.enabled` modes keep the
+migration directories (the no-files cache is still to build), and `converge()` sweeps a directory on
+anything but a commit, so a directory in `out` says a migration was generated and committed. It does
+not say it ran _here_: `out` is committed to the repository, so a directory can come from a
+colleague's database (this section's own rule — an approval belongs to one database — is exactly why
+that matters), or be left behind by a process killed mid-boot. So before the trail says `applied`,
+boot looks in the live database for what the request would change: the column or table it drops,
+the length of a column it narrows. Present means the change is not in effect, whatever the chain
+says. Gone means it is — but only when nothing on the way could have merely _moved_ the data: a
+missing table says nothing about its columns, and a rename anywhere between the request and now
+makes "absent" unreadable, so both are `undetermined` rather than `gone`. A request with an
+operation nothing can look for (unclassified) is never `gone` either.
+
+The witness is read **twice**: before this boot converges, to answer for what others did since the
+request was filed, and after, to answer for what this boot did. Each request records the snapshot
+it was measured against (`parentSnapshotId`) and its findings; boot reads the answer off three facts
+in order (`server/convergence/reconcile.ts`):
+
+1. **What was generated since the request was filed.** Walk the chain from the head it had _before_
+   this boot back to the request's snapshot. The request's hash on the way and its targets gone
+   before this boot → `applied`, naming the migration, `outsideApproval`, `verified`. Hash found but a
+   target still there → **left open**, saying which migration claims the change and that either it
+   never ran here or the column was added back. The chain advanced without the hash — the same drop
+   may still have run inside another migration, against another parent, or from a hand-edited file —
+   so the database decides: targets gone before this boot → `applied`, verified; undetermined → left
+   open; targets present → this boot's result decides (below). The walk never reaches the request's
+   snapshot, the chain has no single head, or the request predates the field → **left open**, logged
+   at error level with the reason.
+2. **What this boot did**, read from the database _after_ it. The same change `pending` again →
+   nothing to record. A different change `pending` → `superseded` by the new request, which is
+   filed. The request's own change `applied` — measured again, there was nothing left to decide — →
+   `applied`, with the reason. Something else applied and the targets are now gone — the drop went
+   along with other changes — → `applied`, with that reason. Something else applied, or nothing to
+   do, and the targets are still there → `withdrawn`: the schema no longer carries the change.
+   Nothing to do and the targets gone anyway → **left open**: somebody removed them with no
+   migration, the database and the snapshot disagree, and neither word is true. A failing boot
+   resolves nothing.
+
+Every open request is reconciled, not only the newest, and a new pending change is filed whatever
+became of the older ones — a request nobody can reconcile must not hide the ones after it. A
+request whose targets cannot be looked for (unclassified only, or a narrowing) is recorded `applied`
+with `verified: false` when its exact hash is in the chain, and left open otherwise.
+
+Ctrl+C at the confirmation prompt arrives as the prompt closing, which declines and sweeps the
+directory like any other refusal. A process killed outright — `SIGTERM`, a timeout — can leave one,
+and that is one of the things the witness is for. What no amount of reading can fix is a directory
+that _did_ come from elsewhere: the snapshot is then ahead of this database and every boot finds
+nothing to do, until baselining (step 8) can re-anchor it. The trail, at least, does not lie about
+it, and the boot log names the directory and says to run its SQL here or remove it.
+
+Writes happen in one transaction that first re-reads which requests are still open, so two instances
+booting together do not both close the same request; a pending change already on file under its hash
+is not filed twice by the same route. There is no uniqueness constraint behind that, only the
+re-read — two instances that both find nothing on file can still each file the same change.
+
+The console case — a column dropped by hand, no migration — does not reach this: the snapshot never
+advanced, the schema still carries the drop, and the measurement finds the column gone. Boot fails
+closed and says the snapshot has to be re-baselined (step 8). On SQLite that took one more guard:
+an unknown double-quoted name is read as a string literal there, so `COUNT("body")` over a table
+with no `body` would count the word once per row and report a populated column. A SQLite probe now
+checks its column exists first.
+
 A developer with a console will always be able to run migrations by hand, and a CMS that fights its
 own developers loses. The answer is to reconcile, and to give that developer a sanctioned path (see
 below) so the trail stays accurate because the tool they reached for knows about it.
@@ -586,11 +648,15 @@ rename, `numeric(10,4) → numeric(10,2)` — are each a test that asserts on th
 before and reverted (`a63653e`), because narrowing to layer-1's findings removed a blanket that was
 covering layer-1's blind spots; the unclassified kind is what replaced the blanket.
 
-**4. Boot reconciliation.** [Reconciling a request that resolved itself](#reconciling-a-request-that-resolved-itself)
-is design of record with nothing behind it: `no_changes` plus an open request records `withdrawn`
-unconditionally — and so, since the classifier landed, does an additive change that applied on its
-own while a request was open — with no journal read, no probe and no partial-apply branch. The case
-it gets wrong is the one that section calls the worst failure an audit trail has.
+**4. Boot reconciliation. — Done.** [Reconciling a request that resolved itself](#reconciling-a-request-that-resolved-itself)
+now reads the snapshot chain as evidence and the live database as the witness — twice, before and
+after this boot — and records `applied`, `superseded` or `withdrawn` from what they agree on, or
+leaves the request open and says why. Four reviews made earlier versions lie: a colleague's committed
+migration, a directory left by a killed process, a drop that went along with an additive change, a
+table renamed with its data kept, this boot's own work credited to somebody else, a hand-dropped
+column with the schema reverted. Each is a test now. What remains is a snapshot that ran ahead of
+this database through a directory from elsewhere: boot then finds nothing to do, and only baselining
+(step 8) can re-anchor it.
 
 **5. `pending: drop` on the descriptor**, so the admin can show a column as on its way out.
 

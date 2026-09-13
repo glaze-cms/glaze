@@ -10,6 +10,7 @@
  * other changes' findings and never coerces the unknown to "safe."
  */
 
+import { quoteIdentifier } from '../sql.ts';
 import {
 	checkColumnHasData,
 	checkTableHasRows,
@@ -21,6 +22,35 @@ import {
 
 import type { Dialect } from '../../dialect/index.ts';
 import type { DataLossFinding, QueryExecutor, UnsafeChange } from './types.ts';
+
+/** The change kinds whose probe names an existing column. */
+const PROBES_AN_EXISTING_COLUMN = new Set([
+	'set_not_null',
+	'add_unique',
+	'narrow_column',
+	'drop_column',
+]);
+
+/**
+ * Makes a SQLite probe fail loudly when its column does not exist. SQLite reads an unknown
+ * double-quoted name as a string literal, so `COUNT("body")` over a table with no `body` column counts
+ * the word once per row and reports a populated column — a measurement of nothing, presented as
+ * something. Postgres refuses the query, which is what the fail-closed path expects.
+ *
+ * @param query - The query executor.
+ * @param change - The change about to be probed.
+ * @throws {Error} When the column is not there, so the caller records `could_not_verify`.
+ */
+async function assertSqliteColumnExists(query: QueryExecutor, change: UnsafeChange): Promise<void> {
+	if (!PROBES_AN_EXISTING_COLUMN.has(change.kind) || !('column' in change)) return;
+	// `table_xinfo` lists generated columns too, which `table_info` leaves out.
+	const columns = await query(`PRAGMA table_xinfo(${quoteIdentifier(change.table)})`);
+	if (columns.length === 0) throw new Error(`table "${change.table}" does not exist`);
+	const wanted = change.column.toLowerCase();
+	if (!columns.some((row) => String(row['name']).toLowerCase() === wanted)) {
+		throw new Error(`column "${change.column}" does not exist on "${change.table}"`);
+	}
+}
 
 /**
  * Runs the probe matching a single change, resolving to a finding, or `null` when safe or not
@@ -38,6 +68,7 @@ async function detectChange(
 	change: UnsafeChange,
 ): Promise<DataLossFinding | null> {
 	try {
+		if (dialect === 'sqlite') await assertSqliteColumnExists(query, change);
 		switch (change.kind) {
 			case 'set_not_null':
 				return await checkNotNullOnExistingNulls(query, change);

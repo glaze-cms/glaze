@@ -13,22 +13,39 @@ import {
 	createInteractiveResolver,
 	describeChange,
 	describeOperation,
+	readSnapshotChain,
+	statementsSince,
 } from '#convergence';
 
 import {
 	buildApprovalSchema,
 	createTrailId,
-	findOpenRequest,
+	findOpenRequests,
 	recordEvent,
 } from '../approvals/index.ts';
+import { checkTargets, reconcileOpenRequest } from './reconcile.ts';
 
-import type { ConvergeResult, InteractiveResolver, UnsafeChange } from '#convergence';
+import type {
+	ConvergeResult,
+	InteractiveResolver,
+	SnapshotChain,
+	UnsafeChange,
+} from '#convergence';
 import type { Logger } from '#logger';
 import type { GlazeContext } from '../app/context.ts';
-import type { ApprovalDb } from '../approvals/index.ts';
+import type { ApprovalDb, OpenRequest } from '../approvals/index.ts';
+import type { TargetState, WitnessContext } from './reconcile.ts';
 import type { Table } from 'drizzle-orm';
 
-/** Guidance appended to every blocked-boot error — how the developer unblocks it. */
+/** The results a person at a terminal could have answered differently. */
+const DECIDABLE_AT_TERMINAL: ReadonlySet<ConvergeResult['status']> = new Set([
+	'rejected',
+	'data_loss_declined',
+	'drop_declined',
+	'unclassified_change',
+]);
+
+/** Guidance appended to a blocked-boot error that a person could have decided — how to unblock it. */
 const REMEDIATION =
 	'Run Glaze in an interactive terminal to resolve it, or reconcile the schema change manually.';
 
@@ -54,7 +71,9 @@ function blockedReason(
 	if (result.status === 'unsafe_change') {
 		const unmeasured = result.findings.every((finding) => finding.code === 'could_not_verify');
 		return unmeasured
-			? `a change could not be measured against the database (${listChanges(result.findings)})`
+			? `a change could not be measured against the database (${listChanges(result.findings)}); ` +
+					'if it was already applied by hand, put the column or table back so the database matches ' +
+					'the snapshot again — Glaze cannot yet move the snapshot to meet the database'
 			: `a change is unsafe against existing data (${listChanges(result.findings)})`;
 	}
 	if (result.status === 'drop_declined') {
@@ -109,9 +128,10 @@ function listChanges(
  *
  * @param logger - The structured logger.
  * @param result - The convergence result.
+ * @param alreadyOnFile - Whether a pending change was already on file before this boot.
  * @throws {Error} When convergence was blocked (declined, unsafe, or errored).
  */
-function reportConvergence(logger: Logger, result: ConvergeResult): void {
+function reportConvergence(logger: Logger, result: ConvergeResult, alreadyOnFile: boolean): void {
 	switch (result.status) {
 		case 'no_changes':
 			return;
@@ -127,15 +147,17 @@ function reportConvergence(logger: Logger, result: ConvergeResult): void {
 				...result.unclassified.map((operation) => `${describeOperation(operation)} (unclassified)`),
 			];
 			logger.warn(
-				`Glaze filed a pending schema change (${why.join('; ')}); the database does not yet ` +
-					'match the schema. Approve it in the admin to apply it.',
+				`${alreadyOnFile ? 'A schema change is still pending' : 'Glaze filed a pending schema change'} ` +
+					`(${why.join('; ')}); the database does not yet match the schema until a person decides it.`,
 			);
 			return;
 		}
 		default: {
 			const reason = blockedReason(result);
 			logger.error(`Glaze could not converge the schema: ${reason}`);
-			throw new Error(`Convergence blocked: ${reason}. ${REMEDIATION}`);
+			// Only a decision somebody declined can be taken at a terminal; a refusal or an error cannot.
+			const decidable = DECIDABLE_AT_TERMINAL.has(result.status);
+			throw new Error(`Convergence blocked: ${reason}.${decidable ? ` ${REMEDIATION}` : ''}`);
 		}
 	}
 }
@@ -144,80 +166,174 @@ function reportConvergence(logger: Logger, result: ConvergeResult): void {
  * Records what boot found, against the pending-approvals trail. Runs only when the project audits;
  * without it, `converge` never returns `pending` and there is nothing to file.
  *
- * Four cases, and the hash decides between them:
+ * A request already on file is reconciled from facts, never assumed (`./reconcile.ts`): the snapshot
+ * chain as it stood before this boot says what was generated since the request was filed, the live
+ * database says whether what the request would drop is still there, and this boot's result says what
+ * happened just now. `applied` when the change is in effect — done elsewhere, or here because nothing
+ * was left to decide; `superseded` when a new request replaces it; `withdrawn` when the schema no
+ * longer carries it. When the facts cannot say, the request stays open and the reason is logged at
+ * error level — a trail that admits it does not know beats one that guesses. A `pending` change not
+ * already on file is then filed, whatever became of the older ones.
  *
- * - **Nothing to do, nothing on file** — silence is correct.
- * - **Nothing pending, a request on file** — the schema went back to what the database already has
- *   (or moved to something that applied on its own), so the request describes a change nobody is
- *   proposing any more: `withdrawn`.
- * - **A change matching the open request** — the same change, still waiting. Recording it again would
- *   turn one decision into a queue of identical ones.
- * - **A change that does not match** — the schema moved while the request was open. The old request is
- *   `superseded` and a new one filed, rather than repositioned onto a change its approver never saw.
- *
- * @param context - The Glaze context (database handle, resolved config).
+ * @param context - The Glaze context (database handle, resolved config, logger).
  * @param result - What convergence just found.
+ * @param chainBefore - The snapshot chain as read before convergence ran.
  * @returns Resolves once the trail reflects this boot.
  */
-async function recordApprovalOutcome(context: GlazeContext, result: ConvergeResult): Promise<void> {
-	if (
-		result.status !== 'pending' &&
-		result.status !== 'no_changes' &&
-		result.status !== 'applied'
-	) {
-		return;
-	}
-
-	const schema = buildApprovalSchema(context.config.dialect);
+async function recordApprovalOutcome(
+	context: GlazeContext,
+	result: ConvergeResult,
+	before: BootWitness,
+): Promise<boolean> {
+	const { db, config, logger } = context;
+	const out = config.migrations.path;
+	const schema = buildApprovalSchema(config.dialect);
 	const events = schema.approvalEvents as Table;
-	const outcome = result;
+	const query = (sql: string) => db.raw(sql);
 
-	// Read and write in one transaction: closing a request and filing its successor is one decision,
-	// and a crash between them would leave the trail claiming a change was superseded by nothing. It
-	// goes through the seam rather than the ORM, whose transaction is a no-op on SQLite.
-	await context.db.queryTransaction(async (tx) => {
-		const db = tx as ApprovalDb;
-		const open = await findOpenRequest(db, events);
+	// Every open request is reconciled, not only the newest: one left open because nothing could tell
+	// what happened to it must not hide the ones filed after it. The database is read again now, so
+	// what this boot did can be told apart from what was already so.
+	const decided = await Promise.all(
+		before.open.map(async (request) => ({
+			request,
+			decision: reconcileOpenRequest(request, result, out, before.chain, {
+				before: before.targets.get(request.requestId) ?? 'undetermined',
+				after: await checkTargets(
+					query,
+					config.dialect,
+					request,
+					renamesOnPath(out, before.chain, request),
+				),
+			}),
+		})),
+	);
 
-		if (outcome.status !== 'pending') {
-			if (open) {
-				await recordEvent(db, events, {
-					requestId: open.requestId,
-					type: 'withdrawn',
+	// Write in one transaction, and only for requests still open when it starts: two instances booting
+	// together must not both close the same request. It goes through the seam rather than the ORM,
+	// whose transaction is a no-op on SQLite.
+	let alreadyOnFile = false;
+	await db.queryTransaction(async (tx) => {
+		const trail = tx as ApprovalDb;
+		const stillOpen = await findOpenRequests(trail, events);
+		const openIds = new Set(stillOpen.map((request) => request.requestId));
+
+		for (const { request, decision } of decided) {
+			if (!openIds.has(request.requestId)) continue;
+			if (decision.outcome === 'unknown') {
+				logger.error(
+					`Glaze cannot tell what happened to pending approval ${request.requestId}: ${decision.reason}. ` +
+						'It stays open until somebody decides it.',
+				);
+			}
+			if (decision.outcome === 'record') {
+				const { type, payload } = decision.event;
+				logger.info(
+					`Glaze recorded pending approval ${request.requestId} as ${type}${describeEvent(payload)}.`,
+				);
+				// oxlint-disable-next-line no-await-in-loop
+				await recordEvent(trail, events, {
+					requestId: request.requestId,
+					type,
 					actorKind: 'system',
+					...(payload ? { payload } : {}),
 				});
 			}
-			return;
 		}
 
-		if (open?.changeHash === outcome.changeHash) return;
-
-		if (open) {
-			await recordEvent(db, events, {
-				requestId: open.requestId,
-				type: 'superseded',
-				actorKind: 'system',
-				payload: { supersededBy: outcome.changeHash },
-			});
-		}
-
-		await recordEvent(db, events, {
+		// A pending change is filed unless it is already on file — under its own hash, whoever filed it.
+		if (result.status !== 'pending') return;
+		alreadyOnFile = stillOpen.some((request) => request.changeHash === result.changeHash);
+		if (alreadyOnFile) return;
+		await recordEvent(trail, events, {
 			requestId: createTrailId(),
 			type: 'requested',
-			changeHash: outcome.changeHash,
+			changeHash: result.changeHash,
 			actorKind: 'system',
 			payload: {
 				origin: 'dev',
-				statements: outcome.statements,
-				findings: outcome.findings,
-				unclassified: outcome.unclassified,
+				parentSnapshotId: result.parentSnapshotId,
+				statements: result.statements,
+				findings: result.findings,
+				unclassified: result.unclassified,
 				description: [
-					...outcome.findings.map((finding) => describeChange(finding.change)),
-					...outcome.unclassified.map(describeOperation),
+					...result.findings.map((finding) => describeChange(finding.change)),
+					...result.unclassified.map(describeOperation),
 				],
 			},
 		});
 	});
+	return alreadyOnFile;
+}
+
+/** What boot reads before it converges: the open requests, the chain, and the database's word. */
+interface BootWitness {
+	readonly open: readonly OpenRequest[];
+	readonly chain: SnapshotChain;
+	/** The target state of each open request, by request id, as it stood before this boot. */
+	readonly targets: ReadonlyMap<string, TargetState>;
+}
+
+/**
+ * Reads what reconciliation needs **before** convergence runs, so what others did since a request was
+ * filed can be told apart from what this boot does.
+ *
+ * @param context - The Glaze context.
+ * @returns The open requests, the chain, and the database's word on each request's targets.
+ */
+async function readBootWitness(context: GlazeContext): Promise<BootWitness> {
+	const { db, config } = context;
+	const out = config.migrations.path;
+	const chain = readSnapshotChain(out);
+	const events = buildApprovalSchema(config.dialect).approvalEvents as Table;
+	const open = await findOpenRequests(db.db as ApprovalDb, events);
+	const states = await Promise.all(
+		open.map((request) =>
+			checkTargets(
+				(sql) => db.raw(sql),
+				config.dialect,
+				request,
+				renamesOnPath(out, chain, request),
+			),
+		),
+	);
+	const targets = new Map(
+		open.map((request, index) => [request.requestId, states[index] as TargetState]),
+	);
+	return { open, chain, targets };
+}
+
+/**
+ * Whether anything was renamed between a request's snapshot and the head of the chain. A rename on
+ * the way means an absent target may have been moved rather than dropped, so the witness must not
+ * call it gone.
+ *
+ * @param out - The migration output directory.
+ * @param chain - The chain.
+ * @param request - The open request.
+ * @returns The witness context.
+ */
+function renamesOnPath(out: string, chain: SnapshotChain, request: OpenRequest): WitnessContext {
+	const payload = request.payload as { parentSnapshotId?: unknown } | null;
+	const parent = typeof payload?.parentSnapshotId === 'string' ? payload.parentSnapshotId : null;
+	if (parent === null || chain.head === null || chain.head.id === parent) {
+		return { renamedOnPath: false };
+	}
+	const statements = statementsSince(out, chain, parent);
+	// An unreadable path is reported as unknown lineage by the walk; nothing to add here.
+	return { renamedOnPath: statements?.some((statement) => /\brename\b/i.test(statement)) ?? false };
+}
+
+/**
+ * Says what an appended event carries, for the log line.
+ *
+ * @param payload - The event payload.
+ * @returns A parenthesised note, or nothing.
+ */
+function describeEvent(payload: Record<string, unknown> | undefined): string {
+	if (!payload) return '';
+	const notes = Object.entries(payload).map(([key, value]) => `${key}: ${String(value)}`);
+	return notes.length > 0 ? ` (${notes.join(', ')})` : '';
 }
 
 /**
@@ -239,6 +355,10 @@ export async function runConvergence(
 
 	if (!config.schema) return;
 
+	// Read before converging, so what happened since a request was filed can be told apart from what
+	// this boot does.
+	const before = config.workflow.audit ? await readBootWitness(context) : null;
+
 	const { resolve, confirmLoss, confirmDrop, confirmUnclassified } = resolver;
 	const result = await converge({
 		db,
@@ -252,7 +372,7 @@ export async function runConvergence(
 		audit: config.workflow.audit,
 	});
 
-	if (config.workflow.audit) await recordApprovalOutcome(context, result);
+	const alreadyOnFile = before ? await recordApprovalOutcome(context, result, before) : false;
 
-	reportConvergence(logger, result);
+	reportConvergence(logger, result, alreadyOnFile);
 }
