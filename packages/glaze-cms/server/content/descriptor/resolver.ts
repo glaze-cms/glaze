@@ -158,6 +158,7 @@ function describeField(
 		description: null,
 		relation: reference ? describeForeignKeyRelation(reference, targets) : null,
 		config: inferFieldConfig(column),
+		pending: null,
 	};
 }
 
@@ -197,6 +198,7 @@ function describeRelationField(
 			allowedTypes: [],
 			previewSize: null,
 		},
+		pending: null,
 	};
 }
 
@@ -240,6 +242,7 @@ export function describeEntity(
 		draftPublish: false,
 		capabilities: describeCapabilities(entity),
 		fields,
+		pending: null,
 	};
 }
 

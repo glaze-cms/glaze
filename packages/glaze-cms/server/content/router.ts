@@ -14,11 +14,12 @@ import { Elysia, NotFound, ParseError, status, ValidationError } from 'elysia';
 
 import { resolveDialect } from '#dialect';
 
+import { buildApprovalSchema, changesOf, findOpenRequests } from '../approvals/index.ts';
 import { createAuthMacro } from '../auth/index.ts';
 import { buildErrorResponse, buildListResponse, buildSuccessResponse } from '../responses/index.ts';
 import { createCorsResponder } from '../security/index.ts';
 import { SETUP_ROUTE_NAME } from '../setup/index.ts';
-import { describeContentModel } from './descriptor/index.ts';
+import { columnKey, describeContentModel, markPendingDrops } from './descriptor/index.ts';
 import {
 	buildFilter,
 	coerceId,
@@ -43,10 +44,11 @@ import type {
 import type { Logger } from '#logger';
 import type { GlazeErrorCode } from '#types';
 import type { GlazeContext } from '../app/context.ts';
+import type { ApprovalDb } from '../approvals/index.ts';
 import type { SessionProvider } from '../auth/index.ts';
 import type { CorsResponder } from '../security/index.ts';
 import type { Entity } from './types.ts';
-import type { Column, SQL } from 'drizzle-orm';
+import type { Column, SQL, Table } from 'drizzle-orm';
 
 /** The default and maximum page sizes for a list request. */
 const DEFAULT_LIMIT = 50;
@@ -478,7 +480,7 @@ export function createContentRouter({ context, auth, entities }: ContentRouterIn
 	// descriptor route un-shadowable by a user table; registering first would leave the name guard in
 	// `servableEntities` as the only thing between a user table and this endpoint. Both together are
 	// defence in depth, in that order.
-	registerEntitiesRoute(app, served, options.prefixes.api, responder);
+	registerEntitiesRoute(app, served, context, responder);
 	return app;
 }
 
@@ -491,19 +493,30 @@ export function createContentRouter({ context, auth, entities }: ContentRouterIn
  *
  * @param app - The macro-enabled content app.
  * @param entities - The servable entities to describe.
- * @param apiPrefix - The API mount prefix (e.g. `/api`).
+ * @param context - The Glaze context, for the trail and the API prefix.
  * @param responder - The content CORS responder, or `null`.
  */
 function registerEntitiesRoute(
 	app: ContentApp,
 	entities: readonly Entity[],
-	apiPrefix: string,
+	context: GlazeContext,
 	responder: CorsResponder | null,
 ): void {
-	const path = `${apiPrefix}/${ENTITIES_ROUTE_NAME}`;
-	// Described once at startup: the model only changes when the process reloads its schema.
+	const path = `${context.options.prefixes.api}/${ENTITIES_ROUTE_NAME}`;
+	// Described once at startup: the model only changes when the process reloads its schema. What is
+	// pending on it changes between boots and decisions, so that is read when the model is served.
 	const descriptor = describeContentModel(entities);
+	const events = buildApprovalSchema(context.config.dialect).approvalEvents as Table;
 
-	app.get(path, { auth: true }, () => buildSuccessResponse(descriptor));
+	app.get(path, { auth: true }, async () => {
+		const open = await findOpenRequests(context.db.db as ApprovalDb, events);
+		const pending = { tables: new Set<string>(), columns: new Set<string>() };
+		for (const change of open.flatMap(changesOf)) {
+			if (change.kind === 'drop_table') pending.tables.add(change.table);
+			if (change.kind === 'drop_column')
+				pending.columns.add(columnKey(change.table, change.column));
+		}
+		return buildSuccessResponse(markPendingDrops(descriptor, pending));
+	});
 	if (responder) app.options(path, ({ request }) => responder.preflight(request));
 }

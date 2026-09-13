@@ -163,5 +163,10 @@ approval.
 What an editor sees — labels, order, help text, which widget. Stored in the database, applies
 immediately, risks no data.
 
+**Pending** (on a field or entity):
+A structural change on file that would remove it. The database still has it and it is still served;
+the mark is so the admin can show it as on its way out.
+_Avoid_: deprecated, scheduled for deletion
+
 **View state**:
 One person's view of a screen — sort, visible columns, density. Never leaves their browser.

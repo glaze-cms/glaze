@@ -19,7 +19,9 @@
 
 import { findMigrationByHash } from '#convergence';
 
-import type { ConvergeResult, DataLossFinding, SnapshotChain, UnsafeChange } from '#convergence';
+import { changesOf, hasUnclassified } from '../approvals/index.ts';
+
+import type { ConvergeResult, SnapshotChain, UnsafeChange } from '#convergence';
 import type { Dialect } from '#dialect';
 import type { ApprovalEventType, OpenRequest } from '../approvals/index.ts';
 
@@ -70,31 +72,6 @@ function parentOf(open: OpenRequest): string | null {
 	const payload = open.payload as { parentSnapshotId?: unknown } | null;
 	const parent = payload?.parentSnapshotId;
 	return typeof parent === 'string' ? parent : null;
-}
-
-/**
- * The measured changes a request describes, read defensively out of its recorded findings.
- *
- * @param open - The open request.
- * @returns The changes it was measured for.
- */
-function changesOf(open: OpenRequest): UnsafeChange[] {
-	const payload = open.payload as { findings?: unknown } | null;
-	const findings = Array.isArray(payload?.findings) ? (payload.findings as DataLossFinding[]) : [];
-	return findings
-		.map((finding) => finding?.change)
-		.filter((change): change is UnsafeChange => change !== undefined && typeof change === 'object');
-}
-
-/**
- * Whether a request carries operations nothing can look for: unclassified ones.
- *
- * @param open - The open request.
- * @returns `true` when the request has unclassified operations.
- */
-function hasUnclassified(open: OpenRequest): boolean {
-	const payload = open.payload as { unclassified?: unknown } | null;
-	return Array.isArray(payload?.unclassified) && payload.unclassified.length > 0;
 }
 
 /**

@@ -42,6 +42,13 @@ export type FieldTypeSource =
 /** How many entries a relation points at. */
 export type RelationCardinality = 'one' | 'many';
 
+/**
+ * A structural change on file that has not happened yet. `drop` means an open approval request would
+ * remove this column or entity: the database still has it and it is still served, and the admin can
+ * show it as on its way out. `null` when nothing is pending.
+ */
+export type PendingChange = 'drop' | null;
+
 /** A column's JS-level type, split into the category it belongs to and any refinement on it. */
 export interface DataTypeInfo {
 	/** The broad JS category — `string`, `number`, `bigint`, `boolean`, `object`, `array`. */
@@ -148,6 +155,8 @@ export interface FieldNode {
 	readonly relation: RelationTarget | null;
 	/** The field's configuration. */
 	readonly config: FieldConfig;
+	/** A structural change on file that would remove this field; `null` when none is. */
+	readonly pending: PendingChange;
 }
 
 /**
@@ -266,6 +275,8 @@ export interface EntityDescriptor {
 	readonly capabilities: EntityCapabilities;
 	/** The field tree. */
 	readonly fields: readonly FieldDescriptor[];
+	/** A structural change on file that would remove this entity; `null` when none is. */
+	readonly pending: PendingChange;
 }
 
 /** The payload of `GET {apiPrefix}/entities`: the whole content model. */

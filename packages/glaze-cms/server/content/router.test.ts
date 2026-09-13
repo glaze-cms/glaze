@@ -8,14 +8,17 @@ import { expect, matrixTest } from '#harness';
 import { createLogger } from '#logger';
 import { resolveRuntime } from '#runtime';
 
+import { buildApprovalSchema, materializeApprovalTables, recordEvent } from '../approvals/index.ts';
 import { resolveOptions } from '../options/index.ts';
 import { loadEntities } from './loader.ts';
 import { createContentRouter } from './router.ts';
 
 import type { DatabaseHandle, Dialect } from '#dialect';
 import type { GlazeContext } from '../app/context.ts';
+import type { ApprovalDb } from '../approvals/index.ts';
 import type { SessionProvider } from '../auth/index.ts';
 import type { CorsOptions } from '../options/index.ts';
+import type { Table } from 'drizzle-orm';
 
 /** Temp schema fixtures under `node_modules` so `drizzle-orm/*` resolves; see the loader test. */
 const TEMP_FIXTURE_PREFIX = join(
@@ -153,8 +156,32 @@ async function buildRouter(
 	const { session = SESSION, exclude = [] } = options;
 	const schema = writePostsSchema(dir, dialect);
 	const context = buildContext(db, dialect, schema, { exclude });
+	// The entities route reads the approvals trail for what is pending; boot materializes it first.
+	await materializeApprovalTables(context);
 	const entities = await loadEntities(context.config);
 	return createContentRouter({ context, auth: authStub(session), entities });
+}
+
+/**
+ * Files an open approval request that would drop `posts.title`, as boot would after measuring it.
+ *
+ * @param db - The database handle.
+ * @param dialect - The active dialect.
+ * @param change - The change the request was measured for.
+ */
+async function fileOpenRequest(
+	db: DatabaseHandle,
+	dialect: Dialect,
+	change: Record<string, unknown>,
+): Promise<void> {
+	const events = buildApprovalSchema(dialect).approvalEvents as Table;
+	await recordEvent(db.db as ApprovalDb, events, {
+		requestId: 'r1',
+		type: 'requested',
+		changeHash: 'h1',
+		actorKind: 'system',
+		payload: { findings: [{ change, code: 'column_has_data', affectedRows: 1 }] },
+	});
 }
 
 /**
@@ -767,6 +794,61 @@ matrixTest(
 			expect((await send(router, 'GET', `/api/posts?filter[id][in]=${huge}`)).status).toBe(422);
 			// An empty list would otherwise mean "the empty string" on text and 422 on numbers.
 			expect((await send(router, 'GET', '/api/posts?filter[id][in]=')).status).toBe(422);
+		} finally {
+			rmSync(dir, { recursive: true, force: true });
+		}
+	},
+);
+
+// The database still has the column and it is still served; the descriptor says a request would
+// remove it, so the admin can show it as on its way out.
+matrixTest('the entities route marks what an open request would drop', async ({ db, dialect }) => {
+	const dir = mkdtempSync(TEMP_FIXTURE_PREFIX);
+	try {
+		await createPostsTable(db);
+		const router = await buildRouter(db, dialect, dir);
+
+		const before = (await toEnvelope(await send(router, 'GET', '/api/entities'))).data as {
+			entities: { name: string; pending: unknown; fields: { name: string; pending: unknown }[] }[];
+		};
+		const postsBefore = before.entities.find((entity) => entity.name === 'posts');
+		expect(postsBefore?.pending).toBeNull();
+		expect(postsBefore?.fields.map((field) => field.pending)).toEqual([null, null]);
+
+		await fileOpenRequest(db, dialect, { kind: 'drop_column', table: 'posts', column: 'title' });
+
+		const after = (await toEnvelope(await send(router, 'GET', '/api/entities'))).data as {
+			entities: { name: string; pending: unknown; fields: { name: string; pending: unknown }[] }[];
+		};
+		const posts = after.entities.find((entity) => entity.name === 'posts');
+		expect(posts?.pending).toBeNull();
+		expect(posts?.fields.map((field) => [field.name, field.pending])).toEqual([
+			['id', null],
+			['title', 'drop'],
+		]);
+		// The column is still served: a pending drop changes nothing about what the database has.
+		expect((await send(router, 'GET', '/api/posts')).status).toBe(200);
+	} finally {
+		rmSync(dir, { recursive: true, force: true });
+	}
+});
+
+matrixTest(
+	'the entities route marks an entity an open request would drop',
+	async ({ db, dialect }) => {
+		const dir = mkdtempSync(TEMP_FIXTURE_PREFIX);
+		try {
+			await createPostsTable(db);
+			const router = await buildRouter(db, dialect, dir);
+			await fileOpenRequest(db, dialect, { kind: 'drop_table', table: 'posts' });
+
+			const model = (await toEnvelope(await send(router, 'GET', '/api/entities'))).data as {
+				entities: { name: string; pending: unknown; fields: { pending: unknown }[] }[];
+			};
+			const posts = model.entities.find((entity) => entity.name === 'posts');
+			expect(posts?.pending).toBe('drop');
+			// The entity is going, not its columns one by one.
+			expect(posts?.fields.map((field) => field.pending)).toEqual([null, null]);
 		} finally {
 			rmSync(dir, { recursive: true, force: true });
 		}

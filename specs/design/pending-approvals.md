@@ -512,7 +512,11 @@ of that entity failed. That cannot happen now: an added column is applied before
 
 What remains is a column pending a **drop**. The database still has it and it is still served, which
 is correct and needs no filtering — the change has not happened yet. The descriptor marks it
-`pending: drop` so the admin can show it as on its way out.
+`pending: 'drop'` so the admin can show it as on its way out; an entity an open request would drop
+is marked the same way. The mark is laid over the model when `GET {api}/entities` is served, from
+the open requests' recorded findings, so it follows the trail rather than the process's start-up:
+filed at boot, gone once the request is decided or reconciled. Every field and entity carries the
+key, `null` when nothing is pending.
 
 ## Two ways to answer
 
@@ -658,7 +662,8 @@ column with the schema reverted. Each is a test now. What remains is a snapshot 
 this database through a directory from elsewhere: boot then finds nothing to do, and only baselining
 (step 8) can re-anchor it.
 
-**5. `pending: drop` on the descriptor**, so the admin can show a column as on its way out.
+**5. `pending: drop` on the descriptor. — Done.** `FieldNode.pending` and `EntityDescriptor.pending`
+(`server/content/descriptor/`), read from the open requests each time the model is served.
 
 **6. The apply path for kept files.** `drizzle-orm/postgres-js/migrator` and `drizzle-orm/bun-sqlite/migrator`
 read the committed chain, compare it to the journal, and apply what is missing. Glaze must apply

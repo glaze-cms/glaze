@@ -1,5 +1,6 @@
 export { createTrailId } from './id.ts';
 export { materializeApprovalTables } from './materializer.ts';
+export { changesOf, hasUnclassified } from './requests.ts';
 export {
 	APPROVAL_REQUEST_INDEX,
 	APPROVAL_TYPE_INDEX,

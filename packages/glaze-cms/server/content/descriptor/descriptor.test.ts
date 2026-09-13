@@ -5,6 +5,7 @@ import { resolveConfig } from '#config';
 import { expect, test } from '#harness';
 
 import { loadEntities } from '../loader.ts';
+import { columnKey, markPendingDrops } from './pending.ts';
 import { describeContentModel } from './resolver.ts';
 
 import type { Dialect } from '#dialect';
@@ -466,4 +467,44 @@ test('treats a string-mode timestamp as a date, not text', async () => {
 	// The mode changes how Drizzle carries the value, not what the column stores.
 	expect(findField(posts, 'price')?.fieldType).toBe('number');
 	expect(findField(posts, 'price')?.config.decimalAllowed).toBe(true);
+});
+
+test('markPendingDrops lays what is on file over the model without touching anything else', () => {
+	const model = {
+		entities: [
+			{
+				name: 'posts',
+				pending: null,
+				fields: [
+					{ kind: 'field', name: 'id', column: 'id', pending: null },
+					{ kind: 'field', name: 'body', column: 'body_text', pending: null },
+					{ kind: 'field', name: 'tags', column: null, pending: null },
+				],
+			},
+			{ name: 'drafts', pending: null, fields: [] },
+		],
+	} as unknown as Parameters<typeof markPendingDrops>[0];
+
+	const marked = markPendingDrops(model, {
+		tables: new Set(['drafts']),
+		// Keyed by the database column name, which is what a request names.
+		columns: new Set([columnKey('posts', 'body_text')]),
+	});
+
+	expect(marked.entities.map((entity) => [entity.name, entity.pending])).toEqual([
+		['posts', null],
+		['drafts', 'drop'],
+	]);
+	expect(
+		marked.entities[0]?.fields.map((field) => [
+			field.name,
+			(field as { pending: unknown }).pending,
+		]),
+	).toEqual([
+		['id', null],
+		['body', 'drop'],
+		['tags', null],
+	]);
+	// Nothing pending: the same model comes back, untouched.
+	expect(markPendingDrops(model, { tables: new Set(), columns: new Set() })).toBe(model);
 });
