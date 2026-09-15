@@ -62,8 +62,18 @@ function chainWith(more: (out: string) => void = () => {}): { out: string; chain
 }
 
 const NO_CHANGES: ConvergeResult = { status: 'no_changes' };
-const APPLIED_SAME: ConvergeResult = { status: 'applied', statements: DROP, changeHash: HASH };
-const APPLIED_OTHER: ConvergeResult = { status: 'applied', statements: [], changeHash: 'other' };
+const APPLIED_SAME: ConvergeResult = {
+	status: 'applied',
+	statements: DROP,
+	changeHash: HASH,
+	migration: '0002_b',
+};
+const APPLIED_OTHER: ConvergeResult = {
+	status: 'applied',
+	statements: [],
+	changeHash: 'other',
+	migration: '0002_x',
+};
 
 /** Runs one decision with the database saying the same before and after this boot. */
 function decideWith(
@@ -173,6 +183,7 @@ test('the chain moved on without the change: the database decides', () => {
 			parentSnapshotId: 'b',
 			findings: [],
 			unclassified: [],
+			decisions: [],
 		};
 		expect(decideWith(out, chain, pendingAgain, 'present')).toEqual({
 			outcome: 'record',
@@ -214,6 +225,7 @@ test('nothing ran in between: this boot decides', () => {
 			parentSnapshotId: 'a',
 			findings: [],
 			unclassified: [],
+			decisions: [],
 		});
 
 		expect(decideWith(out, chain, pending(HASH), 'present')).toEqual({ outcome: 'still_open' });

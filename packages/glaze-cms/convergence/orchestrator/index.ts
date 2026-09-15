@@ -16,6 +16,7 @@ export type {
 	ConvergeResult,
 	DropConfirmer,
 	LossResolver,
+	RecordedDecision,
 	UnclassifiedConfirmer,
 } from './engine.ts';
 export type { GenerateConfig } from './generate.ts';

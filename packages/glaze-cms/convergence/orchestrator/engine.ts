@@ -26,7 +26,7 @@
  */
 
 import { readdirSync, rmSync } from 'node:fs';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 
 import { applyMigration } from '../apply/index.ts';
 import { readMigrationStatements } from './chain.ts';
@@ -45,7 +45,7 @@ import type {
 } from '../classifier/index.ts';
 import type { ConvergenceErrorCode, SchemaDecision } from '../envelope/index.ts';
 import type { DataLossFinding } from '../safety/index.ts';
-import type { ResolvedOutcome, Resolver } from './types.ts';
+import type { DecisionResolution, ResolvedOutcome, Resolver } from './types.ts';
 
 /** An apply failure that is not the confirmable data-loss case. */
 type ApplyFailure = Exclude<
@@ -103,6 +103,13 @@ export interface ConvergeOptions {
 	 * @default false
 	 */
 	readonly audit?: boolean;
+	/**
+	 * Generate, classify and measure, but never apply: every change comes back as `pending`, even an
+	 * additive one, and the migration is rolled back. For checking what the schema produces without
+	 * changing anything — an approval verifying the request it is about to apply.
+	 * @default false
+	 */
+	readonly dryRun?: boolean;
 }
 
 /** The outcome of {@link converge}. */
@@ -112,6 +119,8 @@ export type ConvergeResult =
 			readonly statements: readonly string[];
 			/** Fingerprint of what applied, so boot can match it against a request on file. */
 			readonly changeHash: string;
+			/** The migration directory that now records it. */
+			readonly migration: string;
 	  }
 	| { readonly status: 'no_changes' }
 	| { readonly status: 'rejected'; readonly decision: SchemaDecision }
@@ -131,6 +140,8 @@ export type ConvergeResult =
 			readonly findings: readonly DataLossFinding[];
 			/** The operations Glaze has no rule for — pending because they are unknown, not destructive. */
 			readonly unclassified: readonly Operation[];
+			/** Every question drizzle asked and how it was answered, for an approval to replay. */
+			readonly decisions: readonly RecordedDecision[];
 	  }
 	| { readonly status: 'error'; readonly code: ConvergenceErrorCode; readonly detail?: string };
 
@@ -138,6 +149,17 @@ export type ConvergeResult =
 interface CapturedRename {
 	readonly decision: SchemaDecision;
 	readonly from: readonly string[];
+}
+
+/**
+ * One question drizzle asked while generating, and how it was answered. A pending request records
+ * these so an approval later regenerates the **same** change by replaying them, rather than answering
+ * again — an unattended boot answers `create` to every rename question, and the approval must not
+ * quietly answer differently.
+ */
+export interface RecordedDecision {
+	readonly decision: SchemaDecision;
+	readonly resolution: DecisionResolution;
 }
 
 /**
@@ -158,11 +180,14 @@ export async function converge(options: ConvergeOptions): Promise<ConvergeResult
 		confirmDrop,
 		confirmUnclassified,
 		audit = false,
+		dryRun = false,
 	} = options;
 
 	const renames: CapturedRename[] = [];
+	const decisions: RecordedDecision[] = [];
 	const recordingResolve: Resolver = async (decision) => {
 		const resolution = await resolve(decision);
+		decisions.push({ decision, resolution });
 		if (resolution.action === 'rename') renames.push({ decision, from: resolution.from });
 		return resolution;
 	};
@@ -211,9 +236,11 @@ export async function converge(options: ConvergeOptions): Promise<ConvergeResult
 				tables: deriveRenamedTables(renames),
 				columns: deriveRenamedColumns(renames),
 			},
+			decisions,
 			migrationDir,
 			out,
 			audit,
+			dryRun,
 			confirmLoss,
 			confirmDrop,
 			confirmUnclassified,
@@ -237,9 +264,11 @@ interface DecideAndApplyArgs {
 	readonly dialect: Dialect;
 	readonly statements: readonly string[];
 	readonly renames: Renames;
+	readonly decisions: readonly RecordedDecision[];
 	readonly migrationDir: string;
 	readonly out: string;
 	readonly audit: boolean;
+	readonly dryRun: boolean;
 	readonly confirmLoss: LossResolver | undefined;
 	readonly confirmDrop: DropConfirmer | undefined;
 	readonly confirmUnclassified: UnclassifiedConfirmer | undefined;
@@ -254,7 +283,7 @@ interface DecideAndApplyArgs {
  * @returns The converge result.
  */
 async function decideAndApply(args: DecideAndApplyArgs): Promise<ConvergeResult> {
-	const { db, dialect, statements, renames, migrationDir, out, audit } = args;
+	const { db, dialect, statements, renames, decisions, migrationDir, out, audit, dryRun } = args;
 
 	const preflight = await runPreflight((sql) => db.raw(sql), dialect, migrationDir, out, renames);
 	if (preflight.status === 'error') {
@@ -276,10 +305,18 @@ async function decideAndApply(args: DecideAndApplyArgs): Promise<ConvergeResult>
 	const changeHash = computeChangeHash(statements, parentSnapshotId);
 
 	const needsPerson = findings.length > 0 || unclassified.length > 0;
-	if (needsPerson && audit) {
+	if (dryRun || (needsPerson && audit)) {
 		// The measurements are live row counts, read before the rollback: they are what the approver
 		// is shown, and once the migration dir is gone there is no snapshot to diff against.
-		return { status: 'pending', statements, changeHash, parentSnapshotId, findings, unclassified };
+		return {
+			status: 'pending',
+			statements,
+			changeHash,
+			parentSnapshotId,
+			findings,
+			unclassified,
+			decisions,
+		};
 	}
 	if (needsPerson) {
 		if (!(await allDropsConfirmed(findings, args.confirmDrop))) {
@@ -308,7 +345,9 @@ async function decideAndApply(args: DecideAndApplyArgs): Promise<ConvergeResult>
 		args.confirmLoss,
 		decidedDrops,
 	);
-	return applied.status === 'applied' ? { ...applied, changeHash } : applied;
+	return applied.status === 'applied'
+		? { ...applied, changeHash, migration: basename(migrationDir) }
+		: applied;
 }
 
 /**
@@ -436,7 +475,7 @@ async function applyWithLossConfirmation(
 		// oxlint-disable-next-line no-await-in-loop
 		const result = await applyMigration(db, { statements, dialect, droppedTables, renamedTables });
 
-		if (result.success) return { status: 'applied', statements, changeHash: '' };
+		if (result.success) return { status: 'applied', statements, changeHash: '', migration: '' };
 		if (result.reason !== 'unexpected_data_loss') return fromApplyFailure(result);
 
 		// A surviving table that lost rows is never a confirmable drop — it signals a truncation or a

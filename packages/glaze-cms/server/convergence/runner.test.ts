@@ -8,7 +8,7 @@ import { expect, matrixTest, nextSecond } from '#harness';
 import { createLogger } from '#logger';
 import { resolveRuntime } from '#runtime';
 
-import { materializeApprovalTables } from '../approvals/index.ts';
+import { createTrailId, materializeApprovalTables } from '../approvals/index.ts';
 import { materializeAuthTables } from '../auth/index.ts';
 import { resolveOptions } from '../options/index.ts';
 import { runConvergence } from './runner.ts';
@@ -1169,6 +1169,68 @@ matrixTest(
 
 			expect((await readTrail(db, dialect)).map(([type]) => type)).toEqual(['requested']);
 			expect(errors.some((line) => line.includes('disagree'))).toBe(true);
+		} finally {
+			rmSync(dir, { recursive: true, force: true });
+		}
+	},
+);
+
+// A person's no stands until the schema changes; a failed apply does not, because nothing was decided
+// against the change itself.
+matrixTest(
+	'a change whose last word was apply_failed is filed again; a rejected one is not',
+	async ({ db, dialect }) => {
+		const dir = mkdtempSync(TEMP_FIXTURE_PREFIX);
+		try {
+			const migrations = await seedPopulatedPosts(db, dialect, dir);
+			const dropsBody = writeSchema(dir, dialect, POSTS_WITHOUT_BODY);
+			const context = buildContext(db, dialect, dropsBody, migrations, { audit: true });
+			await materializeApprovalTables(context);
+			await runConvergence(context, decliningResolver());
+			const hash = (await readTrail(db, dialect))[0]?.[1];
+
+			// Close the request as failed by hand, as the approve path would after a refused apply.
+			const now = dialect === 'postgres' ? "'1970-01-02'" : '1';
+			await db.raw(
+				`insert into ${trailTable(dialect)} (id, request_id, type, change_hash, actor_kind, created_at, payload) ` +
+					`select '${createTrailId()}', request_id, 'apply_failed', null, 'system', ${now}, '{"detail":"x"}' ` +
+					`from ${trailTable(dialect)} where type = 'requested'`,
+			);
+			await nextSecond();
+			await runConvergence(context, decliningResolver());
+			const afterFailure = await readTrail(db, dialect);
+			expect(afterFailure.map(([type]) => type)).toEqual([
+				'requested',
+				'apply_failed',
+				'requested',
+			]);
+			expect(afterFailure[2]?.[1]).toBe(hash);
+
+			// Now reject the new one; the next boot leaves it alone and says why.
+			await db.raw(
+				`insert into ${trailTable(dialect)} (id, request_id, type, change_hash, actor_id, actor_kind, created_at, payload) ` +
+					`select '${createTrailId()}', request_id, 'rejected', null, 'u-admin', 'user', ${now}, '{"reason":"no"}' ` +
+					`from ${trailTable(dialect)} where type = 'requested' and id = (select max(id) from ${trailTable(dialect)} where type = 'requested')`,
+			);
+			const { logger, errors } = capturingLogger();
+			const warnings: string[] = [];
+			logger.warn = (message: unknown) => {
+				warnings.push(String(message));
+			};
+			await nextSecond();
+			await runConvergence(
+				buildContext(db, dialect, dropsBody, migrations, { audit: true }, logger),
+				decliningResolver(),
+			);
+			expect((await readTrail(db, dialect)).map(([type]) => type)).toEqual([
+				'requested',
+				'apply_failed',
+				'requested',
+				'rejected',
+			]);
+			expect(warnings.some((line) => line.includes('rejected by u-admin'))).toBe(true);
+			expect(errors).toEqual([]);
+			expect(await db.raw('select body from posts')).toHaveLength(1);
 		} finally {
 			rmSync(dir, { recursive: true, force: true });
 		}

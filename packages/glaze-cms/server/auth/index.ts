@@ -1,6 +1,7 @@
 export { createAuth } from './instance.ts';
 export { createAuthMacro } from './macro.ts';
 export { createAuthPlugin } from './plugin.ts';
+export { resolveFreshSession } from './session.ts';
 export { materializeAuthTables } from './materializer.ts';
 export {
 	AUTH_EXPECTED_COLUMNS,
@@ -12,5 +13,6 @@ export { resolveAuthProvider } from './provider.ts';
 
 export type { GlazeAuth } from './instance.ts';
 export type { SessionProvider } from './macro.ts';
+export type { FreshSession } from './session.ts';
 export type { AuthModelName, AuthSchema } from './schema/index.ts';
 export type { AuthProvider } from './provider.ts';

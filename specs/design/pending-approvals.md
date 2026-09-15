@@ -223,7 +223,8 @@ destructive change detected
   → [ somebody is here ]  answer now — terminal, `glaze migrate`, or an inline UI confirm
   → [ nobody is here   ]  it stays pending until a person answers it
   → approved → apply → record `applied`
-  → rejected → record `rejected` (reason required)
+  → rejected → record `rejected` (reason required); the next boot does not file the change again
+                while the schema still asks for it — a person said no, and the schema is the thing to change
   → [ schema changed  ] → record `superseded`, file a new request
   → [ schema reverted ] → record `withdrawn`
   → [ applied elsewhere ] → record `applied`, noting it happened outside Glaze
@@ -284,10 +285,13 @@ One row per event. Nothing is ever updated or deleted; current state is derived.
 | `createdAt`  | Event time.                                                                                      |
 | `payload`    | Type-specific detail (below).                                                                    |
 
-**Payloads.** `requested`: origin, statements, pre-flight findings, and a human-readable description
-("Drops `subtitle` from `posts`"). `rejected`: the reason, required and non-empty — a rejection with
-no reason makes the trail useless exactly where it matters. `applied`: the migration name written to
-`out`. `apply_failed`: the failing statement and the typed error.
+**Payloads.** `requested`: origin, the snapshot it was measured against (`parentSnapshotId`),
+statements, pre-flight findings, unclassified operations, the decisions taken while generating, and a
+human-readable description ("drop column posts.body"). `approved`: the findings and their fingerprint
+as the person saw them. `rejected`: the reason, required and non-empty — a rejection with no reason
+makes the trail useless exactly where it matters. `applied`: the migration name written to `out`
+(and, when boot recorded it, why: `nothing_to_decide`, `applied_with_other_changes`,
+`outsideApproval` with `verified`). `apply_failed`: what the apply returned and why.
 
 ### Derived state
 
@@ -410,6 +414,27 @@ shown — same findings, same counts. Any difference refuses the approval and re
 numbers. Somebody who approved "this drops 12 rows" did not approve "this drops 40,000", and treating
 those as one decision is the silent error the oracle exists to prevent.
 
+In practice: the list measures every open request again before showing it and returns a fingerprint
+of the result (`findingsHash`: what was measured and what was found, in a fixed order). An approval
+carries that fingerprint as `seen`; the server measures once more and refuses with `409` when it
+differs, naming the new counts, so the screen fetches the list again and the person decides on the
+numbers in front of them. The counts recorded at filing are history; what the person agreed to is
+recorded on the `approved` event.
+
+**The decisions are replayed, never re-answered.** Generating a change can ask questions — is this
+a rename or a create — and an unattended boot answers `create` to all of them. The request records
+every question and answer (`decisions`), and its description says so in words when a rename was not
+offered. Approval regenerates the change by replaying those answers; a question with no recorded
+answer is refused, because answering it now could regenerate a different change from the one the
+person was shown. This is what closes the second cause of reversal #6.
+
+**The apply agrees only to what was approved.** The apply pass runs through the same classifier and
+measurements as boot, and its confirmers say yes to a finding only when it matches one the person
+approved — same change, same code, same count — and to an unclassified operation only when the
+request recorded it. Anything else the oracle turns up is declined and recorded as `apply_failed`. A
+table vanishing that the classifier did not decide is never agreed to. This is what closes the first
+cause of reversal #6: there is no blanket yes anywhere on the path.
+
 ## At boot
 
 1. Work out what the change is — diff against the snapshot, or read the unapplied committed
@@ -485,7 +510,7 @@ Ctrl+C at the confirmation prompt arrives as the prompt closing, which declines 
 directory like any other refusal. A process killed outright — `SIGTERM`, a timeout — can leave one,
 and that is one of the things the witness is for. What no amount of reading can fix is a directory
 that _did_ come from elsewhere: the snapshot is then ahead of this database and every boot finds
-nothing to do, until baselining (step 8) can re-anchor it. The trail, at least, does not lie about
+nothing to do, until baselining (step 9) can re-anchor it. The trail, at least, does not lie about
 it, and the boot log names the directory and says to run its SQL here or remove it.
 
 Writes happen in one transaction that first re-reads which requests are still open, so two instances
@@ -495,7 +520,7 @@ re-read — two instances that both find nothing on file can still each file the
 
 The console case — a column dropped by hand, no migration — does not reach this: the snapshot never
 advanced, the schema still carries the drop, and the measurement finds the column gone. Boot fails
-closed and says the snapshot has to be re-baselined (step 8). On SQLite that took one more guard:
+closed and says the snapshot has to be re-baselined (step 9). On SQLite that took one more guard:
 an unknown double-quoted name is read as a string literal there, so `COUNT("body")` over a table
 with no `body` would count the word once per row and report a populated column. A SQLite probe now
 checks its column exists first.
@@ -660,22 +685,31 @@ migration, a directory left by a killed process, a drop that went along with an 
 table renamed with its data kept, this boot's own work credited to somebody else, a hand-dropped
 column with the schema reverted. Each is a test now. What remains is a snapshot that ran ahead of
 this database through a directory from elsewhere: boot then finds nothing to do, and only baselining
-(step 8) can re-anchor it.
+(step 9) can re-anchor it.
 
 **5. `pending: drop` on the descriptor. — Done.** `FieldNode.pending` and `EntityDescriptor.pending`
 (`server/content/descriptor/`), read from the open requests each time the model is served.
 
-**6. The apply path for kept files.** `drizzle-orm/postgres-js/migrator` and `drizzle-orm/bun-sqlite/migrator`
+**6. The approve path. — Done.** `GET {api}/pending-approvals`, `POST …/:id/approve`,
+`POST …/:id/reject` (`server/approvals/router.ts`, `approve.ts`, `measure.ts`). The list measures
+live and fingerprints; approve verifies by replaying the recorded decisions, measures against
+`seen`, records `approved` before applying, applies with confirmers that agree only to what was
+approved, and records `applied` or `apply_failed`; reject needs a reason and stops boot from filing
+the same change again. Approvals in one process take turns and re-check the request is still open.
+Deciding needs `admin`; looking needs a session. The screen itself, the command form
+(`glaze migrate`) and any notification beyond polling are still to build.
+
+**7. The apply path for kept files.** `drizzle-orm/postgres-js/migrator` and `drizzle-orm/bun-sqlite/migrator`
 read the committed chain, compare it to the journal, and apply what is missing. Glaze must apply
 the statements **itself** rather than delegating: drizzle's migrator owns its own transaction, and
 the layer-2 oracle has to be able to roll back on a row loss nobody declared. That means Glaze also
 writes the journal row, which is a compatibility promise — the hash is a sha256 of the whole
 `migration.sql` text — so that someone running `drizzle-kit migrate` does not re-apply everything.
 
-**7. `autoApply`**, and the `.glaze/` cache that makes `migrations.enabled: false` real. Until it
+**8. `autoApply`**, and the `.glaze/` cache that makes `migrations.enabled: false` real. Until it
 exists the setting is inert and defaults to `true`, which is what the code actually does.
 
-**8. Baselining, for turning the files on against a database that already has tables.** Drizzle does
+**9. Baselining, for turning the files on against a database that already has tables.** Drizzle does
 the recording: `migrate(db, { migrationsFolder, init: true })` writes the journal row **without
 running the SQL**, on both dialects, and refuses if the journal already has rows or if more than one
 migration is present. `drizzle-kit pull` is CLI-only and not needed — `pull --init` is for someone

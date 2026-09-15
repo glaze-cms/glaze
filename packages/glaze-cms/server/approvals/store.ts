@@ -187,6 +187,53 @@ export async function findOpenRequest(db: ApprovalDb, table: Table): Promise<Ope
 	return (await findOpenRequests(db, table))[0] ?? null;
 }
 
+/** What became of the last request filed for a change: its newest event. */
+export interface LatestForChange {
+	readonly requestId: string;
+	readonly type: ApprovalEventType;
+	readonly actorId: string | null;
+	readonly createdAt: Date;
+}
+
+/**
+ * Finds the newest event of the newest request filed for a change hash — what the trail last said
+ * about this change, whichever request carried it.
+ *
+ * @param db - The query builder.
+ * @param table - The `approval_events` table.
+ * @param changeHash - The change's fingerprint.
+ * @returns The newest event, or `null` when no request was ever filed for the change.
+ */
+export async function findLatestEventForChange(
+	db: ApprovalDb,
+	table: Table,
+	changeHash: string,
+): Promise<LatestForChange | null> {
+	const columns = table as unknown as Record<string, Column>;
+	const id = columns['id'] as Column;
+	const requestId = columns['requestId'] as Column;
+
+	// The newest event of a request whose `requested` carried the hash: the event with no later event
+	// on the same request, among requests that were filed for this change.
+	const rows = (await db
+		.select()
+		.from(table)
+		.where(
+			sql`exists (select 1 from ${table} as filed where filed."request_id" = ${requestId} and filed."type" = 'requested' and filed."change_hash" = ${changeHash}) and not exists (select 1 from ${table} as later where later."request_id" = ${requestId} and later."id" > ${id})`,
+		)
+		.orderBy(desc(id))
+		.limit(1)) as unknown as Array<EventRow & { actorId: string | null }>;
+
+	const latest = rows[0];
+	if (!latest) return null;
+	return {
+		requestId: latest.requestId,
+		type: latest.type as ApprovalEventType,
+		actorId: latest.actorId ?? null,
+		createdAt: toDate(latest.createdAt),
+	};
+}
+
 /** The role values this store recognises when reading a row back. Anything else is treated as `user`. */
 const GRANTED_ROLES: ReadonlySet<string> = new Set(['admin', 'editor']);
 

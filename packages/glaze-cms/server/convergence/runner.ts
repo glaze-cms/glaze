@@ -20,6 +20,7 @@ import {
 import {
 	buildApprovalSchema,
 	createTrailId,
+	findLatestEventForChange,
 	findOpenRequests,
 	recordEvent,
 } from '../approvals/index.ts';
@@ -28,6 +29,7 @@ import { checkTargets, reconcileOpenRequest } from './reconcile.ts';
 import type {
 	ConvergeResult,
 	InteractiveResolver,
+	RecordedDecision,
 	SnapshotChain,
 	UnsafeChange,
 } from '#convergence';
@@ -241,10 +243,22 @@ async function recordApprovalOutcome(
 			}
 		}
 
-		// A pending change is filed unless it is already on file — under its own hash, whoever filed it.
+		// A pending change is filed unless it is already on file — under its own hash, whoever filed it —
+		// or a person has already said no to it. A rejected change comes back on every boot until the
+		// schema stops asking for it; filing it again would turn one answer into a nagging queue.
 		if (result.status !== 'pending') return;
 		alreadyOnFile = stillOpen.some((request) => request.changeHash === result.changeHash);
 		if (alreadyOnFile) return;
+		const lastWord = await findLatestEventForChange(trail, events, result.changeHash);
+		if (lastWord?.type === 'rejected') {
+			alreadyOnFile = true;
+			logger.warn(
+				`The pending schema change was rejected by ${lastWord.actorId ?? 'somebody'} on ` +
+					`${lastWord.createdAt.toISOString()} (request ${lastWord.requestId}); it is not filed again. ` +
+					'Revert the schema, or change it, to move on.',
+			);
+			return;
+		}
 		await recordEvent(trail, events, {
 			requestId: createTrailId(),
 			type: 'requested',
@@ -256,14 +270,33 @@ async function recordApprovalOutcome(
 				statements: result.statements,
 				findings: result.findings,
 				unclassified: result.unclassified,
+				decisions: result.decisions,
 				description: [
 					...result.findings.map((finding) => describeChange(finding.change)),
 					...result.unclassified.map(describeOperation),
+					...result.decisions.flatMap(describeUnattendedDecision),
 				],
 			},
 		});
 	});
 	return alreadyOnFile;
+}
+
+/**
+ * Says, for the person deciding, that a question was answered without anybody there. An unattended
+ * boot answers `create` to every rename question, so what looks like a drop and an add may have been
+ * meant as a rename.
+ *
+ * @param recorded - One recorded decision.
+ * @returns A line for the description, or none.
+ */
+function describeUnattendedDecision(recorded: RecordedDecision): string[] {
+	const { decision, resolution } = recorded;
+	if (decision.type !== 'rename_or_create' || resolution.action !== 'create') return [];
+	return [
+		`${decision.target.join('.')} is created rather than renamed: nobody was at a terminal to say ` +
+			'whether it is a rename, so it was filed as a create',
+	];
 }
 
 /** What boot reads before it converges: the open requests, the chain, and the database's word. */

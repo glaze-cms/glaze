@@ -1,6 +1,14 @@
 export { createTrailId } from './id.ts';
 export { materializeApprovalTables } from './materializer.ts';
-export { changesOf, hasUnclassified } from './requests.ts';
+export { APPROVALS_ROUTE_NAME, createApprovalsRouter } from './router.ts';
+export {
+	changesOf,
+	decisionsOf,
+	descriptionOf,
+	hasUnclassified,
+	statementsOf,
+	unclassifiedOf,
+} from './requests.ts';
 export {
 	APPROVAL_REQUEST_INDEX,
 	APPROVAL_TYPE_INDEX,
@@ -10,6 +18,7 @@ export {
 } from './schema/index.ts';
 export {
 	claimFirstAdmin,
+	findLatestEventForChange,
 	findOpenRequest,
 	findOpenRequests,
 	findRole,
@@ -23,4 +32,4 @@ export type {
 	ApprovalSchema,
 	PrincipalRole,
 } from './schema/index.ts';
-export type { ApprovalDb, ApprovalEventInput, OpenRequest } from './store.ts';
+export type { ApprovalDb, ApprovalEventInput, LatestForChange, OpenRequest } from './store.ts';

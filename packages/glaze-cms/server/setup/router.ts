@@ -10,6 +10,7 @@
 import { Elysia, NotFound, status } from 'elysia';
 
 import { buildApprovalSchema, claimFirstAdmin, hasAdmin } from '../approvals/index.ts';
+import { resolveFreshSession } from '../auth/index.ts';
 import { buildErrorResponse, buildSuccessResponse } from '../responses/index.ts';
 import { isSetupTokenValid, readSetupToken, SETUP_TOKEN_HEADER } from './token.ts';
 
@@ -27,30 +28,6 @@ interface SetupRouterInput {
 	readonly context: GlazeContext;
 	/** The shared Better Auth instance backing the route gate. */
 	readonly auth: SessionProvider;
-}
-
-/** Who is asking: a live account, nobody, or a session Glaze cannot read an account out of. */
-type Claimant =
-	| { readonly kind: 'user'; readonly id: string }
-	| { readonly kind: 'none' }
-	| { readonly kind: 'malformed' };
-
-/**
- * Resolves the signed-in account for the claim, from the session **table** rather than the cookie
- * cache. The shared `{ auth: true }` macro accepts the signed session-data cookie for a few minutes
- * after sign-out, which is fine for reading content and not fine for the one write that makes an
- * admin; so this route asks Better Auth to look the session up.
- *
- * @param auth - The Better Auth instance.
- * @param headers - The request headers (cookie or bearer token).
- * @returns The account; `none` when there is no live session; `malformed` when there is one but it
- *   carries no usable id, which is a server fault rather than the caller's.
- */
-async function resolveClaimant(auth: SessionProvider, headers: Headers): Promise<Claimant> {
-	const result = await auth.api.getSession({ headers, query: { disableCookieCache: true } });
-	if (!result) return { kind: 'none' };
-	const id = (result.user as { id?: unknown } | null)?.id;
-	return typeof id === 'string' && id.length > 0 ? { kind: 'user', id } : { kind: 'malformed' };
 }
 
 /**
@@ -81,7 +58,7 @@ export function createSetupRouter({ context, auth }: SetupRouterInput) {
 				return buildSuccessResponse({ firstAdminNeeded: !sealed });
 			})
 			.post(`${base}/first-admin`, async ({ request }) => {
-				const claimant = await resolveClaimant(auth, request.headers);
+				const claimant = await resolveFreshSession(auth, request.headers);
 				if (claimant.kind === 'none') {
 					return buildErrorResponse(401, 'UNAUTHORIZED', 'Authentication required');
 				}

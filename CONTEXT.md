@@ -103,6 +103,11 @@ _Avoid_: ledger, pending migration, pending request
 One change awaiting a decision. Identified by a `requestId` that groups every event about it.
 _Avoid_: request on its own, which means an HTTP request everywhere else
 
+**Seen**:
+The fingerprint of the counts a person was shown when they decided. An approval carries it; the
+server measures again and refuses when the numbers have moved, so nobody approves 12 rows and
+destroys 40,000.
+
 **Approval event**:
 One recorded thing that happened to a request — requested, approved, rejected, applied, superseded.
 Append-only; current state is derived from the events, never stored beside them.

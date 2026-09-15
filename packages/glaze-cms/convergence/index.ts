@@ -50,6 +50,7 @@ export type {
 	EnvelopeCompute,
 	Hint,
 	LossResolver,
+	RecordedDecision,
 	ResolvedOutcome,
 	Resolver,
 	SnapshotChain,
