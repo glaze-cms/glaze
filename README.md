@@ -152,22 +152,6 @@ bun server.ts
 
 **4. Use it.** Every table becomes a gated REST endpoint under `/api/{table}`.
 
-```sh
-# sign up — returns a session cookie (saved to the jar) AND a bearer token
-curl -X POST localhost:4000/api/auth/sign-up/email -c cookies.txt \
-  -H 'content-type: application/json' \
-  -d '{"email":"ada@example.com","password":"correct-horse-battery","name":"Ada"}'
-
-# the first account to claim it becomes admin; the route refuses everyone once an admin exists
-# (set GLAZE_SETUP_TOKEN before strangers can reach the server, and send it as x-glaze-setup-token)
-curl -X POST localhost:4000/api/setup/first-admin -b cookies.txt
-
-# create + list (cookie or `Authorization: Bearer <token>`)
-curl -X POST localhost:4000/api/posts -b cookies.txt \
-  -H 'content-type: application/json' -d '{"title":"Hello"}'
-curl localhost:4000/api/posts -b cookies.txt
-```
-
 Per entity: `GET /api/posts` (list, `?limit=&offset=`), `POST /api/posts` (create), and — when the
 table has a single-column primary key — `GET|PATCH|DELETE /api/posts/:id`. Every content route requires
 a session; bodies are validated against your schema (TypeBox) and unknown fields are dropped; every
@@ -206,20 +190,6 @@ reports each missing or malformed one with a fix.
 
 `connection` and `schema` are needed by both, so they live once in the config file.
 
-## Architecture
-
-Two seams are resolved once at the composition root and injected inward, so the logic never branches
-on environment:
-
-- **Runtime seam — Bun vs Node.** Each runtime uses its native primitive (`Bun.file`/`Bun.serve`/
-  `bun:sqlite` vs `node:fs`/`@elysia/node`/`node:sqlite`).
-- **Dialect seam — Postgres vs SQLite.** Dialect-correct DDL is delegated to `drizzle-kit`; Glaze
-  reads its typed JSON envelopes and never branches on dialect. The seam also owns transactions:
-  `bun:sqlite`'s `Database.transaction` is synchronous, so Drizzle's `transaction` through it does not
-  roll back; the seam's `queryTransaction` does.
-
-The human decisions — `resolve`, `confirmLoss`, `confirmDrop` — are injected as functions, so the
-engine is testable without a UI and the approvals API is one more caller of the same seams.
 
 ## Development
 
