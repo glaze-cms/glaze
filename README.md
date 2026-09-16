@@ -190,7 +190,6 @@ reports each missing or malformed one with a fix.
 
 `connection` and `schema` are needed by both, so they live once in the config file.
 
-
 ## Development
 
 The gate must be green for any change to be done:
