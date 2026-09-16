@@ -12,7 +12,6 @@ Glaze does not fight your workflow. It adapts to your team.
 
 Glaze is a Bun-native headless CMS built on the shoulders of giants: Drizzle, Elysia, and Better Auth.
 
-
 **Who it's for:**
 
 - **A solo developer.** Schema in plain Drizzle, converged at boot, `audit: false`. Nothing to approve
@@ -63,7 +62,6 @@ exist.
   database, and held only when the measurement finds something. A column drop is held because the
   column holds data, not because it is a drop.
 - **Unclassified** — an operation the classifier does not recognise. Held, and reported as unknown.
-
 
 Design of record: [`specs/design/convergence.md`](./specs/design/convergence.md) and
 [`specs/design/pending-approvals.md`](./specs/design/pending-approvals.md).
@@ -125,7 +123,6 @@ export default defineGlazeConfig({
 	workflow: { audit: false }, // false: answer held changes at the terminal · true: on the admin
 });
 ```
-
 
 **2. Write your schema as a plain Drizzle module — `schema.ts`.**
 
@@ -200,7 +197,6 @@ for Swagger UI). The auth API has its own reference at `/api/auth/reference`.
 See [`.env.example`](./.env.example) for all environment variables. Glaze validates them at boot and
 reports each missing or malformed one with a fix.
 
-
 ## Configuration split
 
 - **`glaze.config.ts`** — the tooling substrate the CLI can load without booting the server:
@@ -266,4 +262,3 @@ is a direction, not a promise:
 - **A declared frontend contract.** The site declares which fields it consumes, so a structural change
   can be answered with "this breaks the article page".
 - **Not planned:** live co-editing, presence, or a large-team permissions matrix.
-
