@@ -16,6 +16,15 @@ export function isProduction(): boolean {
 }
 
 /**
+ * Reports whether the process is running under a test runner (`NODE_ENV === 'test'`).
+ *
+ * @returns `true` under test.
+ */
+export function isTestEnv(): boolean {
+	return process.env['NODE_ENV'] === 'test';
+}
+
+/**
  * Reports whether an environment variable is set to a truthy flag value. Present-but-`0`/`false`/`no`/
  * `off` (and empty) all read as off, so `CI=false` is treated as unset rather than as "in CI".
  *

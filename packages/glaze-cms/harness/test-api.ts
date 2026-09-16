@@ -52,6 +52,11 @@ type NodeTest = {
 
 const isBun = typeof (globalThis as { Bun?: unknown }).Bun !== 'undefined';
 
+// `bun test` sets this automatically; `node --test` does not. Both runtimes load this module before
+// any spec, so pinning it here — rather than in CI or per-spec — keeps `isTestEnv()` (used to gate
+// test-only behavior like disabling the auth rate limiter) true under either runner.
+process.env['NODE_ENV'] ??= 'test';
+
 /**
  * Builds the Node-backed `expect` over `node:assert/strict`.
  *

@@ -15,6 +15,8 @@ import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { openAPI } from 'better-auth/plugins';
 import { bearer } from 'better-auth/plugins/bearer';
 
+import { isEnvFlagEnabled, isTestEnv } from '#utils';
+
 import { resolveAuthBaseUrl } from './base-url.ts';
 import { resolveAuthProvider } from './provider.ts';
 import { buildAuthSchema } from './schema/index.ts';
@@ -55,7 +57,13 @@ export function createAuth(context: GlazeContext) {
 		// routes are a schemaless catch-all in Glaze's content spec, so Better Auth documents them itself.
 		// Gated on the docs toggle so `docs.enabled: false` turns off every docs surface together.
 		plugins: options.docs.enabled ? [bearer(), openAPI()] : [bearer()],
-		rateLimit: { enabled: true },
+		// Off by default under test, on everywhere else. The integration suite drives the handler
+		// directly (`app.handle()`, no bound server), so `./ip.ts` can never resolve a real peer address
+		// and every request in the *process* — across every test file and dialect — falls onto Better
+		// Auth's single process-global fallback bucket, tripping the limiter on suites that legitimately
+		// make more than a handful of auth calls, unrelated to what's under test. The one spec that
+		// exercises the limiter itself opts back in via `GLAZE_TEST_RATE_LIMIT=1`.
+		rateLimit: { enabled: isTestEnv() ? isEnvFlagEnabled('GLAZE_TEST_RATE_LIMIT') : true },
 		// The rate limiter reads the client IP from this header; `./ip.ts` overwrites it with the
 		// trusted peer address so a client cannot spoof its own bucket.
 		advanced: { ipAddress: { ipAddressHeaders: ['x-forwarded-for'] } },

@@ -111,6 +111,10 @@ test("Better Auth's built-in rate limiter returns 429 on repeated sign-ins", asy
 	const handle = await resolveDialect('sqlite').createDatabase({
 		connection: join(directory, 'rl.db'),
 	});
+	// The rest of the suite disables Better Auth's rate limiter (see `./instance.ts`) because every
+	// `app.handle()` call in-process shares its single fallback bucket; this is the one spec that
+	// needs it live, so it opts back in for the duration of the test.
+	process.env['GLAZE_TEST_RATE_LIMIT'] = '1';
 	try {
 		const app = await bootAuthApp(handle, 'sqlite');
 
@@ -130,6 +134,7 @@ test("Better Auth's built-in rate limiter returns 429 on repeated sign-ins", asy
 		// The first attempt is the limiter working, not a blanket block.
 		expect(statuses[0]).toBe(401);
 	} finally {
+		delete process.env['GLAZE_TEST_RATE_LIMIT'];
 		await handle.close();
 		rmSync(directory, { recursive: true, force: true });
 	}

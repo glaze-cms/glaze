@@ -38,7 +38,10 @@ jobs:
         run: bun run format
 
       - name: Test (matrix suite — full matrix, Docker available)
-        run: bun test
+        run: bun run test
+
+      - name: Test (admin — jsdom/testing-library, own bunfig)
+        run: bun run test:admin
 
   # The runtime dimension of the matrix: the SAME specs run under Node via `node --test`
   # (Node's native TypeScript + test runner), exercising the Node side of the runtime seam —
