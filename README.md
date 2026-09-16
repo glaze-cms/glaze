@@ -1,17 +1,23 @@
 # Glaze
 
-**A headless CMS for people and agents working on the same content, together.** Developers change
-the structure in code. Editors change the content in a UI. Agents now do both, on someone's behalf.
-Glaze gives all of them one process: every change is proposed, reviewed, approved and applied the
-same way, whoever made it — and it works the same for one developer as for a team with non-technical
-admins and editors.
+Solo or on a team. Developer or editor. Working with agents, or not. You should be in control and shipping, with a system that protects you from changes you did not mean to make without slowing you down.
+
+A CMS should not have to choose between giving control to developers or editors. It should serve both. Every change—to content or the content model, from code or the admin, by a person or an agent acting for one—goes through the same process, adapted to how you work.
+
+Prototyping or working alone? Change the schema, boot, and it applies. Glaze speaks only when a change would destroy data, asking once at the terminal. Working on a team? The same decision becomes a pending approval that someone answers in the admin, with a reason and on the record.
+
+Whether a change is proposed through the schema or the UI, the content model and database remain in sync.
+
+Glaze does not fight your workflow. It adapts to your team.
+
+Glaze is a Bun-native headless CMS built on the shoulders of giants: Drizzle, Elysia, and Better Auth.
+
 
 **Who it's for:**
 
-- **A solo developer.** Schema in plain Drizzle, converged at boot. Anything that needs a decision is
-  asked at the terminal. Migration files only if you want a history.
-- **A team.** The same decision is filed as a pending approval, shared in the database, and whoever
-  has the `admin` role answers it — with a reason, on the record.
+- **A solo developer.** Schema in plain Drizzle, converged at boot, `audit: false`. Nothing to approve
+  and no files unless you want a history; a destructive change is one question at the terminal.
+- **A team.** The same decision is filed as a pending approval, shared in the database, and answered by someone with the admin role—with a reason, on the record. With migrations enabled, every schema change also produces a committed migration and snapshot, creating a shared, reviewable history.
 - **Non-technical admins and editors.** Approve a change to the content model without reading a
   migration. Edit content through the same process that serves the site. Proposing a structural
   change from the admin — a team with no developer adding a field — is the next design pass, not a
@@ -23,37 +29,23 @@ admins and editors.
 > API, auth, content CRUD, the convergence engine, and a pending-approvals API that holds a change
 > until a person approves it. **The admin screen for approvals and content editing is not built
 > yet** — today Glaze is a content backend with an approval API. See [Status](#status). Not published
-> to npm; install from git. APIs will change before `1.0`.
+> to npm. APIs will change before `1.0`.
+
+## Why another CMS
+
+- **Schemas are just Drizzle.** No proprietary schema format, no parallel config to keep in sync.
+- **Built on Drizzle, Elysia and Better Auth, on Bun.** Glaze does not reinvent the ORM, the HTTP
+  server or auth. Each of those is a project larger and better maintained than a CMS-internal version
+  would be, and one you may already use. What Glaze adds is the layer between them — convergence,
+  approvals, and the admin — and nothing underneath.
+- **Structural change is reviewable by someone who does not write migrations.** Findings are typed
+  codes with row counts, so a screen can translate them.
+- **No hidden pipeline.** Everything Glaze does is explicit and typed. When it refuses, it says why.
+- **One process, on Bun and Elysia.** The API and the admin run in a single process — one port, one
+  artifact — on a runtime and an HTTP framework chosen for speed and low memory, with TypeScript
+  native to both. Node 24 works too, behind a seam.
 
 ---
-
-## The idea
-
-The people who change a CMS do not share a process. A developer changes structure through a
-migration. An editor changes content through a form. An admin approves nothing, because there is
-nothing to approve — the migration ran at deploy, and the form saved on click. Now agents make both
-kinds of change, and they inherit the same absence of review.
-
-Glaze puts one loop under all of it: **propose → review → approve → apply.** A developer, an editor,
-an admin and an agent are four origins on the same pipeline. The loop is the same at every team size;
-what changes is where a decision is answered — the terminal, or the admin screen — and that is one
-setting.
-
-**One model, no DSL.** The content model is your Drizzle schema and nothing else. Developers
-already know Drizzle, so there is no schema language to learn and no second definition of the model
-to keep in sync with the first. The schema file is converged into the database at boot, and the
-admin's forms are derived from what the database then holds — `GET /api/entities` serves that
-descriptor, with anything an open request would drop marked as pending. An admin sees fields and
-entries, not tables and migrations, in a UI built to be obvious to someone who has never opened the
-code. Change the schema file and the admin changes. The reverse is the direction:
-an editor adds a field from the admin, it is filed for approval like any other change, and once
-approved it is written back to the schema file — so code and admin describe the same model whichever
-one you changed. The forward half is built; the write-back is the next design pass.
-
-The loop is what makes the structural side safe. A change to the content model is checked against the
-rows that exist before it applies, and if it would destroy data, the person answering is shown which
-column and how many rows. That is the guarantee: nobody destroys data without being shown what will
-be destroyed. But it is a consequence of the review, not the reason for it.
 
 ## Convergence — the engine
 
@@ -72,31 +64,6 @@ exist.
   column holds data, not because it is a drop.
 - **Unclassified** — an operation the classifier does not recognise. Held, and reported as unknown.
 
-**Destructive changes are measured, not assumed.** Five probes run against the live database before
-anything applies. drizzle-kit's own data-loss check misses cases — verified against rc.4, where the
-low-level `pushSchema` dropped a populated column without a warning:
-
-| Probe                       | Catches                                                   |
-| --------------------------- | --------------------------------------------------------- |
-| `column_has_data`           | dropping a column that still holds values                 |
-| `not_null_existing_nulls`   | adding `NOT NULL` to a column with NULLs                  |
-| `not_null_column_non_empty` | a new `NOT NULL` column, no default, on a non-empty table |
-| `unique_duplicates`         | a new `UNIQUE` where duplicates exist (collation-aware)   |
-| `column_length_overflow`    | narrowing a column below values that exist (Postgres)     |
-
-Each finding carries the affected row count. A probe that cannot determine safety reports
-`could_not_verify`, and the change is treated as unsafe.
-
-**Apply is transactional and independently verified.** Row counts are captured before and after inside
-the transaction; a loss nobody declared rolls the change back. This check is separate from the probes,
-so a gap in one is not a gap in the other.
-
-**A held change becomes a pending approval**, recorded in the database as an append-only event trail
-with the statements, the findings, and a hash of the decisions that produced it. Approving re-verifies
-the change, re-measures the counts, and applies through the same check. If the database changed
-underneath, the request is superseded, not applied. Boot reconciles open requests against the snapshot
-chain and the live database. A developer answers at the terminal; with `workflow.audit: true` the
-question goes to the admin instead.
 
 Design of record: [`specs/design/convergence.md`](./specs/design/convergence.md) and
 [`specs/design/pending-approvals.md`](./specs/design/pending-approvals.md).
@@ -159,8 +126,6 @@ export default defineGlazeConfig({
 });
 ```
 
-`audit` does not decide whether a destructive change is held — it always is. It decides where the
-answer comes from.
 
 **2. Write your schema as a plain Drizzle module — `schema.ts`.**
 
@@ -235,19 +200,6 @@ for Swagger UI). The auth API has its own reference at `/api/auth/reference`.
 See [`.env.example`](./.env.example) for all environment variables. Glaze validates them at boot and
 reports each missing or malformed one with a fix.
 
-## Why another CMS
-
-- **Schemas are just Drizzle.** No proprietary schema format, no parallel config to keep in sync.
-- **Built on Drizzle, Elysia and Better Auth, on Bun.** Glaze does not reinvent the ORM, the HTTP
-  server or auth. Each of those is a project larger and better maintained than a CMS-internal version
-  would be, and one you may already use. What Glaze adds is the layer between them — convergence,
-  approvals, and the admin — and nothing underneath.
-- **Structural change is reviewable by someone who does not write migrations.** Findings are typed
-  codes with row counts, so a screen can translate them.
-- **No hidden pipeline.** Everything Glaze does is explicit and typed. When it refuses, it says why.
-- **One process, on Bun and Elysia.** The API and the admin run in a single process — one port, one
-  artifact — on a runtime and an HTTP framework chosen for speed and low memory, with TypeScript
-  native to both. Node 24 works too, behind a seam.
 
 ## Configuration split
 
@@ -315,6 +267,3 @@ is a direction, not a promise:
   can be answered with "this breaks the article page".
 - **Not planned:** live co-editing, presence, or a large-team permissions matrix.
 
-## License
-
-Intended open-source; license TBD.
